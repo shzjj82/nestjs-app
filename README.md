@@ -16,6 +16,25 @@ docker compose up mosquitto
 npm run start:dev
 ```
 
+## 无 Docker：Mosquitto + PM2
+
+适合 1 核小机器，进程比 Docker 更省内存。
+
+```bash
+# 1. 安装并启动 MQTT（Linux 用 sudo，macOS 直接跑）
+sudo ./scripts/install-mosquitto.sh
+
+# 2. 启动全部服务：gateway + 3 个 usercenter + order
+chmod +x scripts/*.sh
+npm run pm2:start
+
+# 云上只跑网关，微服务在本地：
+MQTT_URL=mqtt://127.0.0.1:1883 PORT=3000 npm run pm2:start:gateway
+```
+
+常用命令：`npm run pm2:status` / `npm run pm2:logs` / `npm run pm2:restart` / `npm run pm2:stop`。  
+开机自启：`pm2 startup && pm2 save`。
+
 ## Docker Compose（推荐）
 
 默认 3 个 usercenter + 1 个 order，请求地址始终是 `http://localhost:3000`：
