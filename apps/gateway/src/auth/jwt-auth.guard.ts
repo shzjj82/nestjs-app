@@ -6,8 +6,11 @@ import { AuthService } from './auth.service';
 export class JwtAuthGuard implements CanActivate {
   constructor(private readonly auth: AuthService) {}
 
-  canActivate(context: ExecutionContext): boolean {
-    this.auth.enforce(['jwt'], context.switchToHttp().getRequest<Request>());
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    await this.auth.enforce(
+      ['jwt'],
+      context.switchToHttp().getRequest<Request>(),
+    );
     return true;
   }
 }

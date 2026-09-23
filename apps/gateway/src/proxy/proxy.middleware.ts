@@ -28,12 +28,28 @@ export class ProxyMiddleware implements NestMiddleware {
     }
 
     try {
-      this.auth.enforce(route.auth, req);
+      const user = await this.auth.enforce(route.auth, req, route.permissions);
       this.logger.log(`${req.method} ${pathname} -> ${route.pattern}`);
       const result = await this.clients.send(
         route.client,
         route.pattern,
-        buildProxyPayload(req, route.params),
+        buildProxyPayload(
+          req,
+          route.params,
+          user
+            ? {
+                token: user.token,
+                userId: user.id,
+                appId: user.appId,
+                username: user.username ?? null,
+                nickname: user.name,
+                role: user.role,
+                roles: user.roles,
+                permissions: user.permissions,
+              }
+            : null,
+          this.auth.bearerToken(req) ?? user?.token,
+        ),
       );
       const code = req.method === 'POST' ? 201 : 200;
       res.status(code).json(ok(unwrapData(result), 'ok', code));

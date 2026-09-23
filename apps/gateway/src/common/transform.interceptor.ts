@@ -16,6 +16,9 @@ export class TransformInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       map((payload: unknown) => {
+        if (res.headersSent) {
+          return payload;
+        }
         if (this.alreadyWrapped(payload)) {
           return payload;
         }

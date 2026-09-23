@@ -1,8 +1,12 @@
 import {
   BadGatewayException,
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
   GatewayTimeoutException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom, TimeoutError } from 'rxjs';
@@ -26,19 +30,35 @@ export class MqttProxy {
     }
 
     const payload = this.asRecord(err);
-    if (payload?.status === 404) {
-      return new NotFoundException(String(payload.message ?? '资源不存在'));
+    const message = String(payload?.message ?? (err instanceof Error ? err.message : '微服务调用失败'));
+    switch (payload?.status) {
+      case 400:
+        return new BadRequestException(message);
+      case 401:
+        return new UnauthorizedException(message);
+      case 403:
+        return new ForbiddenException(message);
+      case 404:
+        return new NotFoundException(message);
+      case 409:
+        return new ConflictException(message);
+      default:
+        return new BadGatewayException(message);
     }
-
-    return new BadGatewayException(
-      String(payload?.message ?? (err instanceof Error ? err.message : '微服务调用失败')),
-    );
   }
 
   private asRecord(err: unknown): { status?: number; message?: string } | null {
-    if (typeof err === 'object' && err !== null) {
-      return err as { status?: number; message?: string };
+    if (typeof err !== 'object' || err === null) {
+      return null;
     }
-    return null;
+    const record = err as {
+      status?: number;
+      message?: string;
+      error?: { status?: number; message?: string };
+    };
+    if (record.error && (record.error.status || record.error.message)) {
+      return record.error;
+    }
+    return record;
   }
 }

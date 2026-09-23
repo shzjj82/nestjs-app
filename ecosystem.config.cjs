@@ -1,6 +1,10 @@
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://127.0.0.1:1883';
 const gatewayPort = process.env.PORT ?? '3000';
 const usercenterReplicas = Number(process.env.USERCENTER_REPLICAS ?? 3);
+const databaseUrl =
+  process.env.DATABASE_URL ??
+  'postgres://nestjs:nestjs@127.0.0.1:5432/nestjs';
+const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
 
 const usercenterApps = Array.from({ length: usercenterReplicas }, (_, index) => {
   const id = index + 1;
@@ -14,6 +18,8 @@ const usercenterApps = Array.from({ length: usercenterReplicas }, (_, index) => 
     env: {
       NODE_ENV: 'production',
       MQTT_URL: mqttUrl,
+      DATABASE_URL: databaseUrl,
+      REDIS_URL: redisUrl,
       INSTANCE_ID: `usercenter-${id}`,
     },
   };
@@ -31,6 +37,8 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         MQTT_URL: mqttUrl,
+        DATABASE_URL: databaseUrl,
+        REDIS_URL: redisUrl,
         PORT: gatewayPort,
       },
     },
@@ -45,6 +53,8 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         MQTT_URL: mqttUrl,
+        DATABASE_URL: databaseUrl,
+        REDIS_URL: redisUrl,
         INSTANCE_ID: 'order-1',
       },
     },

@@ -8,6 +8,8 @@ set -euo pipefail
 #   ./scripts/pm2-start.sh apps         # 只启动 usercenter + order
 # 环境变量：
 #   MQTT_URL=mqtt://127.0.0.1:1883
+#   DATABASE_URL=postgres://nestjs:nestjs@127.0.0.1:5432/nestjs
+#   REDIS_URL=redis://127.0.0.1:6379
 #   PORT=3000
 #   USERCENTER_REPLICAS=3
 
@@ -16,9 +18,11 @@ cd "$ROOT"
 
 SCOPE="${1:-all}"
 MQTT_URL="${MQTT_URL:-mqtt://127.0.0.1:1883}"
+DATABASE_URL="${DATABASE_URL:-postgres://nestjs:nestjs@127.0.0.1:5432/nestjs}"
+REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 PORT="${PORT:-3000}"
 USERCENTER_REPLICAS="${USERCENTER_REPLICAS:-3}"
-export MQTT_URL PORT USERCENTER_REPLICAS
+export MQTT_URL DATABASE_URL REDIS_URL PORT USERCENTER_REPLICAS
 
 if ! command -v node >/dev/null 2>&1; then
   echo "未找到 node，请先安装 Node.js 18+" >&2
@@ -80,6 +84,8 @@ echo
 pm2 status
 echo
 echo "MQTT_URL=${MQTT_URL}"
+echo "DATABASE_URL=${DATABASE_URL}"
+echo "REDIS_URL=${REDIS_URL}"
 echo "网关: http://127.0.0.1:${PORT}"
 echo "查看日志: npm run pm2:logs"
 echo "开机自启: pm2 startup && pm2 save"

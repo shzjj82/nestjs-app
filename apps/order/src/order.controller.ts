@@ -7,8 +7,9 @@ import {
   MQTT_PATTERNS,
   sharePattern,
   USER_CLIENT,
+  unwrapData,
 } from '@app/common';
-import type { CreateOrderDto, User } from '@app/common';
+import type { CreateOrderDto, ServiceEnvelope, User } from '@app/common';
 import { OrderService } from './order.service';
 
 @Controller()
@@ -45,12 +46,15 @@ export class OrderController {
 
   private async assertUserExists(userId: string) {
     try {
-      const user = await lastValueFrom(
+      const raw = await lastValueFrom(
         this.userClient
-          .send<ServiceEnvelope<User>>(MQTT_PATTERNS.USER_FIND_ONE, { id: userId })
+          .send<ServiceEnvelope<User> | User>(MQTT_PATTERNS.USER_FIND_ONE, {
+            id: userId,
+          })
           .pipe(timeout(5000)),
       );
-      if (!user?.data) {
+      const user = unwrapData<User>(raw);
+      if (!user?.id) {
         throw new RpcException({ status: 404, message: `用户 ${userId} 不存在` });
       }
     } catch (err) {

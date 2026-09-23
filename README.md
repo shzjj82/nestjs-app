@@ -2,12 +2,22 @@
 
 对外只暴露 **gateway:3000**。`usercenter` / `order` 通过 MQTT 通信，多个同名实例用 `$share` 共享订阅做负载均衡。
 
+数据层使用 **PostgreSQL**（主库）和 **Redis**（缓存 / 会话），MQTT 用 Mosquitto。三种依赖都支持 **脚本安装** 和 **docker-compose**。
+
+默认连接：
+
+- `DATABASE_URL=postgres://nestjs:nestjs@127.0.0.1:5432/nestjs`
+- `REDIS_URL=redis://127.0.0.1:6379`
+- `MQTT_URL=mqtt://127.0.0.1:1883`
+
+可复制 `.env.example` 为 `.env` 后按需修改。
+
 ## 本地开发
 
-先启动 MQTT broker：
+用 Docker 只起依赖（PostgreSQL + Redis + Mosquitto）：
 
 ```bash
-docker compose up mosquitto
+npm run infra:up
 ```
 
 再启动三个应用：
@@ -16,16 +26,25 @@ docker compose up mosquitto
 npm run start:dev
 ```
 
-## 无 Docker：Mosquitto + PM2
+停止依赖：`npm run infra:down`，看日志：`npm run infra:logs`。
 
-适合 1 核小机器，进程比 Docker 更省内存。
+## 无 Docker：脚本安装 + PM2
+
+适合 1 核小机器，进程比 Docker 更省内存。Linux 用 `sudo`，macOS 直接跑。
 
 ```bash
-# 1. 安装并启动 MQTT（Linux 用 sudo，macOS 直接跑）
+chmod +x scripts/*.sh
+
+# 1. 安装 PostgreSQL + Redis
+sudo ./scripts/install-db.sh
+# 或分别安装：
+# sudo ./scripts/install-postgres.sh
+# sudo ./scripts/install-redis.sh
+
+# 2. 安装并启动 MQTT
 sudo ./scripts/install-mosquitto.sh
 
-# 2. 启动全部服务：gateway + 3 个 usercenter + order
-chmod +x scripts/*.sh
+# 3. 启动全部服务：gateway + 3 个 usercenter + order
 npm run pm2:start
 
 # 云上只跑网关，微服务在本地：
@@ -35,9 +54,16 @@ MQTT_URL=mqtt://127.0.0.1:1883 PORT=3000 npm run pm2:start:gateway
 常用命令：`npm run pm2:status` / `npm run pm2:logs` / `npm run pm2:restart` / `npm run pm2:stop`。  
 开机自启：`pm2 startup && pm2 save`。
 
+脚本默认只监听本机。如需远程连接：
+
+```bash
+sudo PG_BIND=0.0.0.0 ./scripts/install-postgres.sh
+sudo REDIS_BIND=0.0.0.0 ./scripts/install-redis.sh
+```
+
 ## Docker Compose（推荐）
 
-默认 3 个 usercenter + 1 个 order，请求地址始终是 `http://localhost:3000`：
+默认 3 个 usercenter + 1 个 order，并带上 PostgreSQL / Redis / Mosquitto。请求地址始终是 `http://localhost:3000`：
 
 ```bash
 npm run docker:up
@@ -49,28 +75,127 @@ npm run docker:up
 docker compose up --build --scale usercenter=3 --scale order=1
 ```
 
-## 接口
-
-网关默认按 `libs/common/src/gateway-routes.ts` 自动转发。表上可配 `auth`；`override: true` 的接口走手写 Controller。
-
-- `GET /health` — 网关探活
-- `GET /users` / `GET /users/:id` — 通用转发，无需登录
-- `POST /users` — 通用转发，需要 `Authorization: Bearer demo`
-- `GET /orders` / `GET /orders/:id` — 通用转发，无需登录
-- `POST /orders` — 手写覆盖，需要登录，并注入 `operatorId`
-
-演示 Token：`demo`（普通用户）、`demo-admin`（管理员）。
+只起基础设施：
 
 ```bash
-curl -X POST http://localhost:3000/users \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer demo' \
-  -d '{"name":"Carol","email":"carol@example.com"}'
-
-curl -X POST http://localhost:3000/orders \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer demo' \
-  -d '{"userId":"u-1","item":"键盘","amount":199}'
+docker compose up -d postgres redis mosquitto
 ```
 
-预置用户：`u-1`（Alice）、`u-2`（Bob）。响应里的 `instance` 会随命中的副本变化。
+## 用户中心
+
+账号按 **appId** 隔离，同一个用户可以绑定多个应用。登录后下发 **access token**（默认 2 小时）和 **refresh token**（默认 30 天），都存在 **Redis**。网关用 access token 读会话；过期后用 `POST /auth/refresh` 换新的一对，旧 refresh 立即作废。
+
+启动后会种子：
+
+- 应用 `default`（Web）、`wechat`（小程序）
+- 管理员 `admin` / `admin123`（两个应用都已开通，角色 `admin`）
+
+### 注册 / 登录 / 查询
+
+```bash
+# 注册到某个应用
+curl -X POST http://localhost:3000/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"appId":"default","username":"carol","password":"pass123","nickname":"Carol"}'
+
+# 账密登录（username 也可以填手机号）
+curl -X POST http://localhost:3000/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"appId":"default","username":"admin","password":"admin123"}'
+
+# 刷新 Token（旧 refresh 立即作废，返回新的一对）
+curl -X POST http://localhost:3000/auth/refresh \
+  -H 'Content-Type: application/json' \
+  -d '{"refreshToken":"<refreshToken>"}'
+
+# 当前用户
+curl http://localhost:3000/auth/me \
+  -H "Authorization: Bearer <token>"
+
+# 查询用户（需要 user.query）
+curl 'http://localhost:3000/users?appId=default&keyword=carol' \
+  -H "Authorization: Bearer <token>"
+```
+
+### 微信小程序登录
+
+客户端 `wx.login()` 拿到 `code` 后：
+
+```bash
+curl -X POST http://localhost:3000/auth/wechat \
+  -H 'Content-Type: application/json' \
+  -d '{"appId":"wechat","code":"wx-login-code","nickname":"小程序用户"}'
+```
+
+服务端用该应用配置的 `wechatAppId` / `wechatSecret` 调 `jscode2session`。同一 `unionid` 会自动绑到已有账号，从而一个账号开通多个 appId。本地可设 `WECHAT_MOCK=1`，此时 `code` 会映射成 `mock-${code}`，不必连微信。
+
+### 权限与角色组
+
+功能点按 appId 维护，角色组勾选功能点。管理员拥有全部功能点。
+
+```bash
+# 功能点列表
+curl 'http://localhost:3000/permissions?appId=default' \
+  -H "Authorization: Bearer <token>"
+
+# 角色组勾选功能点
+curl -X PUT http://localhost:3000/roles/<roleId>/permissions \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"permissionIds":["...","..."]}'
+
+# Excel 导出（功能点 + 角色勾选两个 sheet）
+curl -L 'http://localhost:3000/permissions/export?appId=default' \
+  -H "Authorization: Bearer <token>" \
+  -o permissions.xlsx
+
+# Excel 导入
+curl -X POST 'http://localhost:3000/permissions/import?appId=default' \
+  -H "Authorization: Bearer <token>" \
+  -F file=@permissions.xlsx
+```
+
+Excel「功能点」表头：`模块 / 功能编码 / 功能名称 / 描述 / 排序`。  
+「角色勾选」表头：`功能编码 / 功能名称 / <角色编码>...`，单元格填 `是` / `否`。
+
+把已有账号开通到另一个应用：
+
+```bash
+curl -X POST http://localhost:3000/users/<userId>/apps \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"appId":"wechat","roleCodes":["user"]}'
+```
+
+## 接口
+
+网关默认按 `libs/common/src/gateway-routes.ts` 自动转发。表上可配 `auth`、`permissions`；`override: true` 的接口走手写 Controller。
+
+- `POST /auth/register` / `POST /auth/login` / `POST /auth/wechat` / `POST /auth/refresh` — 公开
+- `GET /auth/me` — 需要登录
+- `POST /auth/logout` — 可带 access Token，或 body 里只传 `refreshToken`
+- `GET /users` / `GET /users/:id` — `user.query`
+- `POST /users` / `PATCH /users/:id` / `POST /users/:id/apps` / `PUT /users/:id/roles` — 对应用户权限
+- `GET|POST|PATCH /apps` — `app.manage`
+- `GET|POST|PATCH|DELETE /roles` 、 `PUT /roles/:id/permissions` — `role.manage`
+- `GET|POST|PATCH|DELETE /permissions` — `permission.manage`
+- `GET /permissions/export` / `POST /permissions/import` — Excel，手写覆盖
+- `GET /orders` / `GET /orders/:id` — 无需登录
+- `POST /orders` — 需要登录，并注入 `operatorId`
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:3000/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"appId":"default","username":"admin","password":"admin123"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["token"])')
+
+curl -X POST http://localhost:3000/users \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"appId":"default","username":"carol","password":"pass123","nickname":"Carol"}'
+
+curl -X POST http://localhost:3000/orders \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"userId":"<userId>","item":"键盘","amount":199}'
+```

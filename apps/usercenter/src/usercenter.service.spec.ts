@@ -1,9 +1,8 @@
 import { UsercenterService } from './usercenter.service';
 
 describe('UsercenterService', () => {
-  it('returns seeded users', () => {
+  it('returns health', () => {
     const service = new UsercenterService();
-    const result = service.findAll();
-    expect(result.map((user) => user.id)).toEqual(['u-1', 'u-2']);}
+    expect(service.health()).toEqual({ status: 'ok' });
   });
 });
