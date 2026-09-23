@@ -1,0 +1,52 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./docker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  gateway:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        APP_NAME: gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      MQTT_URL: mqtt://mosquitto:1883
+      MQTT_TIMEOUT_MS: 5000
+    depends_on:
+      - mosquitto
+
+  usercenter:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        APP_NAME: usercenter
+    restart: unless-stopped
+    environment:
+      MQTT_URL: mqtt://mosquitto:1883
+    depends_on:
+      - mosquitto
+
+  order:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        APP_NAME: order
+    restart: unless-stopped
+    environment:
+      MQTT_URL: mqtt://mosquitto:1883
+    depends_on:
+      - mosquitto
+
+# 默认按 3 个 usercenter + 1 个 order 扩容。
+# 只对外暴露 gateway:3000，内部实例通过 MQTT 共享订阅做负载均衡。
+# 扩缩容：docker compose up --build --scale usercenter=3 --scale order=1
