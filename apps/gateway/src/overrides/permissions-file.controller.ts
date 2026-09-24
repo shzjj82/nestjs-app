@@ -4,7 +4,6 @@ import {
   ForbiddenException,
   Get,
   Post,
-  Query,
   Res,
   UploadedFile,
   UseGuards,
@@ -29,28 +28,15 @@ export class PermissionsFileController {
 
   @Get('export')
   @UseGuards(JwtAuthGuard)
-  async export(
-    @Query('appId') appId: string,
-    @CurrentUser() user: GatewayUser,
-    @Res() res: Response,
-  ) {
-    if (!appId?.trim()) {
-      throw new BadRequestException('appId 必填');
-    }
-    if (
-      !this.auth.hasAnyPermission(user, [PERMISSIONS.PERMISSION_EXPORT])
-    ) {
+  async export(@CurrentUser() user: GatewayUser, @Res() res: Response) {
+    if (!this.auth.hasAnyPermission(user, [PERMISSIONS.PERMISSION_EXPORT])) {
       throw new ForbiddenException('缺少权限: permission.export');
     }
     const file = unwrapData<{
       filename: string;
       mime: string;
       base64: string;
-    }>(
-      await this.clients.send(USER_CLIENT, MQTT_PATTERNS.PERMISSION_EXPORT, {
-        appId: appId.trim(),
-      }),
-    );
+    }>(await this.clients.send(USER_CLIENT, MQTT_PATTERNS.PERMISSION_EXPORT, {}));
     const buffer = Buffer.from(file.base64, 'base64');
     res.setHeader('Content-Type', file.mime);
     res.setHeader(
@@ -64,24 +50,16 @@ export class PermissionsFileController {
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async import(
-    @Query('appId') queryAppId: string,
     @UploadedFile() file: Express.Multer.File | undefined,
     @CurrentUser() user: GatewayUser,
   ) {
-    const appId = queryAppId?.trim();
-    if (!appId) {
-      throw new BadRequestException('appId 必填，放在 query: ?appId=');
-    }
-    if (
-      !this.auth.hasAnyPermission(user, [PERMISSIONS.PERMISSION_IMPORT])
-    ) {
+    if (!this.auth.hasAnyPermission(user, [PERMISSIONS.PERMISSION_IMPORT])) {
       throw new ForbiddenException('缺少权限: permission.import');
     }
     if (!file?.buffer?.length) {
       throw new BadRequestException('请上传 Excel 文件，字段名 file');
     }
     return this.clients.send(USER_CLIENT, MQTT_PATTERNS.PERMISSION_IMPORT, {
-      appId,
       base64: file.buffer.toString('base64'),
     });
   }

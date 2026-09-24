@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 用 PM2 管理本仓库进程，不依赖 Docker。
+# 默认先用 Docker 拉起 postgres / redis / mosquitto，再用 PM2 跑业务进程。
 # 用法：
 #   ./scripts/pm2-start.sh              # 启动全部（gateway + usercenter x3 + order）
-#   ./scripts/pm2-start.sh gateway      # 只启动网关（云上只放 MQTT + gateway 时用）
+#   ./scripts/pm2-start.sh gateway      # 只启动网关
 #   ./scripts/pm2-start.sh apps         # 只启动 usercenter + order
+#   SKIP_INFRA=1 ./scripts/pm2-start.sh # 跳过 Docker，使用本机已有数据库
 # 环境变量：
 #   MQTT_URL=mqtt://127.0.0.1:1883
 #   DATABASE_URL=postgres://nestjs:nestjs@127.0.0.1:5432/nestjs
@@ -23,6 +24,16 @@ REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 PORT="${PORT:-3000}"
 USERCENTER_REPLICAS="${USERCENTER_REPLICAS:-3}"
 export MQTT_URL DATABASE_URL REDIS_URL PORT USERCENTER_REPLICAS
+
+if [[ "${SKIP_INFRA:-0}" != "1" ]]; then
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "未找到 docker。若数据库已在本机运行，使用 SKIP_INFRA=1 $0" >&2
+    exit 1
+  fi
+  echo "启动 Docker 依赖：postgres / redis / mosquitto"
+  docker compose up -d postgres redis mosquitto
+  docker compose up --wait postgres redis mosquitto
+fi
 
 if ! command -v node >/dev/null 2>&1; then
   echo "未找到 node，请先安装 Node.js 18+" >&2

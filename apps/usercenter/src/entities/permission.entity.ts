@@ -1,17 +1,14 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('uc_permissions')
-@Index(['appId', 'code'], { unique: true })
 export class PermissionEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'app_id', type: 'varchar', length: 64 })
-  appId: string;
-
   @Column({ type: 'varchar', length: 64, default: '默认' })
   module: string;
 
+  @Index({ unique: true })
   @Column({ type: 'varchar', length: 64 })
   code: string;
 

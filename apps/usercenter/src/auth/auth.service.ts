@@ -4,11 +4,14 @@ import { compare } from 'bcrypt';
 import { TokenStore } from '@app/common';
 import type { AuthResult, AuthSession, User } from '@app/common';
 import { Repository } from 'typeorm';
-import { AppsService } from '../apps/apps.service';
+import { ClientsService } from '../apps/clients.service';
+import type { ClientEntity, IdentityProvider } from '../entities';
 import { UserIdentityEntity } from '../entities';
 import { RbacService } from '../rbac/rbac.service';
-import { optionalString, requiredString, rpcFail } from '../rpc';
+import { clientCodeOf, optionalString, requiredString, rpcFail } from '../rpc';
+import { normalizePhone } from '../users/account-merge';
 import { UsersService } from '../users/users.service';
+import { AlipayClient } from './alipay.client';
 import { WechatClient } from './wechat.client';
 
 @Injectable()
@@ -17,16 +20,14 @@ export class AuthService {
     @InjectRepository(UserIdentityEntity)
     private readonly identities: Repository<UserIdentityEntity>,
     private readonly users: UsersService,
-    private readonly apps: AppsService,
+    private readonly clients: ClientsService,
     private readonly rbac: RbacService,
     private readonly tokens: TokenStore,
     private readonly wechatClient: WechatClient,
+    private readonly alipayClient: AlipayClient,
   ) {}
 
   async register(payload: Record<string, unknown>): Promise<AuthResult> {
-    const app = await this.apps.requireByAppId(
-      requiredString(payload.appId, 'appId'),
-    );
     const username = requiredString(payload.username, 'username');
     const password = requiredString(payload.password, 'password');
     if (username.length < 2 || username.length > 32) {
@@ -36,11 +37,12 @@ export class AuthService {
       rpcFail(400, '密码长度需为 6-64');
     }
     await this.users.assertUsernameFree(username);
-    const phone = optionalString(payload.phone);
+    const rawPhone = optionalString(payload.phone);
+    const phone = rawPhone ? normalizePhone(rawPhone) : undefined;
     if (phone) {
-      const taken = await this.users.findByUsernameOrPhone(phone);
+      const taken = await this.users.findByPhone(phone);
       if (taken) {
-        rpcFail(409, '手机号已被占用');
+        rpcFail(409, '手机号已被占用，请登录后绑定以合并账号');
       }
     }
     const user = await this.users.createUser({
@@ -50,15 +52,11 @@ export class AuthService {
       phone,
       email: optionalString(payload.email),
     });
-    await this.users.bindApp(user.id, app);
-    await this.users.assignRoleCodes(user.id, app.appId, ['user']);
-    return this.issue(user.id, app.appId);
+    await this.users.assignRoleCodes(user.id, ['user']);
+    return this.issue(user.id, this.loginAppCode(payload));
   }
 
   async login(payload: Record<string, unknown>): Promise<AuthResult> {
-    const app = await this.apps.requireByAppId(
-      requiredString(payload.appId, 'appId'),
-    );
     const username = requiredString(payload.username, 'username');
     const password = requiredString(payload.password, 'password');
     const user = await this.users.findByUsernameOrPhone(username);
@@ -72,82 +70,70 @@ export class AuthService {
     if (user.status !== 1) {
       rpcFail(403, '账号已停用');
     }
-    if (!(await this.users.isBound(user.id, app.id))) {
-      rpcFail(403, '该账号未开通此应用');
-    }
-    return this.issue(user.id, app.appId);
+    return this.issue(user.id, this.loginAppCode(payload));
   }
 
   async loginByWechat(payload: Record<string, unknown>): Promise<AuthResult> {
-    const app = await this.apps.requireByAppId(
-      requiredString(payload.appId, 'appId'),
-    );
+    const client = await this.requireClient(payload, 'wechat_mp');
     const code = requiredString(payload.code, 'code');
-    if (!app.wechatAppId || !app.wechatSecret) {
+    if (!client.wechatAppId || !client.wechatSecret) {
       if (process.env.WECHAT_MOCK !== '1') {
-        rpcFail(400, `应用 ${app.appId} 未配置微信小程序`);
+        rpcFail(400, `接入端 ${client.appCode} 未配置微信 appId / appSecret`);
       }
     }
     const session = await this.wechatClient.code2session(
-      app.wechatAppId ?? 'mock-app',
-      app.wechatSecret ?? 'mock-secret',
+      client.wechatAppId || client.appCode,
+      client.wechatSecret || 'mock-secret',
       code,
     );
-
-    let identity = await this.identities.findOne({
-      where: { appPk: app.id, provider: 'wechat_mp', openid: session.openid },
+    return this.loginByIdentity({
+      client,
+      provider: 'wechat_mp',
+      identifier: session.openid,
+      unionid: session.unionid,
+      nickname: optionalString(payload.nickname) ?? '微信用户',
+      avatar: optionalString(payload.avatar),
+      phone: optionalString(payload.phone),
     });
-    if (!identity && session.unionid) {
-      const byUnion = await this.identities.findOne({
-        where: { provider: 'wechat_mp', unionid: session.unionid },
-      });
-      if (byUnion) {
-        await this.users.bindApp(byUnion.userId, app);
-        identity = await this.identities.save(
-          this.identities.create({
-            userId: byUnion.userId,
-            appPk: app.id,
-            provider: 'wechat_mp',
-            openid: session.openid,
-            unionid: session.unionid,
-          }),
-        );
+  }
+
+  async loginByAlipay(payload: Record<string, unknown>): Promise<AuthResult> {
+    const client = await this.requireClient(payload, 'alipay_mp');
+    const code = requiredString(payload.code, 'code');
+    if (!client.alipayAppId || !client.alipayPrivateKey) {
+      if (process.env.ALIPAY_MOCK !== '1' && process.env.WECHAT_MOCK !== '1') {
+        rpcFail(400, `接入端 ${client.appCode} 未配置支付宝 appId / 私钥`);
       }
     }
+    const session = await this.alipayClient.code2session(
+      client.alipayAppId || client.appCode,
+      client.alipayPrivateKey || 'mock-secret',
+      code,
+    );
+    return this.loginByIdentity({
+      client,
+      provider: 'alipay_mp',
+      identifier: session.userId,
+      nickname: optionalString(payload.nickname) ?? '支付宝用户',
+      avatar: optionalString(payload.avatar),
+      phone: optionalString(payload.phone),
+    });
+  }
 
-    if (!identity) {
-      const user = await this.users.createUser({
-        username: null,
-        nickname: optionalString(payload.nickname) ?? '微信用户',
-        avatar: optionalString(payload.avatar) ?? null,
-      });
-      await this.users.bindApp(user.id, app);
-      await this.users.assignRoleCodes(user.id, app.appId, ['user']);
-      identity = await this.identities.save(
-        this.identities.create({
-          userId: user.id,
-          appPk: app.id,
-          provider: 'wechat_mp',
-          openid: session.openid,
-          unionid: session.unionid ?? null,
-        }),
-      );
-    } else {
-      await this.users.bindApp(identity.userId, app);
+  async bindPhone(payload: Record<string, unknown>): Promise<AuthResult> {
+    const session = payload._session as AuthSession | undefined;
+    if (!session?.userId) {
+      rpcFail(401, '未登录');
     }
-
-    const user = await this.users.findEntity(identity.userId);
-    if (user.status !== 1) {
+    const phone = requiredString(payload.phone, 'phone');
+    const bound = await this.users.bindPhone(session.userId, phone);
+    if (bound.mergedFromUserId) {
+      await this.tokens.revokeAll(bound.mergedFromUserId);
+    }
+    if (bound.user.status !== 1) {
       rpcFail(403, '账号已停用');
     }
-    if (optionalString(payload.nickname) || optionalString(payload.avatar)) {
-      await this.users.update({
-        id: user.id,
-        nickname: optionalString(payload.nickname),
-        avatar: optionalString(payload.avatar),
-      });
-    }
-    return this.issue(identity.userId, app.appId);
+    return this.issue(bound.user.id, session.appId);
   }
 
   async refresh(payload: Record<string, unknown>): Promise<AuthResult> {
@@ -161,13 +147,8 @@ export class AuthService {
       await this.tokens.revokeByRefresh(refreshToken);
       rpcFail(403, '账号已停用');
     }
-    const app = await this.apps.requireByAppId(record.appId);
-    if (!(await this.users.isBound(user.id, app.id))) {
-      await this.tokens.revokeByRefresh(refreshToken);
-      rpcFail(403, '该账号未开通此应用');
-    }
     await this.tokens.revokeByRefresh(refreshToken);
-    return this.issue(user.id, app.appId);
+    return this.issue(user.id, record.appId);
   }
 
   async logout(payload: Record<string, unknown>) {
@@ -187,15 +168,106 @@ export class AuthService {
       rpcFail(401, '未登录');
     }
     const user = await this.users.findEntity(session.userId);
-    const publicUser = await this.users.toPublic(user, session.appId);
-    const rbac = await this.rbac.loadUserRbac(user.id, session.appId);
+    const publicUser = await this.users.toPublic(user);
+    const rbac = await this.rbac.loadUserRbac(user.id);
     return { ...publicUser, ...rbac };
+  }
+
+  private async loginByIdentity(input: {
+    client: ClientEntity;
+    provider: IdentityProvider;
+    identifier: string;
+    unionid?: string;
+    nickname: string;
+    avatar?: string;
+    phone?: string;
+  }): Promise<AuthResult> {
+    let identity = await this.identities.findOne({
+      where: {
+        clientId: input.client.id,
+        provider: input.provider,
+        identifier: input.identifier,
+      },
+    });
+
+    if (!identity && input.unionid) {
+      const byUnion = await this.identities.findOne({
+        where: { provider: input.provider, unionid: input.unionid },
+      });
+      if (byUnion) {
+        identity = await this.identities.save(
+          this.identities.create({
+            userId: byUnion.userId,
+            clientId: input.client.id,
+            provider: input.provider,
+            identifier: input.identifier,
+            unionid: input.unionid,
+          }),
+        );
+      }
+    }
+
+    if (!identity) {
+      const user = await this.users.createUser({
+        username: null,
+        nickname: input.nickname,
+        avatar: input.avatar ?? null,
+      });
+      await this.users.assignRoleCodes(user.id, ['user']);
+      identity = await this.identities.save(
+        this.identities.create({
+          userId: user.id,
+          clientId: input.client.id,
+          provider: input.provider,
+          identifier: input.identifier,
+          unionid: input.unionid ?? null,
+        }),
+      );
+    }
+
+    let userId = identity.userId;
+    if (input.phone) {
+      const bound = await this.users.bindPhone(userId, input.phone);
+      if (bound.mergedFromUserId) {
+        await this.tokens.revokeAll(bound.mergedFromUserId);
+      }
+      userId = bound.user.id;
+    }
+
+    const user = await this.users.findEntity(userId);
+    if (user.status !== 1) {
+      rpcFail(403, '账号已停用');
+    }
+    if (input.nickname || input.avatar) {
+      await this.users.update({
+        id: user.id,
+        nickname: input.nickname,
+        avatar: input.avatar,
+      });
+    }
+    return this.issue(userId, input.client.appCode);
+  }
+
+  private async requireClient(
+    payload: Record<string, unknown>,
+    type: ClientEntity['type'],
+  ) {
+    const appCode = clientCodeOf(payload, true);
+    const client = await this.clients.requireByAppCode(appCode);
+    if (client.type !== type) {
+      rpcFail(400, `接入端 ${client.appCode} 不是 ${type}`);
+    }
+    return client;
+  }
+
+  private loginAppCode(payload: Record<string, unknown>) {
+    return clientCodeOf(payload) ?? 'web';
   }
 
   private async issue(userId: string, appId: string): Promise<AuthResult> {
     const user = await this.users.findEntity(userId);
-    const rbac = await this.rbac.loadUserRbac(userId, appId);
-    const publicUser = await this.users.toPublic(user, appId);
+    const rbac = await this.rbac.loadUserRbac(userId);
+    const publicUser = await this.users.toPublic(user);
     const pair = await this.tokens.issue({
       userId,
       appId,

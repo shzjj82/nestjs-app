@@ -30,11 +30,6 @@ export class UsersController {
     return this.users.update(payload);
   }
 
-  @MessagePattern(ucPattern(MQTT_PATTERNS.USER_BIND_APP))
-  bindApp(payload: Record<string, unknown>) {
-    return this.users.bindAppByPayload(payload);
-  }
-
   @MessagePattern(ucPattern(MQTT_PATTERNS.USER_ASSIGN_ROLES))
   assignRoles(payload: Record<string, unknown>) {
     return this.users.assignRolesByPayload(payload);

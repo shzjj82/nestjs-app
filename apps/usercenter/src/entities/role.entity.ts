@@ -1,14 +1,11 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('uc_roles')
-@Index(['appId', 'code'], { unique: true })
 export class RoleEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'app_id', type: 'varchar', length: 64 })
-  appId: string;
-
+  @Index({ unique: true })
   @Column({ type: 'varchar', length: 64 })
   code: string;
 

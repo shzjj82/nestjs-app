@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { PermissionInfo, RoleInfo } from '@app/common';
 import { In, Repository } from 'typeorm';
-import { AppsService } from '../apps/apps.service';
 import {
   PermissionEntity,
   RoleEntity,
@@ -22,19 +21,17 @@ export class RbacService {
     private readonly rolePermissions: Repository<RolePermissionEntity>,
     @InjectRepository(UserRoleEntity)
     private readonly userRoles: Repository<UserRoleEntity>,
-    private readonly apps: AppsService,
   ) {}
 
-  async loadUserRbac(userId: string, appId: string) {
+  async loadUserRbac(userId: string) {
     const rows = await this.userRoles.find({
       where: { userId },
       relations: ['role'],
     });
-    const appRoles = rows.filter((row) => row.role.appId === appId);
-    const roles = appRoles.map((row) => row.role.code);
-    const roleIds = appRoles.map((row) => row.roleId);
+    const roleCodes = rows.map((row) => row.role.code);
+    const roleIds = rows.map((row) => row.roleId);
     if (!roleIds.length) {
-      return { roles, permissions: [] as string[] };
+      return { roles: roleCodes, permissions: [] as string[] };
     }
     const links = await this.rolePermissions.find({
       where: { roleId: In(roleIds) },
@@ -43,31 +40,23 @@ export class RbacService {
     const permissions = [
       ...new Set(links.map((link) => link.permission.code)),
     ];
-    return { roles, permissions };
+    return { roles: roleCodes, permissions };
   }
 
-  async listRoles(payload: Record<string, unknown>): Promise<RoleInfo[]> {
-    const appId = requiredString(payload.appId, 'appId');
-    await this.apps.requireByAppId(appId);
-    const roles = await this.roles.find({
-      where: { appId },
-      order: { createdAt: 'ASC' },
-    });
+  async listRoles(_payload: Record<string, unknown> = {}): Promise<RoleInfo[]> {
+    const roles = await this.roles.find({ order: { createdAt: 'ASC' } });
     return Promise.all(roles.map((role) => this.toRoleInfo(role)));
   }
 
   async createRole(payload: Record<string, unknown>): Promise<RoleInfo> {
-    const appId = requiredString(payload.appId, 'appId');
-    await this.apps.requireByAppId(appId);
     const code = requiredString(payload.code, 'code');
     const name = requiredString(payload.name, 'name');
-    const exists = await this.roles.findOne({ where: { appId, code } });
+    const exists = await this.roles.findOne({ where: { code } });
     if (exists) {
       rpcFail(409, `角色 ${code} 已存在`);
     }
     const saved = await this.roles.save(
       this.roles.create({
-        appId,
         code,
         name,
         description: optionalString(payload.description) ?? null,
@@ -103,36 +92,28 @@ export class RbacService {
       ? payload.permissionIds.map(String)
       : [];
     const permissions = permissionIds.length
-      ? await this.permissions.find({
-          where: { id: In(permissionIds), appId: role.appId },
-        })
+      ? await this.permissions.find({ where: { id: In(permissionIds) } })
       : [];
     await this.replaceRolePermissions(role.id, permissions);
     return this.toRoleInfo(role);
   }
 
-  async listPermissions(payload: Record<string, unknown>): Promise<PermissionInfo[]> {
-    const appId = requiredString(payload.appId, 'appId');
-    await this.apps.requireByAppId(appId);
+  async listPermissions(_payload: Record<string, unknown> = {}): Promise<PermissionInfo[]> {
     const rows = await this.permissions.find({
-      where: { appId },
       order: { sort: 'ASC', createdAt: 'ASC' },
     });
     return rows.map((row) => this.toPermissionInfo(row));
   }
 
   async createPermission(payload: Record<string, unknown>): Promise<PermissionInfo> {
-    const appId = requiredString(payload.appId, 'appId');
-    await this.apps.requireByAppId(appId);
     const code = requiredString(payload.code, 'code');
     const name = requiredString(payload.name, 'name');
-    const exists = await this.permissions.findOne({ where: { appId, code } });
+    const exists = await this.permissions.findOne({ where: { code } });
     if (exists) {
       rpcFail(409, `功能点 ${code} 已存在`);
     }
     const saved = await this.permissions.save(
       this.permissions.create({
-        appId,
         code,
         name,
         module: optionalString(payload.module) ?? '默认',
@@ -140,7 +121,7 @@ export class RbacService {
         sort: Number(payload.sort) || 0,
       }),
     );
-    await this.grantToAdminRole(appId, saved);
+    await this.grantToAdminRole(saved);
     return this.toPermissionInfo(saved);
   }
 
@@ -167,20 +148,19 @@ export class RbacService {
     return { ok: true };
   }
 
-  async listRolesByApp(appId: string): Promise<RoleEntity[]> {
-    return this.roles.find({ where: { appId }, order: { createdAt: 'ASC' } });
+  async listAllRoles(): Promise<RoleEntity[]> {
+    return this.roles.find({ order: { createdAt: 'ASC' } });
   }
 
-  async listPermissionsByApp(appId: string): Promise<PermissionEntity[]> {
+  async listAllPermissions(): Promise<PermissionEntity[]> {
     return this.permissions.find({
-      where: { appId },
       order: { sort: 'ASC', createdAt: 'ASC' },
     });
   }
 
-  async listRolePermissionMatrix(appId: string) {
-    const roles = await this.listRolesByApp(appId);
-    const permissions = await this.listPermissionsByApp(appId);
+  async listRolePermissionMatrix() {
+    const roles = await this.listAllRoles();
+    const permissions = await this.listAllPermissions();
     const links = roles.length
       ? await this.rolePermissions.find({
           where: { roleId: In(roles.map((role) => role.id)) },
@@ -193,7 +173,6 @@ export class RbacService {
   }
 
   async upsertPermissions(
-    appId: string,
     rows: Array<{
       module: string;
       code: string;
@@ -204,28 +183,25 @@ export class RbacService {
   ) {
     const saved: PermissionEntity[] = [];
     for (const row of rows) {
-      let item = await this.permissions.findOne({
-        where: { appId, code: row.code },
-      });
+      let item = await this.permissions.findOne({ where: { code: row.code } });
       if (!item) {
-        item = this.permissions.create({ appId, code: row.code });
+        item = this.permissions.create({ code: row.code });
       }
       item.module = row.module;
       item.name = row.name;
       item.description = row.description;
       item.sort = row.sort;
       saved.push(await this.permissions.save(item));
-      await this.grantToAdminRole(appId, item);
+      await this.grantToAdminRole(item);
     }
     return saved;
   }
 
   async applyRoleChecks(
-    appId: string,
     checks: Array<{ permissionCode: string; roleCode: string; enabled: boolean }>,
   ) {
-    const roles = await this.listRolesByApp(appId);
-    const permissions = await this.listPermissionsByApp(appId);
+    const roles = await this.listAllRoles();
+    const permissions = await this.listAllPermissions();
     const roleMap = new Map(
       roles.flatMap((role) => [
         [role.code, role] as const,
@@ -274,8 +250,8 @@ export class RbacService {
     );
   }
 
-  private async grantToAdminRole(appId: string, permission: PermissionEntity) {
-    const admin = await this.roles.findOne({ where: { appId, code: 'admin' } });
+  private async grantToAdminRole(permission: PermissionEntity) {
+    const admin = await this.roles.findOne({ where: { code: 'admin' } });
     if (!admin) {
       return;
     }
@@ -316,7 +292,6 @@ export class RbacService {
     });
     return {
       id: role.id,
-      appId: role.appId,
       code: role.code,
       name: role.name,
       description: role.description,
@@ -328,7 +303,6 @@ export class RbacService {
   toPermissionInfo(item: PermissionEntity): PermissionInfo {
     return {
       id: item.id,
-      appId: item.appId,
       module: item.module,
       code: item.code,
       name: item.name,

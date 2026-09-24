@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AppsModule } from '../apps/apps.module';
 import { SharedModule } from '../common/shared.module';
 import {
   PermissionEntity,
@@ -21,7 +20,6 @@ import { RolesController } from './roles.controller';
       RolePermissionEntity,
       UserRoleEntity,
     ]),
-    AppsModule,
     SharedModule,
   ],
   controllers: [RolesController, PermissionsController],

@@ -19,12 +19,12 @@ export function refreshTokenKey(token: string): string {
   return `auth:refresh:${token}`;
 }
 
-export function userTokenSetKey(userId: string, appId: string): string {
-  return `auth:user:${userId}:${appId}`;
+export function userTokenSetKey(userId: string): string {
+  return `auth:user:${userId}`;
 }
 
-export function userRefreshSetKey(userId: string, appId: string): string {
-  return `auth:user-refresh:${userId}:${appId}`;
+export function userRefreshSetKey(userId: string): string {
+  return `auth:user-refresh:${userId}`;
 }
 
 export function tokenTtlSeconds(): number {

@@ -7,6 +7,7 @@ import { UserIdentityEntity } from '../entities';
 import { RbacModule } from '../rbac/rbac.module';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
+import { AlipayClient } from './alipay.client';
 import { AuthService } from './auth.service';
 import { WechatClient } from './wechat.client';
 
@@ -20,7 +21,7 @@ import { WechatClient } from './wechat.client';
     SharedModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, WechatClient],
+  providers: [AuthService, WechatClient, AlipayClient],
   exports: [AuthService],
 })
 export class AuthModule {}

@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { Workbook } from 'exceljs';
-import { AppsService } from '../apps/apps.service';
 import { requiredString, rpcFail } from '../rpc';
 import { parsePermissionWorkbook } from './excel.parser';
 import { RbacService } from './rbac.service';
@@ -9,16 +8,11 @@ const PERMISSION_HEADERS = ['模块', '功能编码', '功能名称', '描述', 
 
 @Injectable()
 export class ExcelService {
-  constructor(
-    private readonly apps: AppsService,
-    private readonly rbac: RbacService,
-  ) {}
+  constructor(private readonly rbac: RbacService) {}
 
-  async exportWorkbook(payload: Record<string, unknown>) {
-    const appId = requiredString(payload.appId, 'appId');
-    await this.apps.requireByAppId(appId);
+  async exportWorkbook(_payload: Record<string, unknown> = {}) {
     const { roles, permissions, checked } =
-      await this.rbac.listRolePermissionMatrix(appId);
+      await this.rbac.listRolePermissionMatrix();
 
     const workbook = new Workbook();
     const sheet = workbook.addWorksheet('功能点');
@@ -47,24 +41,22 @@ export class ExcelService {
 
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
     return {
-      filename: `permissions-${appId}.xlsx`,
+      filename: 'permissions.xlsx',
       mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       base64: buffer.toString('base64'),
     };
   }
 
   async importWorkbook(payload: Record<string, unknown>) {
-    const appId = requiredString(payload.appId, 'appId');
-    await this.apps.requireByAppId(appId);
     const base64 = requiredString(payload.base64, 'file');
     const buffer = Buffer.from(base64, 'base64');
     const parsed = await parsePermissionWorkbook(buffer);
     if (!parsed.permissions.length) {
       rpcFail(400, 'Excel 中没有有效的功能点');
     }
-    await this.rbac.upsertPermissions(appId, parsed.permissions);
+    await this.rbac.upsertPermissions(parsed.permissions);
     if (parsed.checks.length) {
-      await this.rbac.applyRoleChecks(appId, parsed.checks);
+      await this.rbac.applyRoleChecks(parsed.checks);
     }
     return {
       imported: parsed.permissions.length,

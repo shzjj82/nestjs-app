@@ -39,8 +39,8 @@ export class TokenStore {
       userId: session.userId,
       appId: session.appId,
     };
-    const accessSet = userTokenSetKey(session.userId, session.appId);
-    const refreshSet = userRefreshSetKey(session.userId, session.appId);
+    const accessSet = userTokenSetKey(session.userId);
+    const refreshSet = userRefreshSetKey(session.userId);
     await this.redis
       .multi()
       .set(tokenKey(accessToken), JSON.stringify(full), 'EX', expiresIn)
@@ -71,13 +71,10 @@ export class TokenStore {
     const session = await this.get(token);
     const pipeline = this.redis.multi().del(tokenKey(token));
     if (session) {
-      pipeline.srem(userTokenSetKey(session.userId, session.appId), token);
+      pipeline.srem(userTokenSetKey(session.userId), token);
       if (session.refreshToken) {
         pipeline.del(refreshTokenKey(session.refreshToken));
-        pipeline.srem(
-          userRefreshSetKey(session.userId, session.appId),
-          session.refreshToken,
-        );
+        pipeline.srem(userRefreshSetKey(session.userId), session.refreshToken);
       }
     }
     await pipeline.exec();
@@ -88,16 +85,16 @@ export class TokenStore {
     const pipeline = this.redis.multi().del(refreshTokenKey(refreshToken));
     if (record) {
       pipeline.del(tokenKey(record.accessToken));
-      pipeline.srem(userTokenSetKey(record.userId, record.appId), record.accessToken);
-      pipeline.srem(userRefreshSetKey(record.userId, record.appId), refreshToken);
+      pipeline.srem(userTokenSetKey(record.userId), record.accessToken);
+      pipeline.srem(userRefreshSetKey(record.userId), refreshToken);
     }
     await pipeline.exec();
     return record;
   }
 
-  async revokeAll(userId: string, appId: string): Promise<void> {
-    const accessSet = userTokenSetKey(userId, appId);
-    const refreshSet = userRefreshSetKey(userId, appId);
+  async revokeAll(userId: string): Promise<void> {
+    const accessSet = userTokenSetKey(userId);
+    const refreshSet = userRefreshSetKey(userId);
     const [accessTokens, refreshTokens] = await Promise.all([
       this.redis.smembers(accessSet),
       this.redis.smembers(refreshSet),

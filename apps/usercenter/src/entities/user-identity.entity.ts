@@ -6,11 +6,13 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { AppEntity } from './app.entity';
+import { ClientEntity } from './client.entity';
 import { UserEntity } from './user.entity';
 
-@Entity('uc_user_identities')
-@Index(['appPk', 'provider', 'openid'], { unique: true })
+export type IdentityProvider = 'wechat_mp' | 'alipay_mp';
+
+@Entity('uc_identities')
+@Index(['clientId', 'provider', 'identifier'], { unique: true })
 export class UserIdentityEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -18,14 +20,14 @@ export class UserIdentityEntity {
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
-  @Column({ name: 'app_pk', type: 'uuid' })
-  appPk: string;
+  @Column({ name: 'client_id', type: 'uuid' })
+  clientId: string;
 
-  @Column({ type: 'varchar', length: 32, default: 'wechat_mp' })
-  provider: string;
+  @Column({ type: 'varchar', length: 32 })
+  provider: IdentityProvider;
 
-  @Column({ type: 'varchar', length: 64 })
-  openid: string;
+  @Column({ type: 'varchar', length: 128 })
+  identifier: string;
 
   @Column({ type: 'varchar', length: 64, nullable: true })
   unionid: string | null;
@@ -34,9 +36,9 @@ export class UserIdentityEntity {
   @JoinColumn({ name: 'user_id' })
   user: UserEntity;
 
-  @ManyToOne(() => AppEntity, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'app_pk' })
-  app: AppEntity;
+  @ManyToOne(() => ClientEntity, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'client_id' })
+  client: ClientEntity;
 
   @Column({ name: 'created_at', type: 'timestamptz', default: () => 'now()' })
   createdAt: Date;

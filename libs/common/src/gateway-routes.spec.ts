@@ -8,15 +8,26 @@ describe('matchRoute', () => {
     expect(route?.auth).toBeUndefined();
   });
 
-  it('matches wechat login route', () => {
-    const route = matchRoute('POST', '/auth/wechat');
-    expect(route?.pattern).toBe(MQTT_PATTERNS.AUTH_WECHAT);
+  it('matches wechat and alipay login routes', () => {
+    expect(matchRoute('POST', '/auth/wechat')?.pattern).toBe(
+      MQTT_PATTERNS.AUTH_WECHAT,
+    );
+    expect(matchRoute('POST', '/auth/alipay')?.pattern).toBe(
+      MQTT_PATTERNS.AUTH_ALIPAY,
+    );
   });
 
-  it('matches public refresh route', () => {
-    const route = matchRoute('POST', '/auth/refresh');
-    expect(route?.pattern).toBe(MQTT_PATTERNS.AUTH_REFRESH);
-    expect(route?.auth).toBeUndefined();
+  it('protects bind-phone with jwt', () => {
+    const route = matchRoute('POST', '/auth/bind-phone');
+    expect(route?.pattern).toBe(MQTT_PATTERNS.AUTH_BIND_PHONE);
+    expect(route?.auth).toEqual(['jwt']);
+  });
+
+  it('protects client admin routes', () => {
+    const route = matchRoute('POST', '/clients');
+    expect(route?.pattern).toBe(MQTT_PATTERNS.CLIENT_CREATE);
+    expect(route?.auth).toEqual(['jwt']);
+    expect(route?.permissions).toEqual(['client.manage']);
   });
 
   it('extracts path params', () => {

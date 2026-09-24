@@ -12,7 +12,8 @@ export interface User {
   email: string | null;
   avatar: string | null;
   status: number;
-  appIds: string[];
+  appCodes?: string[];
+  providers?: string[];
   roles?: string[];
   permissions?: string[];
 }
@@ -25,12 +26,12 @@ export interface Order {
 }
 
 export interface CreateUserDto {
-  appId: string;
   username: string;
   password: string;
   nickname?: string;
   phone?: string;
   email?: string;
+  roleCodes?: string[];
 }
 
 export interface CreateOrderDto {
@@ -43,7 +44,7 @@ export interface PageQuery {
   page?: number;
   pageSize?: number;
   keyword?: string;
-  appId?: string;
+  appCode?: string;
 }
 
 export interface PageResult<T> {
@@ -78,39 +79,54 @@ export interface RefreshTokenDto {
 }
 
 export interface RegisterDto {
-  appId: string;
   username: string;
   password: string;
   nickname?: string;
   phone?: string;
   email?: string;
+  appCode?: string;
 }
 
 export interface LoginDto {
-  appId: string;
   username: string;
   password: string;
+  appCode?: string;
 }
 
 export interface WechatLoginDto {
-  appId: string;
+  appCode: string;
   code: string;
   nickname?: string;
   avatar?: string;
+  phone?: string;
 }
 
-export interface AppInfo {
+export interface AlipayLoginDto {
+  appCode: string;
+  code: string;
+  nickname?: string;
+  avatar?: string;
+  phone?: string;
+}
+
+export interface BindPhoneDto {
+  phone: string;
+}
+
+export interface ClientInfo {
   id: string;
-  appId: string;
+  appCode: string;
   name: string;
-  type: 'web' | 'miniprogram' | 'app';
+  type: 'web' | 'wechat_mp' | 'alipay_mp' | 'app';
   wechatAppId: string | null;
+  hasWechatSecret: boolean;
+  alipayAppId: string | null;
+  hasAlipayPrivateKey: boolean;
   status: number;
 }
 
 export interface RoleInfo {
   id: string;
-  appId: string;
   code: string;
   name: string;
   description: string | null;
@@ -120,7 +136,6 @@ export interface RoleInfo {
 
 export interface PermissionInfo {
   id: string;
-  appId: string;
   module: string;
   code: string;
   name: string;
@@ -132,9 +147,8 @@ export const PERMISSIONS = {
   USER_QUERY: 'user.query',
   USER_CREATE: 'user.create',
   USER_UPDATE: 'user.update',
-  USER_BIND_APP: 'user.bindApp',
   USER_ASSIGN_ROLE: 'user.assignRole',
-  APP_MANAGE: 'app.manage',
+  CLIENT_MANAGE: 'client.manage',
   ROLE_MANAGE: 'role.manage',
   PERMISSION_MANAGE: 'permission.manage',
   PERMISSION_IMPORT: 'permission.import',

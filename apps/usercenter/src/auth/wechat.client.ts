@@ -18,7 +18,7 @@ export class WechatClient {
   ): Promise<WechatSession> {
     if (process.env.WECHAT_MOCK === '1') {
       return {
-        openid: `mock-${code}`,
+        openid: `mock-${wechatAppId}-${code}`,
         unionid: `union-${code}`,
       };
     }

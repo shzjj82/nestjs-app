@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AppsModule } from '../apps/apps.module';
 import { SharedModule } from '../common/shared.module';
 import {
   RoleEntity,
-  UserAppEntity,
   UserEntity,
+  UserIdentityEntity,
   UserRoleEntity,
 } from '../entities';
 import { UsersController } from './users.controller';
@@ -15,11 +14,10 @@ import { UsersService } from './users.service';
   imports: [
     TypeOrmModule.forFeature([
       UserEntity,
-      UserAppEntity,
+      UserIdentityEntity,
       UserRoleEntity,
       RoleEntity,
     ]),
-    AppsModule,
     SharedModule,
   ],
   controllers: [UsersController],

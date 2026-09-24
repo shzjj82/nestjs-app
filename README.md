@@ -83,25 +83,28 @@ docker compose up -d postgres redis mosquitto
 
 ## 用户中心
 
-账号按 **appId** 隔离，同一个用户可以绑定多个应用。登录后下发 **access token**（默认 2 小时）和 **refresh token**（默认 30 天），都存在 **Redis**。网关用 access token 读会话；过期后用 `POST /auth/refresh` 换新的一对，旧 refresh 立即作废。
+一个人一行 `uc_users`。账密、多套微信小程序、多套支付宝小程序都是登录身份，挂在这个人上。**权限只有一套**，角色不按小程序拆。手机号全局唯一，用来合并账号。登录后下发 **access token**（默认 2 小时）和 **refresh token**（默认 30 天），存在 **Redis**；过期用 `POST /auth/refresh` 换新的一对。
 
 启动后会种子：
 
-- 应用 `default`（Web）、`wechat`（小程序）
-- 管理员 `admin` / `admin123`（两个应用都已开通，角色 `admin`）
+- 接入端 `web`（账密）、`wechat`、`alipay`
+- 全局角色 `admin` / `user`
+- 管理员 `admin` / `admin123`
+
+若从旧表升级，角色/功能点曾按 appId 拆过，启动可能因唯一约束失败，需要清掉 `uc_roles` / `uc_permissions` 旧数据或重建库。
 
 ### 注册 / 登录 / 查询
 
 ```bash
-# 注册到某个应用
+# 注册（phone 可选；已被占用则 409，请登录后绑定以合并）
 curl -X POST http://localhost:3000/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"appId":"default","username":"carol","password":"pass123","nickname":"Carol"}'
+  -d '{"username":"carol","password":"pass123","nickname":"Carol","phone":"13800138000"}'
 
 # 账密登录（username 也可以填手机号）
 curl -X POST http://localhost:3000/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"appId":"default","username":"admin","password":"admin123"}'
+  -d '{"username":"admin","password":"admin123"}'
 
 # 刷新 Token（旧 refresh 立即作废，返回新的一对）
 curl -X POST http://localhost:3000/auth/refresh \
@@ -113,29 +116,60 @@ curl http://localhost:3000/auth/me \
   -H "Authorization: Bearer <token>"
 
 # 查询用户（需要 user.query）
-curl 'http://localhost:3000/users?appId=default&keyword=carol' \
+curl 'http://localhost:3000/users?keyword=carol' \
   -H "Authorization: Bearer <token>"
 ```
 
-### 微信小程序登录
+### 接入端（多套微信 / 支付宝小程序）
 
-客户端 `wx.login()` 拿到 `code` 后：
+`uc_clients` 用你们的 **appCode** 区分接入端。微信小程序存微信 appId / appSecret，支付宝小程序存支付宝 appId / 私钥。列表不回传密钥。
 
 ```bash
+# 微信登录
 curl -X POST http://localhost:3000/auth/wechat \
   -H 'Content-Type: application/json' \
-  -d '{"appId":"wechat","code":"wx-login-code","nickname":"小程序用户"}'
+  -d '{"appCode":"wechat","code":"wx-login-code","nickname":"小程序用户","phone":"13800138000"}'
+
+# 支付宝登录
+curl -X POST http://localhost:3000/auth/alipay \
+  -H 'Content-Type: application/json' \
+  -d '{"appCode":"alipay","code":"alipay-auth-code","nickname":"支付宝用户"}'
+
+# 再登记一套微信 / 支付宝（需要 client.manage）
+curl -X POST http://localhost:3000/clients \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"appCode":"mall","name":"商城小程序","type":"wechat_mp","wechatAppId":"wxaaaaaaaa","wechatSecret":"secret-a"}'
+
+curl -X POST http://localhost:3000/clients \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"appCode":"pay","name":"支付小程序","type":"alipay_mp","alipayAppId":"2021xxxx","alipayPrivateKey":"-----BEGIN PRIVATE KEY-----"}'
 ```
 
-服务端用该应用配置的 `wechatAppId` / `wechatSecret` 调 `jscode2session`。同一 `unionid` 会自动绑到已有账号，从而一个账号开通多个 appId。本地可设 `WECHAT_MOCK=1`，此时 `code` 会映射成 `mock-${code}`，不必连微信。
+本地 `WECHAT_MOCK=1` 时，微信 `code` 映射成 `mock-${wechatAppId}-${code}`；支付宝在 `ALIPAY_MOCK=1` 或同样开了 `WECHAT_MOCK` 时走 mock。登录可带 `phone`，与账密账号合并。
+
+### 绑定手机号（合并账号）
+
+不发短信。手机号必须是 11 位大陆号（支持 `+86` / `86` 前缀）。同一手机号只能属于一个用户。
+
+```bash
+# 登录后绑定；若手机号已被另一账号占用，则合并并返回合并后用户的新 token
+curl -X POST http://localhost:3000/auth/bind-phone \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"phone":"13800138000"}'
+```
+
+合并规则：优先保留有密码+用户名的账号，分数相同则保留更早创建的。第三方身份和全局角色都会迁到保留侧。
 
 ### 权限与角色组
 
-功能点按 appId 维护，角色组勾选功能点。管理员拥有全部功能点。
+全站只有一套功能点和角色。管理员拥有全部功能点。
 
 ```bash
 # 功能点列表
-curl 'http://localhost:3000/permissions?appId=default' \
+curl http://localhost:3000/permissions \
   -H "Authorization: Bearer <token>"
 
 # 角色组勾选功能点
@@ -145,12 +179,12 @@ curl -X PUT http://localhost:3000/roles/<roleId>/permissions \
   -d '{"permissionIds":["...","..."]}'
 
 # Excel 导出（功能点 + 角色勾选两个 sheet）
-curl -L 'http://localhost:3000/permissions/export?appId=default' \
+curl -L http://localhost:3000/permissions/export \
   -H "Authorization: Bearer <token>" \
   -o permissions.xlsx
 
 # Excel 导入
-curl -X POST 'http://localhost:3000/permissions/import?appId=default' \
+curl -X POST http://localhost:3000/permissions/import \
   -H "Authorization: Bearer <token>" \
   -F file=@permissions.xlsx
 ```
@@ -158,25 +192,16 @@ curl -X POST 'http://localhost:3000/permissions/import?appId=default' \
 Excel「功能点」表头：`模块 / 功能编码 / 功能名称 / 描述 / 排序`。  
 「角色勾选」表头：`功能编码 / 功能名称 / <角色编码>...`，单元格填 `是` / `否`。
 
-把已有账号开通到另一个应用：
-
-```bash
-curl -X POST http://localhost:3000/users/<userId>/apps \
-  -H "Authorization: Bearer <token>" \
-  -H 'Content-Type: application/json' \
-  -d '{"appId":"wechat","roleCodes":["user"]}'
-```
-
 ## 接口
 
 网关默认按 `libs/common/src/gateway-routes.ts` 自动转发。表上可配 `auth`、`permissions`；`override: true` 的接口走手写 Controller。
 
-- `POST /auth/register` / `POST /auth/login` / `POST /auth/wechat` / `POST /auth/refresh` — 公开
+- `POST /auth/register` / `POST /auth/login` / `POST /auth/wechat` / `POST /auth/alipay` / `POST /auth/refresh` — 公开
 - `GET /auth/me` — 需要登录
 - `POST /auth/logout` — 可带 access Token，或 body 里只传 `refreshToken`
 - `GET /users` / `GET /users/:id` — `user.query`
-- `POST /users` / `PATCH /users/:id` / `POST /users/:id/apps` / `PUT /users/:id/roles` — 对应用户权限
-- `GET|POST|PATCH /apps` — `app.manage`
+- `POST /users` / `PATCH /users/:id` / `PUT /users/:id/roles` — 对应用户权限
+- `GET|POST|PATCH /clients` — `client.manage`，Web / 微信 / 支付宝接入端
 - `GET|POST|PATCH|DELETE /roles` 、 `PUT /roles/:id/permissions` — `role.manage`
 - `GET|POST|PATCH|DELETE /permissions` — `permission.manage`
 - `GET /permissions/export` / `POST /permissions/import` — Excel，手写覆盖
@@ -186,13 +211,13 @@ curl -X POST http://localhost:3000/users/<userId>/apps \
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:3000/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"appId":"default","username":"admin","password":"admin123"}' \
+  -d '{"username":"admin","password":"admin123"}' \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["token"])')
 
 curl -X POST http://localhost:3000/users \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"appId":"default","username":"carol","password":"pass123","nickname":"Carol"}'
+  -d '{"username":"carol","password":"pass123","nickname":"Carol"}'
 
 curl -X POST http://localhost:3000/orders \
   -H "Authorization: Bearer $TOKEN" \

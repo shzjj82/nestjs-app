@@ -25,6 +25,11 @@ export class AuthController {
     return this.auth.loginByWechat(payload);
   }
 
+  @MessagePattern(ucPattern(MQTT_PATTERNS.AUTH_ALIPAY))
+  alipay(payload: Record<string, unknown>) {
+    return this.auth.loginByAlipay(payload);
+  }
+
   @MessagePattern(ucPattern(MQTT_PATTERNS.AUTH_REFRESH))
   refresh(payload: Record<string, unknown>) {
     return this.auth.refresh(payload);
@@ -38,5 +43,10 @@ export class AuthController {
   @MessagePattern(ucPattern(MQTT_PATTERNS.AUTH_ME))
   me(payload: Record<string, unknown>) {
     return this.auth.me(payload);
+  }
+
+  @MessagePattern(ucPattern(MQTT_PATTERNS.AUTH_BIND_PHONE))
+  bindPhone(payload: Record<string, unknown>) {
+    return this.auth.bindPhone(payload);
   }
 }

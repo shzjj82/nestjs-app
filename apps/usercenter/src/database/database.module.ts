@@ -11,6 +11,7 @@ import { SeedService } from './seed.service';
       url: databaseUrl(),
       entities: USERCENTER_ENTITIES,
       synchronize: process.env.TYPEORM_SYNC !== 'false',
+      dropSchema: process.env.TYPEORM_DROP === '1',
       logging: process.env.TYPEORM_LOGGING === 'true',
     }),
     TypeOrmModule.forFeature(USERCENTER_ENTITIES),
