@@ -3,6 +3,12 @@ x-app-env: &app-env
   DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/${POSTGRES_DB:-nestjs}
   DOCS_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/docs
   REDIS_URL: redis://redis:6379
+  UPLOAD_API_KEY: ${UPLOAD_API_KEY:-dev-upload-key}
+  UPLOAD_DRIVER: ${UPLOAD_DRIVER:-minio}
+  MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+  MINIO_BUCKET: ${MINIO_BUCKET:-uploads}
 
 x-app-depends: &app-depends
   mosquitto:
@@ -109,11 +115,40 @@ services:
       DOCS_SERVICE_KEY: ${DOCS_SERVICE_KEY:-dev-docs-key}
     depends_on: *app-depends
 
+  upload:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        APP_NAME: upload
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      INSTANCE_ID: upload-1
+    depends_on:
+      <<: *app-depends
+      minio:
+        condition: service_started
+
+  minio:
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+
 volumes:
   postgres_data:
   redis_data:
+  minio_data:
 
 # 只起依赖：docker compose up -d postgres redis mosquitto
-# 默认按 3 个 usercenter + 1 个 order + 1 个 docs 扩容。
+# 默认按 3 个 usercenter + 1 个 order + 1 个 docs + 1 个 upload 扩容。
 # 只对外暴露 gateway:3000，内部实例通过 MQTT 共享订阅做负载均衡。
-# 扩缩容：docker compose up --build --scale usercenter=3 --scale order=1 --scale docs=1
+# 扩缩容：docker compose up --build --scale usercenter=3 --scale order=1 --scale docs=1 --scale upload=1

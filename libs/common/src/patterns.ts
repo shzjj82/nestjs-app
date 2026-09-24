@@ -1,11 +1,13 @@
 export const USER_CLIENT = 'USER_CLIENT';
 export const ORDER_CLIENT = 'ORDER_CLIENT';
 export const DOCS_CLIENT = 'DOCS_CLIENT';
+export const UPLOAD_CLIENT = 'UPLOAD_CLIENT';
 
 export const MQTT_GROUPS = {
   USERCENTER: 'usercenter',
   ORDER: 'order',
   DOCS: 'docs',
+  UPLOAD: 'upload',
 } as const;
 
 export const MQTT_PATTERNS = {
@@ -58,6 +60,11 @@ export const MQTT_PATTERNS = {
   DOC_CATEGORY_DELETE: 'doc.category.delete',
   DOC_SITE_GET: 'doc.site.get',
   DOC_SITE_SAVE: 'doc.site.save',
+  UPLOAD_HEALTH: 'upload.health',
+  UPLOAD_PUT: 'upload.put',
+  UPLOAD_ENQUEUE: 'upload.enqueue',
+  UPLOAD_JOB: 'upload.job',
+  UPLOAD_DELETE: 'upload.delete',
 } as const;
 
 export function sharePattern(group: string, pattern: string): string {

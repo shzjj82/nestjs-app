@@ -46,6 +46,15 @@
         "tsConfigPath": "apps/docs/tsconfig.app.json"
       }
     },
+    "upload": {
+      "type": "application",
+      "root": "apps/upload",
+      "entryFile": "main",
+      "sourceRoot": "apps/upload/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/upload/tsconfig.app.json"
+      }
+    },
     "common": {
       "type": "library",
       "root": "libs/common",

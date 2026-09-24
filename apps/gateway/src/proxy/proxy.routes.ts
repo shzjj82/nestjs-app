@@ -19,6 +19,8 @@ export const PROXY_HTTP_PATHS: RouteInfo[] = [
   { path: 'permissions/{*path}', method: RequestMethod.ALL },
   { path: 'orders', method: RequestMethod.ALL },
   { path: 'orders/{*path}', method: RequestMethod.ALL },
+  { path: 'upload', method: RequestMethod.ALL },
+  { path: 'upload/{*path}', method: RequestMethod.ALL },
 ];
 
 export function requestPathname(req: { path?: string; url: string }): string {

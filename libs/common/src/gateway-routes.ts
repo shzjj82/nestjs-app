@@ -1,7 +1,7 @@
-import { DOCS_CLIENT, MQTT_PATTERNS, ORDER_CLIENT, USER_CLIENT } from './patterns';
+import { DOCS_CLIENT, MQTT_PATTERNS, ORDER_CLIENT, UPLOAD_CLIENT, USER_CLIENT } from './patterns';
 import { PERMISSIONS } from './types';
 
-export type GatewayAuth = 'jwt' | 'admin' | 'docs-key';
+export type GatewayAuth = 'jwt' | 'admin' | 'docs-key' | 'upload-key';
 export type GatewayHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface GatewayRoute {
@@ -295,6 +295,42 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
     client: DOCS_CLIENT,
     pattern: MQTT_PATTERNS.DOC_SITE_SAVE,
     auth: ['jwt', 'docs-key'],
+  },
+  {
+    method: 'POST',
+    path: '/upload',
+    client: UPLOAD_CLIENT,
+    pattern: MQTT_PATTERNS.UPLOAD_PUT,
+    auth: ['jwt', 'upload-key'],
+    override: true,
+  },
+  {
+    method: 'POST',
+    path: '/upload/async',
+    client: UPLOAD_CLIENT,
+    pattern: MQTT_PATTERNS.UPLOAD_ENQUEUE,
+    auth: ['jwt', 'upload-key'],
+    override: true,
+  },
+  {
+    method: 'GET',
+    path: '/upload/health',
+    client: UPLOAD_CLIENT,
+    pattern: MQTT_PATTERNS.UPLOAD_HEALTH,
+  },
+  {
+    method: 'GET',
+    path: '/upload/jobs/:id',
+    client: UPLOAD_CLIENT,
+    pattern: MQTT_PATTERNS.UPLOAD_JOB,
+    auth: ['jwt', 'upload-key'],
+  },
+  {
+    method: 'DELETE',
+    path: '/upload/objects',
+    client: UPLOAD_CLIENT,
+    pattern: MQTT_PATTERNS.UPLOAD_DELETE,
+    auth: ['jwt', 'upload-key'],
   },
 ];
 

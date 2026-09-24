@@ -6,6 +6,7 @@ import {
   GatewayTimeoutException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
@@ -42,6 +43,8 @@ export class MqttProxy {
         return new NotFoundException(message);
       case 409:
         return new ConflictException(message);
+      case 503:
+        return new ServiceUnavailableException(message);
       default:
         return new BadGatewayException(message);
     }

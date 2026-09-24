@@ -4,7 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { GatewayAuth } from '@app/common';
-import { docsServiceKey, TokenStore } from '@app/common';
+import { docsServiceKey, TokenStore, uploadServiceKey } from '@app/common';
 import type { Request } from 'express';
 import type { GatewayUser } from './auth.types';
 
@@ -25,6 +25,19 @@ export class AuthService {
   hasValidDocsKey(req: Request): boolean {
     const key = this.docsKey(req);
     return !!key && key === docsServiceKey();
+  }
+
+  uploadKey(req: Request): string | null {
+    const header = req.headers['x-upload-key'];
+    if (typeof header === 'string' && header.trim()) {
+      return header.trim();
+    }
+    return null;
+  }
+
+  hasValidUploadKey(req: Request): boolean {
+    const key = this.uploadKey(req);
+    return !!key && key === uploadServiceKey();
   }
 
   bearerToken(req: Request): string | null {
@@ -63,11 +76,15 @@ export class AuthService {
     permissions?: string[],
   ): Promise<GatewayUser | null> {
     const allowDocsKey = auth?.includes('docs-key');
+    const allowUploadKey = auth?.includes('upload-key');
+    const allowServiceKey = allowDocsKey || allowUploadKey;
     const allowJwt =
       auth?.includes('jwt') || auth?.includes('admin') || !!permissions?.length;
+    const keyOk =
+      (allowDocsKey && this.hasValidDocsKey(req)) ||
+      (allowUploadKey && this.hasValidUploadKey(req));
 
-    if (allowDocsKey && allowJwt) {
-      const keyOk = this.hasValidDocsKey(req);
+    if (allowServiceKey && allowJwt) {
       const user = await this.fromRequest(req);
       if (keyOk) {
         if (user) {
@@ -85,12 +102,25 @@ export class AuthService {
         (req as AuthedRequest).user = user;
         return user;
       }
-      throw new UnauthorizedException('需要登录或文档服务密钥：x-docs-key');
+      throw new UnauthorizedException(
+        allowUploadKey
+          ? '需要登录或上传服务密钥：x-upload-key'
+          : '需要登录或文档服务密钥：x-docs-key',
+      );
     }
 
     if (allowDocsKey) {
       if (!this.hasValidDocsKey(req)) {
         throw new UnauthorizedException('需要文档服务密钥：x-docs-key');
+      }
+      if (!allowJwt) {
+        return null;
+      }
+    }
+
+    if (allowUploadKey) {
+      if (!this.hasValidUploadKey(req)) {
+        throw new UnauthorizedException('需要上传服务密钥：x-upload-key');
       }
       if (!allowJwt) {
         return null;

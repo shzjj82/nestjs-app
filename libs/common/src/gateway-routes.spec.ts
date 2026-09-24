@@ -74,4 +74,20 @@ describe('matchRoute', () => {
     expect(matchRoute('GET', '/docs/categories')?.auth).toBeUndefined();
     expect(matchRoute('PUT', '/docs/site')?.auth).toEqual(['jwt', 'docs-key']);
   });
+
+  it('protects upload writes with upload-key and marks file posts as override', () => {
+    expect(matchRoute('POST', '/upload')?.override).toBe(true);
+    expect(matchRoute('POST', '/upload')?.auth).toEqual(['jwt', 'upload-key']);
+    expect(matchRoute('POST', '/upload/async')?.pattern).toBe(
+      MQTT_PATTERNS.UPLOAD_ENQUEUE,
+    );
+    expect(matchRoute('GET', '/upload/health')?.auth).toBeUndefined();
+    expect(matchRoute('GET', '/upload/jobs/job-1')?.params).toEqual({
+      id: 'job-1',
+    });
+    expect(matchRoute('DELETE', '/upload/objects')?.auth).toEqual([
+      'jwt',
+      'upload-key',
+    ]);
+  });
 });
