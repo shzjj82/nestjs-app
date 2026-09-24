@@ -56,4 +56,22 @@ describe('matchRoute', () => {
   it('returns null for unknown paths', () => {
     expect(matchRoute('GET', '/unknown')).toBeNull();
   });
+
+  it('exposes public docs list and protects writes with docs-key', () => {
+    expect(matchRoute('GET', '/docs/posts')?.auth).toBeUndefined();
+    expect(matchRoute('GET', '/docs/posts/hello-slug')?.pattern).toBe(
+      MQTT_PATTERNS.DOC_POST_FIND_SLUG,
+    );
+    expect(matchRoute('POST', '/docs/posts')?.auth).toEqual(['jwt', 'docs-key']);
+    expect(matchRoute('GET', '/docs/posts/workspace/specials')?.auth).toEqual([
+      'jwt',
+      'docs-key',
+    ]);
+    expect(matchRoute('GET', '/docs/documents')?.pattern).toBe(
+      MQTT_PATTERNS.DOC_POST_FIND_ALL,
+    );
+    expect(matchRoute('POST', '/docs/documents')?.auth).toEqual(['jwt', 'docs-key']);
+    expect(matchRoute('GET', '/docs/categories')?.auth).toBeUndefined();
+    expect(matchRoute('PUT', '/docs/site')?.auth).toEqual(['jwt', 'docs-key']);
+  });
 });

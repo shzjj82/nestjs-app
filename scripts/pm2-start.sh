@@ -3,9 +3,9 @@ set -euo pipefail
 
 # 默认先用 Docker 拉起 postgres / redis / mosquitto，再用 PM2 跑业务进程。
 # 用法：
-#   ./scripts/pm2-start.sh              # 启动全部（gateway + usercenter x3 + order）
+#   ./scripts/pm2-start.sh              # 启动全部（gateway + usercenter x3 + order + docs）
 #   ./scripts/pm2-start.sh gateway      # 只启动网关
-#   ./scripts/pm2-start.sh apps         # 只启动 usercenter + order
+#   ./scripts/pm2-start.sh apps         # 只启动 usercenter + order + docs
 #   SKIP_INFRA=1 ./scripts/pm2-start.sh # 跳过 Docker，使用本机已有数据库
 # 环境变量：
 #   MQTT_URL=mqtt://127.0.0.1:1883
@@ -65,6 +65,7 @@ if [[ "${need_build}" -eq 1 ]]; then
   if [[ "${SCOPE}" != "gateway" ]]; then
     npx nest build usercenter
     npx nest build order
+    npx nest build docs
   fi
 fi
 
@@ -79,7 +80,7 @@ case "${SCOPE}" in
     only="$(node -e "
       const n = Number(process.env.USERCENTER_REPLICAS || 3);
       const list = Array.from({ length: n }, (_, i) => 'usercenter-' + (i + 1));
-      list.push('order');
+      list.push('order', 'docs');
       process.stdout.write(list.join(','));
     ")"
     pm2 start ecosystem.config.cjs --only "${only}"

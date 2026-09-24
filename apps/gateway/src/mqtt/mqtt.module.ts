@@ -1,6 +1,7 @@
 import { Inject, Module, OnModuleInit } from '@nestjs/common';
 import { ClientProxy, ClientsModule } from '@nestjs/microservices';
 import {
+  DOCS_CLIENT,
   mqttClientOptions,
   ORDER_CLIENT,
   USER_CLIENT,
@@ -19,6 +20,10 @@ import { MqttProxy } from './mqtt.proxy';
         name: ORDER_CLIENT,
         ...mqttClientOptions('gateway-order'),
       },
+      {
+        name: DOCS_CLIENT,
+        ...mqttClientOptions('gateway-docs'),
+      },
     ]),
   ],
   providers: [MqttProxy, ClientHub],
@@ -28,9 +33,14 @@ export class MqttModule implements OnModuleInit {
   constructor(
     @Inject(USER_CLIENT) private readonly userClient: ClientProxy,
     @Inject(ORDER_CLIENT) private readonly orderClient: ClientProxy,
+    @Inject(DOCS_CLIENT) private readonly docsClient: ClientProxy,
   ) {}
 
   async onModuleInit() {
-    await Promise.all([this.userClient.connect(), this.orderClient.connect()]);
+    await Promise.all([
+      this.userClient.connect(),
+      this.orderClient.connect(),
+      this.docsClient.connect(),
+    ]);
   }
 }

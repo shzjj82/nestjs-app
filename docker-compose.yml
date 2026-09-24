@@ -1,6 +1,7 @@
 x-app-env: &app-env
   MQTT_URL: mqtt://mosquitto:1883
   DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/${POSTGRES_DB:-nestjs}
+  DOCS_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/docs
   REDIS_URL: redis://redis:6379
 
 x-app-depends: &app-depends
@@ -31,6 +32,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-nestjs}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nestjs} -d ${POSTGRES_DB:-nestjs}"]
       interval: 5s
@@ -94,11 +96,24 @@ services:
       <<: *app-env
     depends_on: *app-depends
 
+  docs:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        APP_NAME: docs
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      INSTANCE_ID: docs-1
+      DOCS_SERVICE_KEY: ${DOCS_SERVICE_KEY:-dev-docs-key}
+    depends_on: *app-depends
+
 volumes:
   postgres_data:
   redis_data:
 
 # 只起依赖：docker compose up -d postgres redis mosquitto
-# 默认按 3 个 usercenter + 1 个 order 扩容。
+# 默认按 3 个 usercenter + 1 个 order + 1 个 docs 扩容。
 # 只对外暴露 gateway:3000，内部实例通过 MQTT 共享订阅做负载均衡。
-# 扩缩容：docker compose up --build --scale usercenter=3 --scale order=1
+# 扩缩容：docker compose up --build --scale usercenter=3 --scale order=1 --scale docs=1

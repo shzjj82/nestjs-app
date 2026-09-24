@@ -1,6 +1,6 @@
 import { BadGatewayException, Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { ORDER_CLIENT, USER_CLIENT } from '@app/common';
+import { DOCS_CLIENT, ORDER_CLIENT, USER_CLIENT } from '@app/common';
 import { MqttProxy } from './mqtt.proxy';
 
 @Injectable()
@@ -10,11 +10,13 @@ export class ClientHub {
   constructor(
     @Inject(USER_CLIENT) userClient: ClientProxy,
     @Inject(ORDER_CLIENT) orderClient: ClientProxy,
+    @Inject(DOCS_CLIENT) docsClient: ClientProxy,
     private readonly mqtt: MqttProxy,
   ) {
     this.clients = {
       [USER_CLIENT]: userClient,
       [ORDER_CLIENT]: orderClient,
+      [DOCS_CLIENT]: docsClient,
     };
   }
 

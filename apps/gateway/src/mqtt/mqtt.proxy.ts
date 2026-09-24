@@ -12,7 +12,7 @@ import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom, TimeoutError } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 
-const MQTT_TIMEOUT_MS = Number(process.env.MQTT_TIMEOUT_MS ?? 5000);
+const MQTT_TIMEOUT_MS = Number(process.env.MQTT_TIMEOUT_MS ?? 30000);
 
 @Injectable()
 export class MqttProxy {

@@ -11,6 +11,8 @@ export const PROXY_HTTP_PATHS: RouteInfo[] = [
   { path: 'users/{*path}', method: RequestMethod.ALL },
   { path: 'clients', method: RequestMethod.ALL },
   { path: 'clients/{*path}', method: RequestMethod.ALL },
+  { path: 'docs', method: RequestMethod.ALL },
+  { path: 'docs/{*path}', method: RequestMethod.ALL },
   { path: 'roles', method: RequestMethod.ALL },
   { path: 'roles/{*path}', method: RequestMethod.ALL },
   { path: 'permissions', method: RequestMethod.ALL },
@@ -42,5 +44,6 @@ export function buildProxyPayload(
     appId: rest.appId ?? session?.appId,
     _session: session ?? null,
     _token: token ?? null,
+    _docsPrivileged: rest._docsPrivileged ?? false,
   };
 }

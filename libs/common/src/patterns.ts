@@ -1,9 +1,11 @@
 export const USER_CLIENT = 'USER_CLIENT';
 export const ORDER_CLIENT = 'ORDER_CLIENT';
+export const DOCS_CLIENT = 'DOCS_CLIENT';
 
 export const MQTT_GROUPS = {
   USERCENTER: 'usercenter',
   ORDER: 'order',
+  DOCS: 'docs',
 } as const;
 
 export const MQTT_PATTERNS = {
@@ -39,6 +41,23 @@ export const MQTT_PATTERNS = {
   ORDER_FIND_ALL: 'order.findAll',
   ORDER_FIND_ONE: 'order.findOne',
   ORDER_CREATE: 'order.create',
+  DOC_HEALTH: 'doc.health',
+  DOC_POST_FIND_ALL: 'doc.post.findAll',
+  DOC_POST_FIND_SLUG: 'doc.post.findSlug',
+  DOC_POST_FIND_ID: 'doc.post.findId',
+  DOC_POST_SPECIALS: 'doc.post.specials',
+  DOC_POST_CREATE: 'doc.post.create',
+  DOC_POST_UPDATE: 'doc.post.update',
+  DOC_POST_DELETE: 'doc.post.delete',
+  DOC_POST_CHILDREN: 'doc.post.children',
+  DOC_POST_REPARENT: 'doc.post.reparent',
+  DOC_CATEGORY_FIND_ALL: 'doc.category.findAll',
+  DOC_CATEGORY_FIND_SLUG: 'doc.category.findSlug',
+  DOC_CATEGORY_CREATE: 'doc.category.create',
+  DOC_CATEGORY_UPDATE: 'doc.category.update',
+  DOC_CATEGORY_DELETE: 'doc.category.delete',
+  DOC_SITE_GET: 'doc.site.get',
+  DOC_SITE_SAVE: 'doc.site.save',
 } as const;
 
 export function sharePattern(group: string, pattern: string): string {
