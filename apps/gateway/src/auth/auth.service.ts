@@ -62,11 +62,37 @@ export class AuthService {
     req: Request,
     permissions?: string[],
   ): Promise<GatewayUser | null> {
-    if (auth?.includes('docs-key')) {
+    const allowDocsKey = auth?.includes('docs-key');
+    const allowJwt =
+      auth?.includes('jwt') || auth?.includes('admin') || !!permissions?.length;
+
+    if (allowDocsKey && allowJwt) {
+      const keyOk = this.hasValidDocsKey(req);
+      const user = await this.fromRequest(req);
+      if (keyOk) {
+        if (user) {
+          (req as AuthedRequest).user = user;
+        }
+        return user;
+      }
+      if (user) {
+        if (auth?.includes('admin') && !this.isAdmin(user)) {
+          throw new ForbiddenException('需要管理员权限');
+        }
+        if (permissions?.length && !this.hasAnyPermission(user, permissions)) {
+          throw new ForbiddenException(`缺少权限: ${permissions.join(', ')}`);
+        }
+        (req as AuthedRequest).user = user;
+        return user;
+      }
+      throw new UnauthorizedException('需要登录或文档服务密钥：x-docs-key');
+    }
+
+    if (allowDocsKey) {
       if (!this.hasValidDocsKey(req)) {
         throw new UnauthorizedException('需要文档服务密钥：x-docs-key');
       }
-      if (auth.length === 1 && !permissions?.length) {
+      if (!allowJwt) {
         return null;
       }
     }

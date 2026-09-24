@@ -2,6 +2,7 @@ import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { MQTT_PATTERNS } from '@app/common';
 import { HandleLogInterceptor } from '../common/handle-log.interceptor';
+import { resolveAppCode } from '../common/app-code';
 import { docsPattern, optionalString, requiredString, rpcFail } from '../common/rpc';
 import {
   isCategoryKind,
@@ -16,13 +17,15 @@ export class CategoriesController {
   constructor(private readonly categories: CategoriesService) {}
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_CATEGORY_FIND_ALL))
-  async listCategories() {
-    return { categories: await this.categories.list() };
+  async listCategories(payload: Record<string, unknown> = {}) {
+    const appCode = resolveAppCode(optionalString(payload.appCode));
+    return { categories: await this.categories.list(appCode) };
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_CATEGORY_FIND_SLUG))
   async categoryBySlug(payload: Record<string, unknown>) {
     const category = await this.categories.findBySlug(
+      resolveAppCode(optionalString(payload.appCode)),
       requiredString(payload.slug, 'slug'),
     );
     if (!category) {
@@ -64,6 +67,7 @@ export class CategoriesController {
       rpcFail(400, 'INVALID_INPUT');
     }
     return {
+      appCode: resolveAppCode(optionalString(payload.appCode)),
       id: optionalString(payload.id),
       name,
       slug: optionalString(payload.slug),

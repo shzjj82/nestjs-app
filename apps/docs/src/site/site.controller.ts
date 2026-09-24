@@ -2,6 +2,7 @@ import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { MQTT_PATTERNS } from '@app/common';
 import { HandleLogInterceptor } from '../common/handle-log.interceptor';
+import { resolveAppCode } from '../common/app-code';
 import { asRecord, docsPattern, optionalString, requiredString, rpcFail } from '../common/rpc';
 import {
   isEditorJsDocument,
@@ -17,13 +18,15 @@ export class SiteController {
   constructor(private readonly site: SiteService) {}
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_SITE_GET))
-  async getSite() {
-    return { about: await this.site.getAbout() };
+  async getSite(payload: Record<string, unknown> = {}) {
+    const appCode = resolveAppCode(optionalString(payload.appCode));
+    return { about: await this.site.getAbout(appCode) };
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_SITE_SAVE))
   async saveSite(payload: Record<string, unknown>) {
-    return { about: await this.site.saveAbout(this.parseAbout(payload)) };
+    const appCode = resolveAppCode(optionalString(payload.appCode));
+    return { about: await this.site.saveAbout(appCode, this.parseAbout(payload)) };
   }
 
   private parseAbout(payload: Record<string, unknown>): SiteAbout {

@@ -2,8 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
+import { DEFAULT_APP_CODE } from '../common/app-code';
 import { rpcFail } from '../common/rpc';
-import { CategoryEntity, PostEntity } from '../entities';
+import { CategoryEntity, DocumentEntity } from '../entities';
 import {
   DEFAULT_CATEGORIES,
   SITE_SKILL_COLORS,
@@ -23,13 +24,14 @@ export class CategoriesService {
   constructor(
     @InjectRepository(CategoryEntity)
     private readonly categories: Repository<CategoryEntity>,
-    @InjectRepository(PostEntity)
-    private readonly posts: Repository<PostEntity>,
+    @InjectRepository(DocumentEntity)
+    private readonly posts: Repository<DocumentEntity>,
   ) {}
 
   toCategory(row: CategoryEntity): Category {
     return {
       id: row.id,
+      appCode: row.appCode,
       slug: row.slug,
       name: row.name,
       hint: row.hint,
@@ -42,15 +44,16 @@ export class CategoriesService {
     };
   }
 
-  async list(): Promise<Category[]> {
+  async list(appCode: string): Promise<Category[]> {
     const rows = await this.categories.find({
+      where: { appCode },
       order: { sort: 'ASC', createdAt: 'ASC' },
     });
     return rows.map((row) => this.toCategory(row));
   }
 
-  async listSlugs(kind: CategoryKind): Promise<string[]> {
-    return (await this.list())
+  async listSlugs(appCode: string, kind: CategoryKind): Promise<string[]> {
+    return (await this.list(appCode))
       .filter((item) => item.kind === kind)
       .map((item) => item.slug);
   }
@@ -60,18 +63,18 @@ export class CategoriesService {
     return row ? this.toCategory(row) : null;
   }
 
-  async findBySlug(slug: string): Promise<Category | null> {
-    const row = await this.categories.findOne({ where: { slug } });
+  async findBySlug(appCode: string, slug: string): Promise<Category | null> {
+    const row = await this.categories.findOne({ where: { appCode, slug } });
     return row ? this.toCategory(row) : null;
   }
 
-  async findByName(name: string): Promise<Category | null> {
+  async findByName(appCode: string, name: string): Promise<Category | null> {
     const key = name.trim().toLocaleLowerCase();
     if (!key) {
       return null;
     }
     return (
-      (await this.list()).find(
+      (await this.list(appCode)).find(
         (item) =>
           item.name.toLocaleLowerCase() === key ||
           item.slug.toLocaleLowerCase() === key,
@@ -79,11 +82,11 @@ export class CategoriesService {
     );
   }
 
-  async resolveExistingSlugs(labels: string[]): Promise<string[]> {
+  async resolveExistingSlugs(appCode: string, labels: string[]): Promise<string[]> {
     const out: string[] = [];
     for (const label of normalizeTags(labels)) {
       const existing =
-        (await this.findBySlug(label)) ?? (await this.findByName(label));
+        (await this.findBySlug(appCode, label)) ?? (await this.findByName(appCode, label));
       if (existing) {
         out.push(existing.slug);
       }
@@ -92,6 +95,7 @@ export class CategoriesService {
   }
 
   async create(input: {
+    appCode: string;
     id?: string;
     name: string;
     slug?: string;
@@ -109,23 +113,24 @@ export class CategoriesService {
     if (!slugCheck.ok) {
       rpcFail(400, `TAG_SLUG_INVALID:${slugCheck.error}`);
     }
-    if (await this.findByName(nameCheck.value)) {
+    if (await this.findByName(input.appCode, nameCheck.value)) {
       rpcFail(409, 'TAG_NAME_EXISTS');
     }
     const now = new Date();
-    const slug = await this.uniqueSlug(slugCheck.value || nameCheck.value);
+    const slug = await this.uniqueSlug(input.appCode, slugCheck.value || nameCheck.value);
     let sort = input.sort;
     if (typeof sort !== 'number') {
       const raw = await this.categories
         .createQueryBuilder('c')
         .select('COALESCE(MAX(c.sort), -1)', 'n')
-        .where('c.kind = :kind', { kind: 'article' })
+        .where('c.appCode = :appCode', { appCode: input.appCode })
         .getRawOne<{ n: string }>();
       sort = Number(raw?.n ?? -1) + 1;
     }
     const saved = await this.categories.save(
       this.categories.create({
         id: isUuid(input.id) ? input.id : randomUUID(),
+        appCode: input.appCode,
         slug,
         name: nameCheck.value,
         hint: input.hint?.trim() ?? '',
@@ -143,6 +148,7 @@ export class CategoriesService {
   async update(
     id: string,
     input: {
+      appCode?: string;
       name: string;
       slug?: string;
       hint?: string;
@@ -156,6 +162,7 @@ export class CategoriesService {
     if (!existing) {
       return null;
     }
+    const appCode = existing.appCode;
     const nameCheck = validateTagName(input.name);
     if (!nameCheck.ok) {
       rpcFail(400, `TAG_NAME_INVALID:${nameCheck.error}`);
@@ -164,12 +171,12 @@ export class CategoriesService {
     if (!slugCheck.ok) {
       rpcFail(400, `TAG_SLUG_INVALID:${slugCheck.error}`);
     }
-    const dup = await this.findByName(nameCheck.value);
+    const dup = await this.findByName(appCode, nameCheck.value);
     if (dup && dup.id !== id) {
       rpcFail(409, 'TAG_NAME_EXISTS');
     }
     const oldSlug = existing.slug;
-    const slug = await this.uniqueSlug(slugCheck.value || nameCheck.value, id);
+    const slug = await this.uniqueSlug(appCode, slugCheck.value || nameCheck.value, id);
     existing.slug = slug;
     existing.name = nameCheck.value;
     existing.hint = input.hint?.trim() ?? '';
@@ -180,7 +187,7 @@ export class CategoriesService {
     existing.updatedAt = new Date();
     await this.categories.save(existing);
     if (slug !== oldSlug) {
-      await this.renameSlugOnPosts(oldSlug, slug);
+      await this.renameSlugOnPosts(appCode, oldSlug, slug);
     }
     return this.findById(id);
   }
@@ -190,10 +197,11 @@ export class CategoriesService {
     if (!existing) {
       return false;
     }
-    await this.detachFromPosts(existing.slug);
+    await this.detachFromPosts(existing.appCode, existing.slug);
     await this.categories.delete({ id });
-    if (!(await this.listSlugs('article')).length) {
+    if (!(await this.listSlugs(existing.appCode, 'article')).length) {
       await this.create({
+        appCode: existing.appCode,
         name: '未分类',
         slug: 'uncategorized',
         hint: '还没归类的笔记',
@@ -205,9 +213,12 @@ export class CategoriesService {
     return true;
   }
 
-  async ensureDefaults() {
-    const count = await this.categories.count();
+  async ensureDefaults(appCode = DEFAULT_APP_CODE) {
+    const count = await this.categories.count({ where: { appCode } });
     if (count > 0) {
+      return;
+    }
+    if (appCode !== DEFAULT_APP_CODE) {
       return;
     }
     const now = new Date();
@@ -215,6 +226,7 @@ export class CategoriesService {
       DEFAULT_CATEGORIES.map((item) =>
         this.categories.create({
           id: randomUUID(),
+          appCode,
           slug: item.slug,
           name: item.name,
           hint: item.hint,
@@ -229,7 +241,7 @@ export class CategoriesService {
     );
   }
 
-  private async uniqueSlug(base: string, excludeId?: string): Promise<string> {
+  private async uniqueSlug(appCode: string, base: string, excludeId?: string): Promise<string> {
     const slugify = (input: string) => {
       const value = input
         .trim()
@@ -247,7 +259,7 @@ export class CategoriesService {
         i += 1;
         continue;
       }
-      const row = await this.categories.findOne({ where: { slug } });
+      const row = await this.categories.findOne({ where: { appCode, slug } });
       if (!row || row.id === excludeId) {
         return slug;
       }
@@ -256,14 +268,15 @@ export class CategoriesService {
     }
   }
 
-  private async renameSlugOnPosts(from: string, to: string) {
+  private async renameSlugOnPosts(appCode: string, from: string, to: string) {
+    const next = await this.findBySlug(appCode, to);
     await this.posts
       .createQueryBuilder()
       .update()
-      .set({ type: to })
-      .where('type = :from', { from })
+      .set({ category: to, categoryId: next?.id ?? null })
+      .where('app_code = :appCode AND category = :from', { appCode, from })
       .execute();
-    const rows = await this.posts.find();
+    const rows = await this.posts.find({ where: { appCode } });
     for (const row of rows) {
       const tags = tagsFromProps(row.props);
       if (!tags.includes(from)) {
@@ -278,25 +291,29 @@ export class CategoriesService {
     }
   }
 
-  private async detachFromPosts(slug: string) {
+  private async detachFromPosts(appCode: string, slug: string) {
     const fallback =
-      (await this.list()).find((item) => item.slug !== slug && item.kind === 'article')
+      (await this.list(appCode)).find((item) => item.slug !== slug && item.kind === 'article')
         ?.slug ?? 'life';
-    const rows = await this.posts.find({ where: { pageKind: 'article' } });
+    const fallbackRow = await this.findBySlug(appCode, fallback);
+    const rows = await this.posts.find({ where: { appCode, kind: 'article' } });
     const now = new Date();
     for (const row of rows) {
       const tags = tagsFromProps(row.props);
-      const had = tags.includes(slug) || row.type === slug;
+      const had = tags.includes(slug) || row.category === slug;
       if (!had) {
         continue;
       }
       const nextTags = tags.filter((tag) => tag !== slug);
-      row.type =
-        row.type === slug
+      const nextSlug =
+        row.category === slug
           ? nextTags[0] ?? fallback
-          : (await this.findBySlug(row.type))
-            ? row.type
+          : (await this.findBySlug(appCode, row.category))
+            ? row.category
             : nextTags[0] ?? fallback;
+      const nextCat = await this.findBySlug(appCode, nextSlug);
+      row.category = nextSlug;
+      row.categoryId = nextCat?.id ?? fallbackRow?.id ?? null;
       row.props = propsWithTags(row.props, nextTags);
       row.updatedAt = now;
       await this.posts.save(row);

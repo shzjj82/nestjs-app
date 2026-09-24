@@ -9,6 +9,8 @@ import {
   requiredString,
   rpcFail,
 } from '../common/rpc';
+import { resolveAppCode } from '../common/app-code';
+import { policyOf } from '../common/doc-kinds';
 import {
   isEditorJsDocument,
   isPageKind,
@@ -16,15 +18,16 @@ import {
   type EditorJsDocument,
   type PageKind,
 } from '../common/shared';
-import { PostsService } from './posts.service';
+import { DocumentsService } from './documents.service';
 
 @Controller()
 @UseInterceptors(HandleLogInterceptor)
-export class PostsController {
-  constructor(private readonly posts: PostsService) {}
+export class DocumentsController {
+  constructor(private readonly posts: DocumentsService) {}
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_FIND_ALL))
   async findAll(payload: Record<string, unknown> = {}) {
+    const appCode = resolveAppCode(optionalString(payload.appCode));
     const privileged = payload._docsPrivileged === true;
     const tree =
       payload.tree === '1' || payload.tree === true || payload.tree === 'true';
@@ -38,7 +41,7 @@ export class PostsController {
       if (!privileged) {
         rpcFail(401, 'UNAUTHORIZED');
       }
-      const posts = await this.posts.listWorkspaceTree(true);
+      const posts = await this.posts.listWorkspaceTree(appCode, true);
       return { posts, total: posts.length };
     }
     const pageKind =
@@ -50,6 +53,7 @@ export class PostsController {
         ? null
         : optionalString(payload.parentId);
     const { posts, total } = await this.posts.list({
+      appCode,
       type: optionalString(payload.type),
       kind: payload.kind === 'article' ? 'article' : undefined,
       pageKind,
@@ -69,8 +73,9 @@ export class PostsController {
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_SPECIALS))
-  async specials() {
-    return { about: (await this.posts.findByKind('about')) ?? null };
+  async specials(payload: Record<string, unknown> = {}) {
+    const appCode = resolveAppCode(optionalString(payload.appCode));
+    return { about: (await this.posts.findByKind(appCode, 'about')) ?? null };
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_FIND_ID))
@@ -93,22 +98,26 @@ export class PostsController {
       (payload.includeDrafts === true ||
         payload.includeDrafts === '1' ||
         payload.includeDrafts === 'true');
+    const appCode = resolveAppCode(optionalString(payload.appCode));
     const post = await this.posts.findBySlug(
+      appCode,
       requiredString(payload.slug, 'slug'),
       includeDrafts,
     );
-    if (!post || post.pageKind !== 'article') {
+    if (!post || !policyOf(post.pageKind).publicBySlug) {
       rpcFail(404, 'NOT_FOUND');
     }
     const ancestors = await this.posts.listAncestors(post.id, includeDrafts);
     const { posts: siblings } = await this.posts.list({
-      pageKind: 'article',
+      appCode: post.appCode,
+      pageKind: post.pageKind,
       parentId: post.parentId ?? null,
       includeDrafts,
       treeOrder: true,
     });
     const { posts: children } = await this.posts.list({
-      pageKind: 'article',
+      appCode: post.appCode,
+      pageKind: post.pageKind,
       parentId: post.id,
       includeDrafts,
       treeOrder: true,
@@ -159,6 +168,7 @@ export class PostsController {
   }
 
   private parseWrite(payload: Record<string, unknown>): {
+    appCode: string;
     id?: string;
     title: string;
     slug?: string;
@@ -172,6 +182,7 @@ export class PostsController {
     tags?: string[];
     body: EditorJsDocument;
     draft: boolean;
+    authorId?: string | null;
   } {
     const title = requiredString(payload.title, 'title');
     const body = payload.body;
@@ -183,6 +194,7 @@ export class PostsController {
         ? payload.pageKind
         : undefined;
     return {
+      appCode: resolveAppCode(optionalString(payload.appCode)),
       id: optionalString(payload.id),
       title,
       slug: optionalString(payload.slug),
@@ -201,6 +213,12 @@ export class PostsController {
       tags: payload.tags === undefined ? undefined : normalizeTags(payload.tags),
       body,
       draft: payload.draft === false || payload.draft === 'false' ? false : true,
+      authorId: sessionUserId(payload),
     };
   }
+}
+
+function sessionUserId(payload: Record<string, unknown>): string | undefined {
+  const session = asRecord(payload._session);
+  return optionalString(session.userId) ?? optionalString(payload.authorId);
 }

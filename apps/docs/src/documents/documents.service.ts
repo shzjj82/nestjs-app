@@ -2,14 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, Repository } from 'typeorm';
+import { DEFAULT_APP_CODE } from '../common/app-code';
 import { CategoriesService } from '../categories/categories.service';
 import { rpcFail } from '../common/rpc';
-import { PostEntity } from '../entities';
-import { SiteService } from '../site/site.service';
+import { policyOf, resolveDocKind, type DocKind } from '../common/doc-kinds';
 import {
+  DEFAULT_ABOUT,
   bodyHasBlocks,
-  isPageKind,
   normalizeEditorDocument,
+  normalizeKindProps,
   propsWithTags,
   starterArticleDocument,
   tagsFromProps,
@@ -17,15 +18,16 @@ import {
   type DocPost,
   type DocPostListItem,
   type EditorJsDocument,
-  type PageKind,
 } from '../common/shared';
+import { DocumentEntity } from '../entities';
 
 type WriteInput = {
+  appCode: string;
   id?: string;
   title: string;
   slug?: string;
   type: string;
-  pageKind?: PageKind;
+  pageKind?: DocKind;
   parentId?: string | null;
   treeSort?: number;
   summary: string;
@@ -34,44 +36,49 @@ type WriteInput = {
   tags?: string[];
   body: EditorJsDocument;
   draft: boolean;
+  authorId?: string | null;
 };
 
 @Injectable()
-export class PostsService {
+export class DocumentsService {
   constructor(
-    @InjectRepository(PostEntity)
-    private readonly posts: Repository<PostEntity>,
+    @InjectRepository(DocumentEntity)
+    private readonly posts: Repository<DocumentEntity>,
     private readonly categories: CategoriesService,
-    private readonly site: SiteService,
     private readonly dataSource: DataSource,
   ) {}
 
-  async toPost(row: PostEntity): Promise<DocPost> {
-    const pageKind = isPageKind(row.pageKind) ? row.pageKind : 'article';
+  async toPost(row: DocumentEntity): Promise<DocPost> {
+    const pageKind = resolveDocKind(row.kind);
+    const policy = policyOf(pageKind);
     const props = row.props ?? {};
     const fromProps = tagsFromProps(props);
     const tags =
       fromProps.length > 0
         ? fromProps
-        : row.type && pageKind === 'article'
-          ? [row.type]
+        : row.category && policy.useCategoryTags
+          ? [row.category]
           : [];
-    const category = await this.categories.findBySlug(row.type);
+    const category = await this.categories.findBySlug(row.appCode, row.category);
+    const normalizedProps = normalizeKindProps(pageKind, props);
     return {
       id: row.id,
+      appCode: row.appCode,
       slug: row.slug,
       title: row.title,
-      type: row.type,
+      type: row.category,
       pageKind,
       parentId: row.parentId,
       treeSort: row.treeSort,
-      categoryName: category?.name ?? row.type,
+      categoryName: category?.name ?? row.category,
       categoryColor: category?.color ?? 'app-yellow',
       categoryKind: category?.kind ?? 'article',
       summary: row.summary,
       coverUrl: row.coverUrl,
-      props,
+      props: normalizedProps,
       tags,
+      bodyFormat: row.bodyFormat || 'editorjs',
+      authorId: row.authorId ?? null,
       body: normalizeEditorDocument(row.body),
       draft: row.draft,
       publishedAt: row.publishedAt?.toISOString() ?? null,
@@ -80,15 +87,16 @@ export class PostsService {
     };
   }
 
-  async toListItem(row: PostEntity): Promise<DocPostListItem> {
+  async toListItem(row: DocumentEntity): Promise<DocPostListItem> {
     const { body: _body, ...item } = await this.toPost(row);
     return item;
   }
 
   async list(opts: {
+    appCode: string;
     type?: string;
     kind?: CategoryKind;
-    pageKind?: PageKind;
+    pageKind?: DocKind;
     parentId?: string | null;
     limit?: number;
     page?: number;
@@ -97,19 +105,21 @@ export class PostsService {
     treeOrder?: boolean;
   }): Promise<{ posts: DocPostListItem[]; total: number }> {
     const qb = this.posts.createQueryBuilder('post');
+    qb.andWhere('post.appCode = :appCode', { appCode: opts.appCode });
     if (!opts.includeDrafts) {
       qb.andWhere('post.draft = false');
       qb.andWhere(`post.id NOT IN (
         WITH RECURSIVE under_draft AS (
-          SELECT id FROM doc_posts WHERE draft = true
+          SELECT id FROM doc_documents WHERE draft = true AND app_code = :appCode
           UNION ALL
-          SELECT p.id FROM doc_posts p INNER JOIN under_draft u ON p.parent_id = u.id
+          SELECT p.id FROM doc_documents p INNER JOIN under_draft u ON p.parent_id = u.id
+          WHERE p.app_code = :appCode
         )
         SELECT id FROM under_draft
       )`);
     }
     if (opts.pageKind) {
-      qb.andWhere('post.pageKind = :pageKind', { pageKind: opts.pageKind });
+      qb.andWhere('post.kind = :pageKind', { pageKind: opts.pageKind });
     }
     if (opts.parentId !== undefined) {
       if (opts.parentId === null) {
@@ -119,24 +129,24 @@ export class PostsService {
       }
     }
     if (opts.type) {
-      if (!(await this.categories.findBySlug(opts.type))) {
+      if (!(await this.categories.findBySlug(opts.appCode, opts.type))) {
         return { posts: [], total: 0 };
       }
       if (!opts.pageKind) {
-        qb.andWhere("post.pageKind = 'article'");
+        qb.andWhere("post.kind = 'article'");
       }
       qb.andWhere(
-        `(post.type = :typeSlug OR jsonb_exists(COALESCE(post.props, '{}'::jsonb) -> 'tags', :typeSlug))`,
+        `(post.category = :typeSlug OR jsonb_exists(COALESCE(post.props, '{}'::jsonb) -> 'tags', :typeSlug))`,
         { typeSlug: opts.type },
       );
     } else if (opts.kind && !opts.pageKind) {
-      const slugs = await this.categories.listSlugs(opts.kind);
+      const slugs = await this.categories.listSlugs(opts.appCode, opts.kind);
       if (!slugs.length) {
         return { posts: [], total: 0 };
       }
-      qb.andWhere('post.type IN (:...slugs)', { slugs });
+      qb.andWhere('post.category IN (:...slugs)', { slugs });
       if (opts.kind === 'article') {
-        qb.andWhere("post.pageKind = 'article'");
+        qb.andWhere("post.kind = 'article'");
       }
     }
     const total = await qb.clone().getCount();
@@ -161,13 +171,17 @@ export class PostsService {
     };
   }
 
-  async listWorkspaceTree(includeDrafts: boolean): Promise<DocPostListItem[]> {
-    const { posts } = await this.list({ includeDrafts, treeOrder: true });
-    return posts.filter((item) => item.pageKind === 'about' || item.pageKind === 'article');
+  async listWorkspaceTree(appCode: string, includeDrafts: boolean): Promise<DocPostListItem[]> {
+    const { posts } = await this.list({ appCode, includeDrafts, treeOrder: true });
+    return posts.filter((item) => policyOf(item.pageKind).tree);
   }
 
-  async findBySlug(slug: string, includeDrafts: boolean): Promise<DocPost | null> {
-    const row = await this.posts.findOne({ where: { slug } });
+  async findBySlug(
+    appCode: string,
+    slug: string,
+    includeDrafts: boolean,
+  ): Promise<DocPost | null> {
+    const row = await this.posts.findOne({ where: { appCode, slug } });
     if (!row) {
       return null;
     }
@@ -183,8 +197,8 @@ export class PostsService {
     return row ? this.toPost(row) : null;
   }
 
-  async findByKind(pageKind: PageKind): Promise<DocPost | null> {
-    const row = await this.posts.findOne({ where: { pageKind } });
+  async findByKind(appCode: string, pageKind: DocKind): Promise<DocPost | null> {
+    const row = await this.posts.findOne({ where: { appCode, kind: pageKind } });
     return row ? this.toPost(row) : null;
   }
 
@@ -227,57 +241,64 @@ export class PostsService {
   }
 
   async create(input: WriteInput): Promise<DocPost> {
-    const pageKind = input.pageKind ?? 'article';
-    if (pageKind === 'about' && (await this.findByKind('about'))) {
+    const appCode = input.appCode;
+    const pageKind = resolveDocKind(input.pageKind);
+    const policy = policyOf(pageKind);
+    if (policy.unique && (await this.findByKind(appCode, pageKind))) {
       rpcFail(409, 'PAGE_EXISTS');
     }
     let parentId: string | null = null;
-    if (pageKind === 'article') {
-      parentId = await this.resolveArticleParent(input.parentId);
+    if (policy.allowParent) {
+      parentId = await this.resolveParent(appCode, input.parentId);
     }
-    const asDraft = parentId ? false : Boolean(input.draft);
+    const asDraft = !policy.allowDraft || parentId ? false : Boolean(input.draft);
     const rawTags =
       input.tags !== undefined
         ? tagsFromProps(propsWithTags({}, input.tags))
         : tagsFromProps(input.props);
     const tagSlugs =
-      pageKind === 'article' && !parentId
-        ? await this.categories.resolveExistingSlugs(rawTags)
+      policy.useCategoryTags && !parentId
+        ? await this.categories.resolveExistingSlugs(appCode, rawTags)
         : rawTags;
-    const cats = await this.categories.list();
-    const resolvedType =
-      pageKind === 'article'
-        ? (tagSlugs[0] && (await this.categories.findBySlug(tagSlugs[0]))
-            ? tagSlugs[0]
-            : ((await this.categories.findBySlug(input.type))?.slug ??
-              cats.find((item) => item.kind === 'article')?.slug ??
-              'life'))
-        : input.type || cats.find((item) => item.kind === 'article')?.slug || 'life';
+    const cats = await this.categories.list(appCode);
+    const fallbackType = cats.find((item) => item.kind === 'article')?.slug ?? 'life';
+    const resolvedType = policy.useCategoryTags
+      ? (tagSlugs[0] && (await this.categories.findBySlug(appCode, tagSlugs[0]))
+          ? tagSlugs[0]
+          : ((await this.categories.findBySlug(appCode, input.type))?.slug ?? fallbackType))
+      : input.type || fallbackType;
+    const categoryRow = await this.categories.findBySlug(appCode, resolvedType);
     const now = new Date();
     const id = isUuid(input.id) ? input.id : randomUUID();
-    const slug = await this.uniqueSlug(input.slug || input.title || pageKind);
-    const props =
-      pageKind === 'article' && !parentId
-        ? propsWithTags(input.props, tagSlugs)
-        : input.tags !== undefined
-          ? propsWithTags(input.props, input.tags)
-          : propsWithTags(input.props, tagsFromProps(input.props));
+    const slug = await this.uniqueSlug(appCode, input.slug || input.title || pageKind);
+    const props = policy.useCategoryTags && !parentId
+      ? propsWithTags(normalizeKindProps(pageKind, input.props), tagSlugs)
+      : normalizeKindProps(
+          pageKind,
+          input.tags !== undefined
+            ? propsWithTags(input.props, input.tags)
+            : input.props,
+        );
     await this.posts.save(
       this.posts.create({
         id,
+        appCode,
         slug,
         title: input.title,
-        type: resolvedType,
-        pageKind,
+        kind: pageKind,
+        category: resolvedType,
+        categoryId: categoryRow?.id ?? null,
         parentId,
         treeSort:
           typeof input.treeSort === 'number'
             ? input.treeSort
-            : await this.nextTreeSort(parentId, pageKind),
+            : await this.nextTreeSort(appCode, parentId, pageKind),
         summary: input.summary,
         coverUrl: input.coverUrl,
         props,
+        bodyFormat: 'editorjs',
         body: input.body as unknown as Record<string, unknown>,
+        authorId: input.authorId ?? null,
         draft: asDraft,
         publishedAt: asDraft ? null : now,
         createdAt: now,
@@ -288,9 +309,6 @@ export class PostsService {
     if (!created) {
       rpcFail(500, 'SERVER_ERROR');
     }
-    if (created.pageKind === 'about') {
-      await this.site.syncFromAboutPage(created);
-    }
     return created;
   }
 
@@ -299,22 +317,25 @@ export class PostsService {
     if (!existing) {
       return null;
     }
-    const pageKind = input.pageKind ?? existing.pageKind;
-    if (existing.pageKind === 'about' && pageKind !== existing.pageKind) {
+    const appCode = existing.appCode;
+    const pageKind = resolveDocKind(input.pageKind ?? existing.pageKind);
+    const policy = policyOf(pageKind);
+    if (
+      existing.pageKind !== pageKind &&
+      !policyOf(existing.pageKind).allowKindChange
+    ) {
       rpcFail(400, 'PAGE_KIND_FIXED');
     }
     let parentId = existing.parentId;
-    if (pageKind === 'article') {
-      if (input.parentId !== undefined) {
-        parentId = await this.resolveArticleParent(input.parentId);
-        if (parentId && (await this.wouldCreateCycle(id, parentId))) {
-          rpcFail(400, 'INVALID_PARENT');
-        }
-      }
-    } else {
+    if (!policy.allowParent) {
       parentId = null;
+    } else if (input.parentId !== undefined) {
+      parentId = await this.resolveParent(appCode, input.parentId);
+      if (parentId && (await this.wouldCreateCycle(id, parentId))) {
+        rpcFail(400, 'INVALID_PARENT');
+      }
     }
-    const asDraft = parentId ? false : Boolean(input.draft);
+    const asDraft = !policy.allowDraft || parentId ? false : Boolean(input.draft);
     if (!bodyHasBlocks(input.body) && bodyHasBlocks(existing.body)) {
       rpcFail(400, 'EMPTY_BODY');
     }
@@ -329,32 +350,35 @@ export class PostsService {
         ? tagsFromProps(propsWithTags({}, input.tags))
         : tagsFromProps(baseProps);
     const tagSlugs =
-      pageKind === 'article' && !parentId
-        ? await this.categories.resolveExistingSlugs(rawTags)
+      policy.useCategoryTags && !parentId
+        ? await this.categories.resolveExistingSlugs(appCode, rawTags)
         : rawTags;
     const props =
-      pageKind === 'article' && !parentId
-        ? propsWithTags(baseProps, tagSlugs)
-        : input.tags !== undefined
-          ? propsWithTags(baseProps, input.tags)
-          : propsWithTags(baseProps, tagsFromProps(baseProps));
-    const cats = await this.categories.list();
-    const resolvedType =
-      pageKind === 'article'
-        ? (tagSlugs[0] && (await this.categories.findBySlug(tagSlugs[0]))
-            ? tagSlugs[0]
-            : ((await this.categories.findBySlug(input.type))?.slug ??
-              existing.type ??
-              cats.find((item) => item.kind === 'article')?.slug ??
-              'life'))
-        : input.type;
+      policy.useCategoryTags && !parentId
+        ? propsWithTags(normalizeKindProps(pageKind, baseProps), tagSlugs)
+        : normalizeKindProps(
+            pageKind,
+            input.tags !== undefined
+              ? propsWithTags(baseProps, input.tags)
+              : baseProps,
+          );
+    const cats = await this.categories.list(appCode);
+    const fallbackType =
+      existing.type || cats.find((item) => item.kind === 'article')?.slug || 'life';
+    const resolvedType = policy.useCategoryTags
+      ? (tagSlugs[0] && (await this.categories.findBySlug(appCode, tagSlugs[0]))
+          ? tagSlugs[0]
+          : ((await this.categories.findBySlug(appCode, input.type))?.slug ?? fallbackType))
+      : input.type || fallbackType;
+    const categoryRow = await this.categories.findBySlug(appCode, resolvedType);
     await this.posts.update(
       { id },
       {
-        slug: await this.uniqueSlug(input.slug || input.title || existing.slug, id),
+        slug: await this.uniqueSlug(appCode, input.slug || input.title || existing.slug, id),
         title: input.title,
-        type: resolvedType,
-        pageKind,
+        kind: pageKind,
+        category: resolvedType,
+        categoryId: categoryRow?.id ?? null,
         parentId,
         treeSort:
           typeof input.treeSort === 'number' ? input.treeSort : existing.treeSort,
@@ -362,28 +386,26 @@ export class PostsService {
         coverUrl: input.coverUrl,
         props: props as never,
         body: input.body as never,
+        authorId: input.authorId ?? existing.authorId,
         draft: asDraft,
         publishedAt,
         updatedAt: now,
       },
     );
-    const updated = await this.findById(id);
-    if (updated?.pageKind === 'about') {
-      await this.site.syncFromAboutPage(updated);
-    }
-    return updated;
+    return this.findById(id);
   }
 
   async createLinkedChild(parentId: string) {
     return this.dataSource.transaction(async () => {
       const parent = await this.findById(parentId);
-      if (!parent || parent.pageKind !== 'article') {
+      if (!parent || !policyOf(parent.pageKind).allowParent) {
         rpcFail(400, 'INVALID_PARENT');
       }
       const child = await this.create({
+        appCode: parent.appCode,
         title: '无标题',
         type: parent.type,
-        pageKind: 'article',
+        pageKind: parent.pageKind,
         parentId,
         summary: '',
         coverUrl: '',
@@ -401,10 +423,10 @@ export class PostsService {
   async reparent(childId: string, newParentId: string | null) {
     return this.dataSource.transaction(async () => {
       const child = await this.findById(childId);
-      if (!child || child.pageKind !== 'article') {
+      if (!child || !policyOf(child.pageKind).allowParent) {
         rpcFail(404, 'NOT_FOUND');
       }
-      const resolvedParentId = await this.resolveArticleParent(newParentId);
+      const resolvedParentId = await this.resolveParent(child.appCode, newParentId);
       if (resolvedParentId && (await this.wouldCreateCycle(childId, resolvedParentId))) {
         rpcFail(400, 'INVALID_PARENT');
       }
@@ -429,7 +451,7 @@ export class PostsService {
         { id: childId },
         {
           parentId: resolvedParentId,
-          treeSort: await this.nextTreeSort(resolvedParentId, 'article'),
+          treeSort: await this.nextTreeSort(child.appCode, resolvedParentId, 'article'),
           draft: asDraft,
           publishedAt,
           updatedAt: now,
@@ -457,7 +479,7 @@ export class PostsService {
       if (!existing) {
         return false;
       }
-      if (existing.pageKind === 'about') {
+      if (!policyOf(existing.pageKind).allowDelete) {
         rpcFail(400, 'PAGE_FIXED');
       }
       const ids = await this.collectSubtree(id);
@@ -471,23 +493,27 @@ export class PostsService {
     });
   }
 
-  async ensureAboutPage() {
-    if (await this.findByKind('about')) {
-      return;
+  async ensureAboutPage(appCode = DEFAULT_APP_CODE): Promise<DocPost> {
+    const existing = await this.findByKind(appCode, 'about');
+    if (existing) {
+      return existing;
     }
-    const cats = await this.categories.list();
-    const about = await this.site.getAbout();
-    await this.create({
-      title: about.name,
+    const cats = await this.categories.list(appCode);
+    return this.create({
+      appCode,
+      title: DEFAULT_ABOUT.name,
       slug: `sys-about-${randomUUID().slice(0, 8)}`,
       type: cats.find((item) => item.kind === 'article')?.slug ?? 'life',
       pageKind: 'about',
       summary: '',
       coverUrl: '',
-      body: about.body,
+      body: DEFAULT_ABOUT.body,
       draft: false,
       treeSort: -1,
-      props: { avatar: about.avatar, skills: about.skills },
+      props: {
+        avatar: DEFAULT_ABOUT.avatar,
+        skills: DEFAULT_ABOUT.skills,
+      },
     });
   }
 
@@ -502,7 +528,7 @@ export class PostsService {
     child: Pick<DocPost, 'id' | 'slug' | 'title'>,
   ) {
     const parent = await this.findById(parentId);
-    if (!parent || parent.pageKind !== 'article') {
+    if (!parent || !policyOf(parent.pageKind).allowParent) {
       return null;
     }
     const blocks = [...(parent.body.blocks ?? [])];
@@ -556,12 +582,12 @@ export class PostsService {
     );
   }
 
-  private async resolveArticleParent(parentId: string | null | undefined) {
+  private async resolveParent(appCode: string, parentId: string | null | undefined) {
     if (!parentId) {
       return null;
     }
     const parent = await this.findById(parentId);
-    if (!parent || parent.pageKind !== 'article') {
+    if (!parent || parent.appCode !== appCode || !policyOf(parent.pageKind).allowParent) {
       rpcFail(400, 'INVALID_PARENT');
     }
     return parent.id;
@@ -584,7 +610,7 @@ export class PostsService {
     return false;
   }
 
-  private async uniqueSlug(base: string, excludeId?: string): Promise<string> {
+  private async uniqueSlug(appCode: string, base: string, excludeId?: string): Promise<string> {
     const slugify = (input: string) => {
       const value = input
         .trim()
@@ -597,7 +623,7 @@ export class PostsService {
     let slug = slugify(base);
     let i = 2;
     for (;;) {
-      const row = await this.posts.findOne({ where: { slug } });
+      const row = await this.posts.findOne({ where: { appCode, slug } });
       if (!row || row.id === excludeId) {
         return slug;
       }
@@ -606,14 +632,15 @@ export class PostsService {
     }
   }
 
-  private async nextTreeSort(parentId: string | null, pageKind?: PageKind) {
+  private async nextTreeSort(appCode: string, parentId: string | null, pageKind?: DocKind) {
     const qb = this.posts
       .createQueryBuilder('post')
-      .select('COALESCE(MAX(post.treeSort), -1)', 'n');
+      .select('COALESCE(MAX(post.treeSort), -1)', 'n')
+      .andWhere('post.appCode = :appCode', { appCode });
     if (parentId) {
-      qb.where('post.parentId = :parentId', { parentId });
-    } else if (pageKind === 'article') {
-      qb.where("post.pageKind = 'article' AND post.parentId IS NULL");
+      qb.andWhere('post.parentId = :parentId', { parentId });
+    } else if (pageKind && policyOf(pageKind).allowParent) {
+      qb.andWhere('post.kind = :pageKind AND post.parentId IS NULL', { pageKind });
     } else {
       return 0;
     }

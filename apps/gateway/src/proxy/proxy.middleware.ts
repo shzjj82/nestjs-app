@@ -29,14 +29,16 @@ export class ProxyMiddleware implements NestMiddleware {
 
     try {
       const query = (req.query ?? {}) as Record<string, unknown>;
-      const needsDocsKey =
-        pathname === '/docs/posts' &&
+      const isDocsList =
+        pathname === '/docs/posts' || pathname === '/docs/documents';
+      const needsPrivilege =
+        isDocsList &&
         (query.tree === '1' ||
           query.tree === 'true' ||
           query.includeDrafts === '1' ||
           query.includeDrafts === 'true');
-      const auth = needsDocsKey
-        ? [...new Set([...(route.auth ?? []), 'docs-key' as const])]
+      const auth = needsPrivilege
+        ? [...new Set([...(route.auth ?? []), 'jwt' as const, 'docs-key' as const])]
         : route.auth;
       const user = await this.auth.enforce(auth, req, route.permissions);
       this.logger.log(`${req.method} ${pathname} -> ${route.pattern}`);
@@ -57,7 +59,7 @@ export class ProxyMiddleware implements NestMiddleware {
           : null,
         this.auth.bearerToken(req) ?? user?.token,
       );
-      payload._docsPrivileged = this.auth.hasValidDocsKey(req);
+      payload._docsPrivileged = this.auth.hasValidDocsKey(req) || !!user;
       const result = await this.clients.send(
         route.client,
         route.pattern,

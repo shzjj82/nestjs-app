@@ -1,35 +1,39 @@
 import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
 
 @Entity('doc_categories')
+@Index('uq_doc_categories_app_slug', ['appCode', 'slug'], { unique: true })
 export class CategoryEntity {
   @PrimaryColumn({ type: 'uuid' })
-  id: string;
+  id!: string;
 
-  @Index({ unique: true })
+  @Index()
+  @Column({ name: 'app_code', type: 'varchar', length: 64, default: 'blog' })
+  appCode!: string;
+
   @Column({ type: 'varchar', length: 64 })
-  slug: string;
+  slug!: string;
 
   @Column({ type: 'varchar', length: 32 })
-  name: string;
+  name!: string;
 
   @Column({ type: 'varchar', length: 128, default: '' })
-  hint: string;
+  hint!: string;
 
   @Column({ type: 'varchar', length: 32 })
-  color: string;
+  color!: string;
 
   @Column({ type: 'varchar', length: 32, default: 'article' })
-  kind: string;
+  kind!: string;
 
   @Column({ type: 'boolean', default: true })
-  nav: boolean;
+  nav!: boolean;
 
   @Column({ type: 'int', default: 0 })
-  sort: number;
+  sort!: number;
 
   @Column({ name: 'created_at', type: 'timestamptz' })
-  createdAt: Date;
+  createdAt!: Date;
 
   @Column({ name: 'updated_at', type: 'timestamptz' })
-  updatedAt: Date;
+  updatedAt!: Date;
 }

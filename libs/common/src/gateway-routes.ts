@@ -242,72 +242,13 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
     pattern: MQTT_PATTERNS.ORDER_CREATE,
     override: true,
   },
+  ...docsContentRoutes('/docs/posts'),
+  ...docsContentRoutes('/docs/documents'),
   {
     method: 'GET',
     path: '/docs/health',
     client: DOCS_CLIENT,
     pattern: MQTT_PATTERNS.DOC_HEALTH,
-  },
-  {
-    method: 'GET',
-    path: '/docs/posts/workspace/specials',
-    client: DOCS_CLIENT,
-    pattern: MQTT_PATTERNS.DOC_POST_SPECIALS,
-    auth: ['docs-key'],
-  },
-  {
-    method: 'GET',
-    path: '/docs/posts/id/:id',
-    client: DOCS_CLIENT,
-    pattern: MQTT_PATTERNS.DOC_POST_FIND_ID,
-    auth: ['docs-key'],
-  },
-  {
-    method: 'POST',
-    path: '/docs/posts/id/:id/children',
-    client: DOCS_CLIENT,
-    pattern: MQTT_PATTERNS.DOC_POST_CHILDREN,
-    auth: ['docs-key'],
-  },
-  {
-    method: 'PUT',
-    path: '/docs/posts/id/:id/parent',
-    client: DOCS_CLIENT,
-    pattern: MQTT_PATTERNS.DOC_POST_REPARENT,
-    auth: ['docs-key'],
-  },
-  {
-    method: 'GET',
-    path: '/docs/posts',
-    client: DOCS_CLIENT,
-    pattern: MQTT_PATTERNS.DOC_POST_FIND_ALL,
-  },
-  {
-    method: 'GET',
-    path: '/docs/posts/:slug',
-    client: DOCS_CLIENT,
-    pattern: MQTT_PATTERNS.DOC_POST_FIND_SLUG,
-  },
-  {
-    method: 'POST',
-    path: '/docs/posts',
-    client: DOCS_CLIENT,
-    pattern: MQTT_PATTERNS.DOC_POST_CREATE,
-    auth: ['docs-key'],
-  },
-  {
-    method: 'PUT',
-    path: '/docs/posts/:id',
-    client: DOCS_CLIENT,
-    pattern: MQTT_PATTERNS.DOC_POST_UPDATE,
-    auth: ['docs-key'],
-  },
-  {
-    method: 'DELETE',
-    path: '/docs/posts/:id',
-    client: DOCS_CLIENT,
-    pattern: MQTT_PATTERNS.DOC_POST_DELETE,
-    auth: ['docs-key'],
   },
   {
     method: 'GET',
@@ -326,21 +267,21 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
     path: '/docs/categories',
     client: DOCS_CLIENT,
     pattern: MQTT_PATTERNS.DOC_CATEGORY_CREATE,
-    auth: ['docs-key'],
+    auth: ['jwt', 'docs-key'],
   },
   {
     method: 'PUT',
     path: '/docs/categories/:id',
     client: DOCS_CLIENT,
     pattern: MQTT_PATTERNS.DOC_CATEGORY_UPDATE,
-    auth: ['docs-key'],
+    auth: ['jwt', 'docs-key'],
   },
   {
     method: 'DELETE',
     path: '/docs/categories/:id',
     client: DOCS_CLIENT,
     pattern: MQTT_PATTERNS.DOC_CATEGORY_DELETE,
-    auth: ['docs-key'],
+    auth: ['jwt', 'docs-key'],
   },
   {
     method: 'GET',
@@ -353,9 +294,76 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
     path: '/docs/site',
     client: DOCS_CLIENT,
     pattern: MQTT_PATTERNS.DOC_SITE_SAVE,
-    auth: ['docs-key'],
+    auth: ['jwt', 'docs-key'],
   },
 ];
+
+function docsContentRoutes(prefix: '/docs/posts' | '/docs/documents'): GatewayRoute[] {
+  const auth: GatewayAuth[] = ['jwt', 'docs-key'];
+  return [
+    {
+      method: 'GET',
+      path: `${prefix}/workspace/specials`,
+      client: DOCS_CLIENT,
+      pattern: MQTT_PATTERNS.DOC_POST_SPECIALS,
+      auth,
+    },
+    {
+      method: 'GET',
+      path: `${prefix}/id/:id`,
+      client: DOCS_CLIENT,
+      pattern: MQTT_PATTERNS.DOC_POST_FIND_ID,
+      auth,
+    },
+    {
+      method: 'POST',
+      path: `${prefix}/id/:id/children`,
+      client: DOCS_CLIENT,
+      pattern: MQTT_PATTERNS.DOC_POST_CHILDREN,
+      auth,
+    },
+    {
+      method: 'PUT',
+      path: `${prefix}/id/:id/parent`,
+      client: DOCS_CLIENT,
+      pattern: MQTT_PATTERNS.DOC_POST_REPARENT,
+      auth,
+    },
+    {
+      method: 'GET',
+      path: prefix,
+      client: DOCS_CLIENT,
+      pattern: MQTT_PATTERNS.DOC_POST_FIND_ALL,
+    },
+    {
+      method: 'GET',
+      path: `${prefix}/:slug`,
+      client: DOCS_CLIENT,
+      pattern: MQTT_PATTERNS.DOC_POST_FIND_SLUG,
+    },
+    {
+      method: 'POST',
+      path: prefix,
+      client: DOCS_CLIENT,
+      pattern: MQTT_PATTERNS.DOC_POST_CREATE,
+      auth,
+    },
+    {
+      method: 'PUT',
+      path: `${prefix}/:id`,
+      client: DOCS_CLIENT,
+      pattern: MQTT_PATTERNS.DOC_POST_UPDATE,
+      auth,
+    },
+    {
+      method: 'DELETE',
+      path: `${prefix}/:id`,
+      client: DOCS_CLIENT,
+      pattern: MQTT_PATTERNS.DOC_POST_DELETE,
+      auth,
+    },
+  ];
+}
 
 export function normalizePath(path: string): string {
   if (!path || path === '/') {

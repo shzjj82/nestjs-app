@@ -4,6 +4,9 @@ const usercenterReplicas = Number(process.env.USERCENTER_REPLICAS ?? 3);
 const databaseUrl =
   process.env.DATABASE_URL ??
   'postgres://nestjs:nestjs@127.0.0.1:5432/nestjs';
+const docsDatabaseUrl =
+  process.env.DOCS_DATABASE_URL ??
+  databaseUrl.replace(/\/[^/?]+(\?|$)/, '/docs$1');
 const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
 
 const usercenterApps = Array.from({ length: usercenterReplicas }, (_, index) => {
@@ -71,6 +74,8 @@ module.exports = {
         DATABASE_URL: databaseUrl,
         REDIS_URL: redisUrl,
         INSTANCE_ID: 'docs-1',
+        DATABASE_URL: databaseUrl,
+        DOCS_DATABASE_URL: docsDatabaseUrl,
         DOCS_SERVICE_KEY: process.env.DOCS_SERVICE_KEY ?? 'dev-docs-key',
       },
     },

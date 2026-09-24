@@ -1,7 +1,6 @@
 import { CategoryEntity } from './category.entity';
-import { PostEntity } from './post.entity';
-import { SiteEntity } from './site.entity';
+import { DocumentEntity } from './document.entity';
 
-export const DOCS_ENTITIES = [CategoryEntity, PostEntity, SiteEntity];
+export const DOCS_ENTITIES = [CategoryEntity, DocumentEntity];
 
-export { CategoryEntity, PostEntity, SiteEntity };
+export { CategoryEntity, DocumentEntity };

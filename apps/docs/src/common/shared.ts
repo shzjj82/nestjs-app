@@ -1,3 +1,5 @@
+import { isDocKind, policyOf, type DocKind } from './doc-kinds';
+
 export type EditorJsBlock = {
   id?: string;
   type: string;
@@ -10,7 +12,8 @@ export type EditorJsDocument = {
   blocks: EditorJsBlock[];
 };
 
-export type PageKind = 'article' | 'about';
+/** @deprecated 使用 DocKind；保留别名是为了博客 pageKind 字段 */
+export type PageKind = import('./doc-kinds').DocKind;
 export type CategoryKind = 'article';
 export type SiteSkillColor =
   | 'app-pink'
@@ -46,7 +49,6 @@ export const RESERVED_PATHS = [
   'login',
   'post',
   'api',
-  'uploads',
   'notes',
   'about',
 ];
@@ -61,6 +63,7 @@ export const RESERVED_TAG_NAMES = [
 
 export type Category = {
   id: string;
+  appCode: string;
   slug: string;
   name: string;
   hint: string;
@@ -74,6 +77,7 @@ export type Category = {
 
 export type DocPost = {
   id: string;
+  appCode: string;
   slug: string;
   title: string;
   type: string;
@@ -87,6 +91,8 @@ export type DocPost = {
   coverUrl: string;
   props: Record<string, unknown>;
   tags: string[];
+  bodyFormat: string;
+  authorId: string | null;
   body: EditorJsDocument;
   draft: boolean;
   publishedAt: string | null;
@@ -97,6 +103,14 @@ export type DocPost = {
 export type DocPostListItem = Omit<DocPost, 'body'>;
 
 export type SiteSkill = { name: string; color: SiteSkillColor };
+
+/** about 文档的额外字段，存在 doc_documents.props 里，不是另一张表 */
+export type AboutExtras = {
+  avatar: string;
+  skills: SiteSkill[];
+};
+
+/** 首页 / 关于卡的投影，对应唯一一篇 pageKind=about 的文档 */
 export type SiteAbout = {
   name: string;
   body: EditorJsDocument;
@@ -169,8 +183,89 @@ export const DEFAULT_ABOUT: SiteAbout = {
   ],
 };
 
+export function parseSkills(raw: unknown): SiteSkill[] {
+  if (typeof raw === 'string') {
+    try {
+      return parseSkills(JSON.parse(raw));
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+    const row = item as { name?: unknown; color?: unknown };
+    if (typeof row.name !== 'string' || typeof row.color !== 'string') {
+      return [];
+    }
+    const name = row.name.trim();
+    if (!name || !isSiteSkillColor(row.color)) {
+      return [];
+    }
+    return [{ name, color: row.color }];
+  });
+}
+
+export function aboutExtrasFromProps(
+  props?: Record<string, unknown>,
+): AboutExtras {
+  const avatar =
+    typeof props?.avatar === 'string' && props.avatar.trim()
+      ? props.avatar.trim()
+      : '';
+  const skills = parseSkills(props?.skills);
+  return {
+    avatar,
+    skills: props?.skills === undefined ? DEFAULT_ABOUT.skills : skills,
+  };
+}
+
+export function propsWithAboutExtras(
+  props: Record<string, unknown> | undefined,
+  extras?: Partial<AboutExtras>,
+): Record<string, unknown> {
+  const current = aboutExtrasFromProps(props);
+  return {
+    ...(props ?? {}),
+    avatar: extras?.avatar ?? current.avatar,
+    skills: extras?.skills ?? current.skills,
+  };
+}
+
+export function normalizeKindProps(
+  kind: DocKind,
+  props?: Record<string, unknown>,
+  extras?: Partial<AboutExtras>,
+): Record<string, unknown> {
+  if (policyOf(kind).extras === 'about') {
+    return propsWithAboutExtras(props, extras);
+  }
+  return { ...(props ?? {}) };
+}
+
+export function aboutFromPost(post: {
+  title: string;
+  body: EditorJsDocument | unknown;
+  props: Record<string, unknown>;
+}): SiteAbout {
+  const extras = aboutExtrasFromProps(post.props);
+  return {
+    name: post.title || DEFAULT_ABOUT.name,
+    body: normalizeEditorDocument(post.body),
+    avatar: extras.avatar || DEFAULT_ABOUT.avatar,
+    skills: extras.skills,
+  };
+}
+
+export { DOC_KINDS, isDocKind, policyOf, resolveDocKind } from './doc-kinds';
+export type { DocKind, DocKindPolicy } from './doc-kinds';
+
 export function isPageKind(value: string): value is PageKind {
-  return value === 'article' || value === 'about';
+  return isDocKind(value);
 }
 
 export function isCategoryKind(value: string): value is CategoryKind {

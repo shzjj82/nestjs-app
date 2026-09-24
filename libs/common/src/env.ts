@@ -21,6 +21,21 @@ export function databaseUrl(): string {
   return `postgres://${user}:${password}@${host}:${port}/${database}`;
 }
 
+/** docs 默认独立库 `docs`；可用 DOCS_DATABASE_URL 覆盖 */
+export function docsDatabaseUrl(): string {
+  if (process.env.DOCS_DATABASE_URL) {
+    return process.env.DOCS_DATABASE_URL;
+  }
+  const shared = databaseUrl();
+  try {
+    const parsed = new URL(shared);
+    parsed.pathname = '/docs';
+    return parsed.toString();
+  } catch {
+    return shared.replace(/\/[^/?]+(\?|$)/, '/docs$1');
+  }
+}
+
 export function redisConfig() {
   return {
     host: readEnv('REDIS_HOST', '127.0.0.1'),
