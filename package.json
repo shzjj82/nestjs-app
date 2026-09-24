@@ -51,6 +51,7 @@
     "exceljs": "^4.4.0",
     "ioredis": "^5.11.1",
     "mqtt": "^5.16.0",
+    "multer": "^2.4.0",
     "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
