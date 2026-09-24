@@ -58,5 +58,21 @@ module.exports = {
         INSTANCE_ID: 'order-1',
       },
     },
+    {
+      name: 'docs',
+      script: 'dist/apps/docs/main.js',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      max_memory_restart: '300M',
+      env: {
+        NODE_ENV: 'production',
+        MQTT_URL: mqttUrl,
+        DATABASE_URL: databaseUrl,
+        REDIS_URL: redisUrl,
+        INSTANCE_ID: 'docs-1',
+        DOCS_SERVICE_KEY: process.env.DOCS_SERVICE_KEY ?? 'dev-docs-key',
+      },
+    },
   ],
 };

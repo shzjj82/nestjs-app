@@ -28,28 +28,40 @@ export class ProxyMiddleware implements NestMiddleware {
     }
 
     try {
-      const user = await this.auth.enforce(route.auth, req, route.permissions);
+      const query = (req.query ?? {}) as Record<string, unknown>;
+      const needsDocsKey =
+        pathname === '/docs/posts' &&
+        (query.tree === '1' ||
+          query.tree === 'true' ||
+          query.includeDrafts === '1' ||
+          query.includeDrafts === 'true');
+      const auth = needsDocsKey
+        ? [...new Set([...(route.auth ?? []), 'docs-key' as const])]
+        : route.auth;
+      const user = await this.auth.enforce(auth, req, route.permissions);
       this.logger.log(`${req.method} ${pathname} -> ${route.pattern}`);
+      const payload = buildProxyPayload(
+        req,
+        route.params,
+        user
+          ? {
+              token: user.token,
+              userId: user.id,
+              appId: user.appId,
+              username: user.username ?? null,
+              nickname: user.name,
+              role: user.role,
+              roles: user.roles,
+              permissions: user.permissions,
+            }
+          : null,
+        this.auth.bearerToken(req) ?? user?.token,
+      );
+      payload._docsPrivileged = this.auth.hasValidDocsKey(req);
       const result = await this.clients.send(
         route.client,
         route.pattern,
-        buildProxyPayload(
-          req,
-          route.params,
-          user
-            ? {
-                token: user.token,
-                userId: user.id,
-                appId: user.appId,
-                username: user.username ?? null,
-                nickname: user.name,
-                role: user.role,
-                roles: user.roles,
-                permissions: user.permissions,
-              }
-            : null,
-          this.auth.bearerToken(req) ?? user?.token,
-        ),
+        payload,
       );
       const code = req.method === 'POST' ? 201 : 200;
       res.status(code).json(ok(unwrapData(result), 'ok', code));

@@ -4,7 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { GatewayAuth } from '@app/common';
-import { TokenStore } from '@app/common';
+import { docsServiceKey, TokenStore } from '@app/common';
 import type { Request } from 'express';
 import type { GatewayUser } from './auth.types';
 
@@ -13,6 +13,19 @@ type AuthedRequest = Request & { user?: GatewayUser };
 @Injectable()
 export class AuthService {
   constructor(private readonly tokens: TokenStore) {}
+
+  docsKey(req: Request): string | null {
+    const header = req.headers['x-docs-key'];
+    if (typeof header === 'string' && header.trim()) {
+      return header.trim();
+    }
+    return null;
+  }
+
+  hasValidDocsKey(req: Request): boolean {
+    const key = this.docsKey(req);
+    return !!key && key === docsServiceKey();
+  }
 
   bearerToken(req: Request): string | null {
     const header = req.headers.authorization;
@@ -49,6 +62,15 @@ export class AuthService {
     req: Request,
     permissions?: string[],
   ): Promise<GatewayUser | null> {
+    if (auth?.includes('docs-key')) {
+      if (!this.hasValidDocsKey(req)) {
+        throw new UnauthorizedException('需要文档服务密钥：x-docs-key');
+      }
+      if (auth.length === 1 && !permissions?.length) {
+        return null;
+      }
+    }
+
     if (!auth?.length && !permissions?.length) {
       return null;
     }

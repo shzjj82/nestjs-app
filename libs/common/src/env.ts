@@ -28,6 +28,10 @@ export function redisConfig() {
   };
 }
 
+export function docsServiceKey(): string {
+  return readEnv('DOCS_SERVICE_KEY', 'dev-docs-key');
+}
+
 export function redisUrl(): string {
   if (process.env.REDIS_URL) {
     return process.env.REDIS_URL;
