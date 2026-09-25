@@ -72,7 +72,7 @@ npm run docker:up
 或：
 
 ```bash
-docker compose up --build --scale usercenter=3 --scale order=1
+docker compose up --build
 ```
 
 只起基础设施：
