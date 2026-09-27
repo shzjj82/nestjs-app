@@ -1,6 +1,6 @@
 # NestJS MQTT 微服务 Monorepo
 
-对外只暴露 **gateway:3000**。`usercenter` / `order` 通过 MQTT 通信，多个同名实例用 `$share` 共享订阅做负载均衡。
+对外只暴露 **gateway:3000**。`usercenter`、`order`、`docs`、`upload` 通过 MQTT 通信，多个同名实例用 `$share` 共享订阅做负载均衡。
 
 数据层使用 **PostgreSQL**（主库）和 **Redis**（缓存 / 会话），MQTT 用 Mosquitto。三种依赖都支持 **脚本安装** 和 **docker-compose**。
 
@@ -20,7 +20,7 @@
 npm run infra:up
 ```
 
-再启动三个应用：
+再启动 gateway、usercenter、order、docs、upload：
 
 ```bash
 npm run start:dev
@@ -44,7 +44,7 @@ sudo ./scripts/install-db.sh
 # 2. 安装并启动 MQTT
 sudo ./scripts/install-mosquitto.sh
 
-# 3. 启动全部服务：gateway + 3 个 usercenter + order
+# 3. 启动全部服务：gateway + 3 个 usercenter + order + docs + upload
 npm run pm2:start
 
 # 云上只跑网关，微服务在本地：
@@ -63,7 +63,7 @@ sudo REDIS_BIND=0.0.0.0 ./scripts/install-redis.sh
 
 ## Docker Compose（推荐）
 
-默认 3 个 usercenter + 1 个 order，并带上 PostgreSQL / Redis / Mosquitto。请求地址始终是 `http://localhost:3000`：
+一次拉起 PostgreSQL、Redis、Mosquitto，以及 gateway、usercenter、order、docs、upload 各 1 个实例。请求地址始终是 `http://localhost:3000`。用户中心要多实例时再加 `--scale usercenter=3`：
 
 ```bash
 npm run docker:up

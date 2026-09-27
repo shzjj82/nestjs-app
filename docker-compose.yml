@@ -4,6 +4,7 @@ x-app-env: &app-env
   DOCS_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/docs
   REDIS_URL: redis://redis:6379
   UPLOAD_API_KEY: ${UPLOAD_API_KEY:-dev-upload-key}
+  DOCS_SERVICE_KEY: ${DOCS_SERVICE_KEY:-dev-docs-key}
 
 x-app-depends: &app-depends
   mosquitto:
@@ -79,11 +80,14 @@ services:
     environment:
       <<: *app-env
       WECHAT_MOCK: ${WECHAT_MOCK:-1}
-      SEED_APP_ID: ${SEED_APP_ID:-default}
+      ALIPAY_MOCK: ${ALIPAY_MOCK:-1}
+      SEED_APP_CODE: ${SEED_APP_CODE:-web}
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin123}
       WECHAT_APP_ID: ${WECHAT_APP_ID:-}
       WECHAT_SECRET: ${WECHAT_SECRET:-}
+      ALIPAY_APP_ID: ${ALIPAY_APP_ID:-}
+      ALIPAY_PRIVATE_KEY: ${ALIPAY_PRIVATE_KEY:-}
     depends_on: *app-depends
 
   order:
@@ -107,7 +111,6 @@ services:
     environment:
       <<: *app-env
       INSTANCE_ID: docs-1
-      DOCS_SERVICE_KEY: ${DOCS_SERVICE_KEY:-dev-docs-key}
     depends_on: *app-depends
 
   upload:
