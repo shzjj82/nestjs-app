@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { SharedModule } from '../common/shared.module';
 import {
   RoleEntity,
   UserEntity,
@@ -18,7 +17,6 @@ import { UsersService } from './users.service';
       UserRoleEntity,
       RoleEntity,
     ]),
-    SharedModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],

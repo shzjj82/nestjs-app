@@ -1,17 +1,12 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { DEFAULT_APP_CODE } from '../common/app-code';
-import { CategoriesService } from '../categories/categories.service';
 import { dropLegacySharedDocTables, openSharedDatabase } from './ensure-database';
 
 @Injectable()
 export class SeedService implements OnModuleInit {
   private readonly logger = new Logger('DocsSeed');
 
-  constructor(
-    private readonly categories: CategoriesService,
-    private readonly dataSource: DataSource,
-  ) {}
+  constructor(private readonly dataSource: DataSource) {}
 
   async onModuleInit() {
     await this.copyFromSharedDatabase();
@@ -21,8 +16,7 @@ export class SeedService implements OnModuleInit {
     if (Number(local[0]?.n ?? 0) > 0) {
       await dropLegacySharedDocTables(this.logger);
     }
-    await this.categories.ensureDefaults(DEFAULT_APP_CODE);
-    this.logger.log(`文档服务已就绪：appCode=${DEFAULT_APP_CODE}`);
+    this.logger.log('文档服务已就绪');
   }
 
   private async copyFromSharedDatabase() {
@@ -48,7 +42,14 @@ export class SeedService implements OnModuleInit {
         return;
       }
       const cats = await src.query(`SELECT * FROM doc_categories`);
+      let copiedCategories = 0;
+      let skipped = 0;
       for (const row of cats) {
+        const appCode = String(row.app_code ?? '').trim();
+        if (!appCode || (row.kind && row.kind !== 'article')) {
+          skipped += 1;
+          continue;
+        }
         await this.dataSource.query(
           `INSERT INTO doc_categories
             (id, app_code, slug, name, hint, color, kind, nav, sort, created_at, updated_at)
@@ -56,21 +57,31 @@ export class SeedService implements OnModuleInit {
            ON CONFLICT (id) DO NOTHING`,
           [
             row.id,
-            row.app_code ?? DEFAULT_APP_CODE,
+            appCode,
             row.slug,
             row.name,
             row.hint ?? '',
             row.color,
-            row.kind ?? 'article',
-            row.nav ?? true,
+            'article',
+            row.nav === true,
             row.sort ?? 0,
             row.created_at,
             row.updated_at,
           ],
         );
+        copiedCategories += 1;
       }
       const docs = await src.query(`SELECT * FROM doc_documents`);
+      const copiedDocs = [];
       for (const row of docs) {
+        const appCode = String(row.app_code ?? '').trim();
+        const kind = row.kind ?? 'article';
+        if (!appCode || kind !== 'article') {
+          skipped += 1;
+          continue;
+        }
+        copiedDocs.push(row);
+        const visibility = row.visibility === 'public' ? 'public' : 'private';
         await this.dataSource.query(
           `INSERT INTO doc_documents
             (id, app_code, slug, title, kind, category, category_id, parent_id, tree_sort,
@@ -80,10 +91,10 @@ export class SeedService implements OnModuleInit {
            ON CONFLICT (id) DO NOTHING`,
           [
             row.id,
-            row.app_code ?? DEFAULT_APP_CODE,
+            appCode,
             row.slug,
             row.title,
-            row.kind === 'kb' ? 'article' : (row.kind ?? 'article'),
+            'article',
             row.category ?? '',
             row.category_id ?? null,
             row.tree_sort ?? 0,
@@ -92,8 +103,7 @@ export class SeedService implements OnModuleInit {
             row.props ?? {},
             row.body_format ?? 'editorjs',
             row.body ?? { time: Date.now(), version: '2.30.7', blocks: [] },
-            row.visibility ??
-              (row.draft === false || row.draft === 'false' ? 'public' : 'private'),
+            visibility,
             row.published_at ?? null,
             row.author_id ?? null,
             row.created_at,
@@ -101,8 +111,9 @@ export class SeedService implements OnModuleInit {
           ],
         );
       }
-      for (const row of docs) {
-        if (!row.parent_id) {
+      const copiedIds = new Set(copiedDocs.map((row) => row.id));
+      for (const row of copiedDocs) {
+        if (!row.parent_id || !copiedIds.has(row.parent_id)) {
           continue;
         }
         await this.dataSource.query(
@@ -110,7 +121,9 @@ export class SeedService implements OnModuleInit {
           [row.id, row.parent_id],
         );
       }
-      this.logger.log(`已从共享库迁入分类 ${cats.length}、文档 ${docs.length}`);
+      this.logger.log(
+        `已从共享库迁入分类 ${copiedCategories}、文档 ${copiedDocs.length}，跳过 ${skipped}（缺 app_code 或非 article）`,
+      );
     } finally {
       await src.destroy();
     }

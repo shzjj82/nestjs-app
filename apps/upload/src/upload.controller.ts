@@ -1,12 +1,11 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-import { instanceId, MQTT_PATTERNS } from '@app/common';
-import { HandleLogInterceptor } from './common/handle-log.interceptor';
+import { instanceId, MQTT_PATTERNS, UploadHandleLogInterceptor } from '@app/common';
 import { uploadPattern } from './common/rpc';
 import { StorageService } from './storage/storage.service';
 
 @Controller()
-@UseInterceptors(HandleLogInterceptor)
+@UseInterceptors(UploadHandleLogInterceptor)
 export class UploadController {
   constructor(private readonly storage: StorageService) {}
 

@@ -1,12 +1,11 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-import { MQTT_PATTERNS } from '@app/common';
-import { HandleLogInterceptor } from '../handle-log.interceptor';
+import { MQTT_PATTERNS, UsercenterHandleLogInterceptor } from '@app/common';
 import { ucPattern } from '../rpc';
 import { RbacService } from './rbac.service';
 
 @Controller()
-@UseInterceptors(HandleLogInterceptor)
+@UseInterceptors(UsercenterHandleLogInterceptor)
 export class RolesController {
   constructor(private readonly rbac: RbacService) {}
 

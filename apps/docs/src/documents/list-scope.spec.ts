@@ -16,13 +16,6 @@ describe('resolveDocsListScope', () => {
     expect(resolveDocsListScope({ scope: 'all' })).toBe('all');
   });
 
-  it('maps tree=1 to mine for backward compatibility', () => {
-    expect(resolveDocsListScope({ tree: '1' })).toBe('mine');
-  });
-
-  it('explicit scope wins over tree', () => {
-    expect(resolveDocsListScope({ scope: 'feed', tree: '1' })).toBe('feed');
-  });
 });
 
 describe('isTreeView', () => {
@@ -34,11 +27,10 @@ describe('isTreeView', () => {
 });
 
 describe('parseVisibility', () => {
-  it('parses visibility and legacy draft', () => {
+  it('parses visibility', () => {
     expect(parseVisibility('public')).toBe('public');
     expect(parseVisibility('private')).toBe('private');
-    expect(parseVisibility(false)).toBe('public');
-    expect(parseVisibility(true)).toBe('private');
+    expect(parseVisibility(false)).toBe('private');
     expect(parseVisibility(undefined)).toBe('private');
   });
 });

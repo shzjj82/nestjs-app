@@ -1,7 +1,6 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-import { MQTT_PATTERNS } from '@app/common';
-import { HandleLogInterceptor } from '../common/handle-log.interceptor';
+import { DocsHandleLogInterceptor, MQTT_PATTERNS } from '@app/common';
 import {
   asRecord,
   docsPattern,
@@ -10,13 +9,12 @@ import {
   rpcFail,
 } from '../common/rpc';
 import { resolveAppCode } from '../common/app-code';
-import { policyOf } from '../common/doc-kinds';
+import { isDocKind } from '../common/doc-kinds';
 import {
   isEditorJsDocument,
-  isPageKind,
   normalizeTags,
   type EditorJsDocument,
-  type PageKind,
+  type DocKind,
 } from '../common/shared';
 import { DocumentsService } from './documents.service';
 import {
@@ -27,7 +25,7 @@ import {
 } from './list-scope';
 
 @Controller()
-@UseInterceptors(HandleLogInterceptor)
+@UseInterceptors(DocsHandleLogInterceptor)
 export class DocumentsController {
   constructor(private readonly posts: DocumentsService) {}
 
@@ -75,11 +73,6 @@ export class DocumentsController {
     });
   }
 
-  @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_SPECIALS))
-  async specials(_payload: Record<string, unknown> = {}) {
-    return { about: null };
-  }
-
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_FIND_ID))
   async findId(payload: Record<string, unknown>) {
     const post = await this.posts.findById(requiredString(payload.id, 'id'));
@@ -105,12 +98,7 @@ export class DocumentsController {
   async findSlug(payload: Record<string, unknown>) {
     const privileged = payload._docsPrivileged === true;
     const sessionAuthorId = sessionUserId(payload);
-    const forceAny =
-      privileged &&
-      (payload.includeDrafts === true ||
-        payload.includeDrafts === '1' ||
-        payload.includeDrafts === 'true' ||
-        payload.mode === 'any');
+    const forceAny = privileged && payload.mode === 'any';
     const mode: 'public' | 'feed' | 'any' = forceAny
       ? 'any'
       : sessionAuthorId
@@ -123,7 +111,7 @@ export class DocumentsController {
       requiredString(payload.slug, 'slug'),
       { mode, viewerId: sessionAuthorId },
     );
-    if (!post || !policyOf(post.pageKind).publicBySlug) {
+    if (!post) {
       rpcFail(404, 'NOT_FOUND');
     }
     const visibilityFilter =
@@ -131,7 +119,7 @@ export class DocumentsController {
     const ancestors = await this.posts.listAncestors(post.id, includePrivate);
     const { posts: siblings } = await this.posts.list({
       appCode: post.appCode,
-      pageKind: post.pageKind,
+      docKind: post.kind,
       parentId: post.parentId ?? null,
       visibilityFilter,
       viewerId: sessionAuthorId,
@@ -139,7 +127,7 @@ export class DocumentsController {
     });
     const { posts: children } = await this.posts.list({
       appCode: post.appCode,
-      pageKind: post.pageKind,
+      docKind: post.kind,
       parentId: post.id,
       visibilityFilter,
       viewerId: sessionAuthorId,
@@ -208,10 +196,8 @@ export class DocumentsController {
       authorId?: string;
     },
   ) {
-    const pageKind =
-      typeof payload.pageKind === 'string' && isPageKind(payload.pageKind)
-        ? payload.pageKind
-        : undefined;
+    const docKind =
+      typeof payload.kind === 'string' && isDocKind(payload.kind) ? payload.kind : undefined;
     const parentId =
       payload.parentId === 'null' || payload.parentId === null
         ? null
@@ -219,15 +205,14 @@ export class DocumentsController {
     const { posts, total } = await this.posts.list({
       appCode,
       type: optionalString(payload.type),
-      kind: payload.kind === 'article' ? 'article' : undefined,
-      pageKind,
+      docKind,
       parentId: parentId === undefined ? undefined : parentId,
       limit: Number(payload.limit) || undefined,
       page: Number(payload.page) || undefined,
       pageSize: Number(payload.pageSize) || undefined,
       visibilityFilter: opts.visibilityFilter,
       viewerId: opts.viewerId,
-      treeOrder: Boolean(pageKind || parentId !== undefined),
+      treeOrder: Boolean(docKind || parentId !== undefined),
       authorId: opts.authorId,
     });
     return {
@@ -244,7 +229,7 @@ export class DocumentsController {
     title: string;
     slug?: string;
     type: string;
-    pageKind?: PageKind;
+    kind?: DocKind;
     parentId?: string | null;
     treeSort?: number;
     summary: string;
@@ -260,17 +245,15 @@ export class DocumentsController {
     if (!isEditorJsDocument(body)) {
       rpcFail(400, 'INVALID_BODY');
     }
-    const pageKind =
-      typeof payload.pageKind === 'string' && isPageKind(payload.pageKind)
-        ? payload.pageKind
-        : undefined;
+    const kind =
+      typeof payload.kind === 'string' && isDocKind(payload.kind) ? payload.kind : undefined;
     return {
       appCode: resolveAppCode(optionalString(payload.appCode)),
       id: optionalString(payload.id),
       title,
       slug: optionalString(payload.slug),
-      type: optionalString(payload.type) || 'life',
-      pageKind,
+      type: optionalString(payload.type) ?? '',
+      kind,
       parentId:
         payload.parentId === undefined
           ? undefined
@@ -283,10 +266,7 @@ export class DocumentsController {
       props: asRecord(payload.props),
       tags: payload.tags === undefined ? undefined : normalizeTags(payload.tags),
       body,
-      visibility: parseVisibility(
-        payload.visibility !== undefined ? payload.visibility : payload.draft,
-        'private',
-      ),
+      visibility: parseVisibility(payload.visibility, 'private'),
       authorId: sessionUserId(payload),
     };
   }

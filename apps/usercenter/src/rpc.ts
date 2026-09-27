@@ -1,26 +1,14 @@
-import { MQTT_GROUPS, sharePattern } from '@app/common';
-import { RpcException } from '@nestjs/microservices';
+import {
+  MQTT_GROUPS,
+  optionalString,
+  rpcFail,
+  sharePattern,
+} from '@app/common';
+
+export { optionalString, requiredString, rpcFail } from '@app/common';
 
 export function ucPattern(pattern: string): string {
   return sharePattern(MQTT_GROUPS.USERCENTER, pattern);
-}
-
-export function rpcFail(status: number, message: string): never {
-  throw new RpcException({ status, message });
-}
-
-export function requiredString(value: unknown, label: string): string {
-  if (typeof value !== 'string' || !value.trim()) {
-    rpcFail(400, `${label} 必填`);
-  }
-  return value.trim();
-}
-
-export function optionalString(value: unknown): string | undefined {
-  if (typeof value !== 'string' || !value.trim()) {
-    return undefined;
-  }
-  return value.trim();
 }
 
 export function systemCodeOf(

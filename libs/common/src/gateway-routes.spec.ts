@@ -58,12 +58,13 @@ describe('matchRoute', () => {
   });
 
   it('exposes public docs list and protects writes with docs-key', () => {
-    expect(matchRoute('GET', '/docs/posts')?.auth).toBeUndefined();
-    expect(matchRoute('GET', '/docs/posts/hello-slug')?.pattern).toBe(
+    expect(matchRoute('GET', '/docs/posts')).toBeNull();
+    expect(matchRoute('GET', '/docs/documents')?.auth).toBeUndefined();
+    expect(matchRoute('GET', '/docs/documents/hello-slug')?.pattern).toBe(
       MQTT_PATTERNS.DOC_POST_FIND_SLUG,
     );
-    expect(matchRoute('POST', '/docs/posts')?.auth).toEqual(['jwt', 'docs-key']);
-    expect(matchRoute('GET', '/docs/posts/workspace/specials')?.auth).toEqual([
+    expect(matchRoute('POST', '/docs/documents')?.auth).toEqual(['jwt', 'docs-key']);
+    expect(matchRoute('GET', '/docs/documents/id/abc')?.auth).toEqual([
       'jwt',
       'docs-key',
     ]);
@@ -72,7 +73,7 @@ describe('matchRoute', () => {
     );
     expect(matchRoute('POST', '/docs/documents')?.auth).toEqual(['jwt', 'docs-key']);
     expect(matchRoute('GET', '/docs/categories')?.auth).toBeUndefined();
-    expect(matchRoute('PUT', '/docs/site')?.auth).toEqual(['jwt', 'docs-key']);
+    expect(matchRoute('PUT', '/docs/categories/abc')?.auth).toEqual(['jwt', 'docs-key']);
   });
 
   it('protects upload writes with upload-key and marks file posts as override', () => {

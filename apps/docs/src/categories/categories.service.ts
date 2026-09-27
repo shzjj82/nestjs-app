@@ -2,13 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
-import { DEFAULT_APP_CODE } from '../common/app-code';
 import { rpcFail } from '../common/rpc';
 import { CategoryEntity, DocumentEntity } from '../entities';
 import {
-  DEFAULT_CATEGORIES,
-  SITE_SKILL_COLORS,
-  isReservedPath,
   normalizeTags,
   propsWithTags,
   tagsFromProps,
@@ -16,7 +12,6 @@ import {
   validateTagSlug,
   type Category,
   type CategoryKind,
-  type SiteSkillColor,
 } from '../common/shared';
 
 @Injectable()
@@ -35,7 +30,7 @@ export class CategoriesService {
       slug: row.slug,
       name: row.name,
       hint: row.hint,
-      color: (this.isColor(row.color) ? row.color : 'app-yellow') as SiteSkillColor,
+      color: row.color,
       kind: row.kind === 'article' ? 'article' : 'article',
       nav: row.nav,
       sort: row.sort,
@@ -136,7 +131,7 @@ export class CategoriesService {
         hint: input.hint?.trim() ?? '',
         color: input.color,
         kind: input.kind,
-        nav: input.nav !== false,
+        nav: input.nav === true,
         sort,
         createdAt: now,
         updatedAt: now,
@@ -182,7 +177,9 @@ export class CategoriesService {
     existing.hint = input.hint?.trim() ?? '';
     existing.color = input.color;
     existing.kind = input.kind;
-    existing.nav = input.nav !== false;
+    if (input.nav !== undefined) {
+      existing.nav = input.nav;
+    }
     existing.sort = typeof input.sort === 'number' ? input.sort : existing.sort;
     existing.updatedAt = new Date();
     await this.categories.save(existing);
@@ -204,41 +201,13 @@ export class CategoriesService {
         appCode: existing.appCode,
         name: '未分类',
         slug: 'uncategorized',
-        hint: '还没归类的笔记',
-        color: SITE_SKILL_COLORS[0],
+        hint: '',
+        color: 'neutral',
         kind: 'article',
         nav: false,
       });
     }
     return true;
-  }
-
-  async ensureDefaults(appCode = DEFAULT_APP_CODE) {
-    const count = await this.categories.count({ where: { appCode } });
-    if (count > 0) {
-      return;
-    }
-    if (appCode !== DEFAULT_APP_CODE) {
-      return;
-    }
-    const now = new Date();
-    await this.categories.save(
-      DEFAULT_CATEGORIES.map((item) =>
-        this.categories.create({
-          id: randomUUID(),
-          appCode,
-          slug: item.slug,
-          name: item.name,
-          hint: item.hint,
-          color: item.color,
-          kind: item.kind,
-          nav: item.nav,
-          sort: item.sort,
-          createdAt: now,
-          updatedAt: now,
-        }),
-      ),
-    );
   }
 
   private async uniqueSlug(appCode: string, base: string, excludeId?: string): Promise<string> {
@@ -254,11 +223,6 @@ export class CategoriesService {
     let slug = slugify(base);
     let i = 2;
     for (;;) {
-      if (isReservedPath(slug)) {
-        slug = `${slugify(base)}-${i}`;
-        i += 1;
-        continue;
-      }
       const row = await this.categories.findOne({ where: { appCode, slug } });
       if (!row || row.id === excludeId) {
         return slug;
@@ -273,56 +237,70 @@ export class CategoriesService {
     await this.posts
       .createQueryBuilder()
       .update()
-      .set({ category: to, categoryId: next?.id ?? null })
+      .set({ category: to, categoryId: next?.id ?? null, updatedAt: new Date() })
       .where('app_code = :appCode AND category = :from', { appCode, from })
       .execute();
-    const rows = await this.posts.find({ where: { appCode } });
-    for (const row of rows) {
-      const tags = tagsFromProps(row.props);
-      if (!tags.includes(from)) {
-        continue;
-      }
-      row.props = propsWithTags(
-        row.props,
-        tags.map((tag) => (tag === from ? to : tag)),
-      );
-      row.updatedAt = new Date();
-      await this.posts.save(row);
-    }
+    await this.posts.query(
+      `UPDATE doc_documents
+       SET props = jsonb_set(
+             COALESCE(props, '{}'::jsonb),
+             '{tags}',
+             (
+               SELECT COALESCE(jsonb_agg(replaced ORDER BY ord), '[]'::jsonb)
+               FROM (
+                 SELECT
+                   CASE WHEN elem #>> '{}' = $3 THEN to_jsonb($4::text) ELSE elem END AS replaced,
+                   ord
+                 FROM jsonb_array_elements(COALESCE(props->'tags', '[]'::jsonb))
+                   WITH ORDINALITY AS tagged(elem, ord)
+               ) tags
+             ),
+             true
+           ),
+           updated_at = now()
+       WHERE app_code = $1
+         AND jsonb_exists(COALESCE(props->'tags', '[]'::jsonb), $2)`,
+      [appCode, from, from, to],
+    );
   }
 
   private async detachFromPosts(appCode: string, slug: string) {
+    const cats = await this.list(appCode);
+    const bySlug = new Map(cats.map((item) => [item.slug, item]));
     const fallback =
-      (await this.list(appCode)).find((item) => item.slug !== slug && item.kind === 'article')
-        ?.slug ?? 'life';
-    const fallbackRow = await this.findBySlug(appCode, fallback);
-    const rows = await this.posts.find({ where: { appCode, kind: 'article' } });
+      cats.find((item) => item.slug !== slug && item.kind === 'article')?.slug ??
+      'uncategorized';
+    const fallbackRow = bySlug.get(fallback) ?? null;
+    const rows = await this.posts
+      .createQueryBuilder('post')
+      .where('post.appCode = :appCode AND post.kind = :kind', { appCode, kind: 'article' })
+      .andWhere(
+        `(post.category = :slug OR jsonb_exists(COALESCE(post.props->'tags', '[]'::jsonb), :slug))`,
+        { slug },
+      )
+      .getMany();
+    if (!rows.length) {
+      return;
+    }
     const now = new Date();
     for (const row of rows) {
       const tags = tagsFromProps(row.props);
-      const had = tags.includes(slug) || row.category === slug;
-      if (!had) {
-        continue;
-      }
       const nextTags = tags.filter((tag) => tag !== slug);
       const nextSlug =
         row.category === slug
           ? nextTags[0] ?? fallback
-          : (await this.findBySlug(appCode, row.category))
+          : bySlug.has(row.category)
             ? row.category
             : nextTags[0] ?? fallback;
-      const nextCat = await this.findBySlug(appCode, nextSlug);
+      const nextCat = bySlug.get(nextSlug) ?? fallbackRow;
       row.category = nextSlug;
-      row.categoryId = nextCat?.id ?? fallbackRow?.id ?? null;
+      row.categoryId = nextCat?.id ?? null;
       row.props = propsWithTags(row.props, nextTags);
       row.updatedAt = now;
-      await this.posts.save(row);
     }
+    await this.posts.save(rows);
   }
 
-  private isColor(value: string): boolean {
-    return SITE_SKILL_COLORS.includes(value as SiteSkillColor);
-  }
 }
 
 function isUuid(value?: string): value is string {

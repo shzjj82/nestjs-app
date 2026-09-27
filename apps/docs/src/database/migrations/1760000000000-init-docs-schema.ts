@@ -4,18 +4,16 @@ export class InitDocsSchema1760000000000 implements MigrationInterface {
   name = 'InitDocsSchema1760000000000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP TABLE IF EXISTS doc_site`);
-    await queryRunner.query(`DROP TABLE IF EXISTS doc_posts`);
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS doc_categories (
         id uuid PRIMARY KEY,
-        app_code varchar(64) NOT NULL DEFAULT 'blog',
+        app_code varchar(64) NOT NULL,
         slug varchar(64) NOT NULL,
         name varchar(32) NOT NULL,
         hint varchar(128) NOT NULL DEFAULT '',
         color varchar(32) NOT NULL,
         kind varchar(32) NOT NULL DEFAULT 'article',
-        nav boolean NOT NULL DEFAULT true,
+        nav boolean NOT NULL DEFAULT false,
         sort int NOT NULL DEFAULT 0,
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now()
@@ -24,7 +22,7 @@ export class InitDocsSchema1760000000000 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS doc_documents (
         id uuid PRIMARY KEY,
-        app_code varchar(64) NOT NULL DEFAULT 'blog',
+        app_code varchar(64) NOT NULL,
         slug varchar(80) NOT NULL,
         title varchar(200) NOT NULL,
         kind varchar(32) NOT NULL DEFAULT 'article',

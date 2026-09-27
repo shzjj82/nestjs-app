@@ -29,18 +29,10 @@ export class ProxyMiddleware implements NestMiddleware {
 
     try {
       const query = (req.query ?? {}) as Record<string, unknown>;
-      const isDocsList =
-        pathname === '/docs/posts' || pathname === '/docs/documents';
+      const isDocsList = pathname === '/docs/documents';
       const scope =
         typeof query.scope === 'string' ? query.scope.trim().toLowerCase() : '';
-      const needsPrivilege =
-        isDocsList &&
-        (query.tree === '1' ||
-          query.tree === 'true' ||
-          query.includeDrafts === '1' ||
-          query.includeDrafts === 'true' ||
-          scope === 'mine' ||
-          scope === 'all');
+      const needsPrivilege = isDocsList && (scope === 'mine' || scope === 'all');
       // mine 必须用户 JWT；all 可用 docs-key。二者都先抬升鉴权，docs 服务再按 scope 细判。
       const auth = needsPrivilege
         ? [...new Set([...(route.auth ?? []), 'jwt' as const, 'docs-key' as const])]
@@ -71,7 +63,7 @@ export class ProxyMiddleware implements NestMiddleware {
           : null,
         this.auth.bearerToken(req) ?? user?.token,
       );
-      payload._docsPrivileged = this.auth.hasValidDocsKey(req) || !!user;
+      payload._docsPrivileged = this.auth.hasValidDocsKey(req);
       const result = await this.clients.send(
         route.client,
         route.pattern,

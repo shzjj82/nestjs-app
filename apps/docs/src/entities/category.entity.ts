@@ -7,7 +7,7 @@ export class CategoryEntity {
   id!: string;
 
   @Index()
-  @Column({ name: 'app_code', type: 'varchar', length: 64, default: 'blog' })
+  @Column({ name: 'app_code', type: 'varchar', length: 64 })
   appCode!: string;
 
   @Column({ type: 'varchar', length: 64 })
@@ -25,7 +25,7 @@ export class CategoryEntity {
   @Column({ type: 'varchar', length: 32, default: 'article' })
   kind!: string;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ type: 'boolean', default: false })
   nav!: boolean;
 
   @Column({ type: 'int', default: 0 })

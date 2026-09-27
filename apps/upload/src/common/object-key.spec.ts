@@ -2,8 +2,8 @@ import { objectKey } from './object-key';
 
 describe('objectKey', () => {
   it('keeps prefix and file extension', () => {
-    const key = objectKey('blog/covers', 'hello world.png');
-    expect(key).toMatch(/^blog\/covers\/\d{4}\/\d{2}\/\d{2}\/[0-9a-f-]+\.png$/);
+    const key = objectKey('covers', 'hello world.png');
+    expect(key).toMatch(/^covers\/\d{4}\/\d{2}\/\d{2}\/[0-9a-f-]+\.png$/);
   });
 
   it('strips path traversal from prefix', () => {

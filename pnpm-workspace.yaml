@@ -1,6 +1,0 @@
-allowBuilds:
-  '@parcel/watcher': true
-  bcrypt: true
-  unrs-resolver: true
-minimumReleaseAgeExclude:
-  - '@aws-sdk/client-s3@3.1139.0'

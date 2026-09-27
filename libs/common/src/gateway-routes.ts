@@ -242,7 +242,6 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
     pattern: MQTT_PATTERNS.ORDER_CREATE,
     override: true,
   },
-  ...docsContentRoutes('/docs/posts'),
   ...docsContentRoutes('/docs/documents'),
   {
     method: 'GET',
@@ -284,19 +283,6 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
     auth: ['jwt', 'docs-key'],
   },
   {
-    method: 'GET',
-    path: '/docs/site',
-    client: DOCS_CLIENT,
-    pattern: MQTT_PATTERNS.DOC_SITE_GET,
-  },
-  {
-    method: 'PUT',
-    path: '/docs/site',
-    client: DOCS_CLIENT,
-    pattern: MQTT_PATTERNS.DOC_SITE_SAVE,
-    auth: ['jwt', 'docs-key'],
-  },
-  {
     method: 'POST',
     path: '/upload',
     client: UPLOAD_CLIENT,
@@ -334,16 +320,9 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   },
 ];
 
-function docsContentRoutes(prefix: '/docs/posts' | '/docs/documents'): GatewayRoute[] {
+function docsContentRoutes(prefix: '/docs/documents'): GatewayRoute[] {
   const auth: GatewayAuth[] = ['jwt', 'docs-key'];
   return [
-    {
-      method: 'GET',
-      path: `${prefix}/workspace/specials`,
-      client: DOCS_CLIENT,
-      pattern: MQTT_PATTERNS.DOC_POST_SPECIALS,
-      auth,
-    },
     {
       method: 'GET',
       path: `${prefix}/id/:id`,

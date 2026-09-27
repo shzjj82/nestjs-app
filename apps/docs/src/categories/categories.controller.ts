@@ -1,18 +1,17 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-import { MQTT_PATTERNS } from '@app/common';
-import { HandleLogInterceptor } from '../common/handle-log.interceptor';
+import { DocsHandleLogInterceptor, MQTT_PATTERNS } from '@app/common';
 import { resolveAppCode } from '../common/app-code';
 import { docsPattern, optionalString, requiredString, rpcFail } from '../common/rpc';
 import {
   isCategoryKind,
-  isSiteSkillColor,
+  isStoredColor,
   type CategoryKind,
 } from '../common/shared';
 import { CategoriesService } from './categories.service';
 
 @Controller()
-@UseInterceptors(HandleLogInterceptor)
+@UseInterceptors(DocsHandleLogInterceptor)
 export class CategoriesController {
   constructor(private readonly categories: CategoriesService) {}
 
@@ -63,7 +62,7 @@ export class CategoriesController {
     const name = requiredString(payload.name, 'name');
     const color = requiredString(payload.color, 'color');
     const kind = requiredString(payload.kind, 'kind');
-    if (!isSiteSkillColor(color) || !isCategoryKind(kind)) {
+    if (!isStoredColor(color) || !isCategoryKind(kind)) {
       rpcFail(400, 'INVALID_INPUT');
     }
     return {
@@ -74,7 +73,7 @@ export class CategoriesController {
       hint: optionalString(payload.hint) ?? '',
       color,
       kind: kind as CategoryKind,
-      nav: payload.nav === false ? false : true,
+      nav: payload.nav === undefined ? undefined : payload.nav === true,
       sort: typeof payload.sort === 'number' ? payload.sort : undefined,
     };
   }

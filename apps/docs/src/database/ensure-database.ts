@@ -58,9 +58,7 @@ export async function dropLegacySharedDocTables(logger: Logger) {
     }
     await src.query('DROP TABLE IF EXISTS doc_documents CASCADE');
     await src.query('DROP TABLE IF EXISTS doc_categories CASCADE');
-    await src.query('DROP TABLE IF EXISTS doc_site');
-    await src.query('DROP TABLE IF EXISTS doc_posts');
-    logger.log('已清理共享库中的旧 doc_* 表');
+    logger.log('已清理共享库中已迁走的 doc_documents / doc_categories');
   } finally {
     await src.destroy();
   }

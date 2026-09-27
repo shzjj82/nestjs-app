@@ -18,7 +18,7 @@ export class DocumentEntity {
   id!: string;
 
   @Index()
-  @Column({ name: 'app_code', type: 'varchar', length: 64, default: 'blog' })
+  @Column({ name: 'app_code', type: 'varchar', length: 64 })
   appCode!: string;
 
   @Column({ type: 'varchar', length: 80 })
@@ -73,7 +73,7 @@ export class DocumentEntity {
   @Column({ name: 'author_id', type: 'uuid', nullable: true })
   authorId!: string | null;
 
-  /** private | public；替代原 draft 布尔 */
+  /** private | public */
   @Index()
   @Column({ type: 'varchar', length: 16, default: 'private' })
   visibility!: string;

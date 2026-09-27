@@ -1,12 +1,11 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-import { MQTT_PATTERNS } from '@app/common';
-import { HandleLogInterceptor } from '../handle-log.interceptor';
+import { MQTT_PATTERNS, UsercenterHandleLogInterceptor } from '@app/common';
 import { ucPattern } from '../rpc';
 import { AuthService } from './auth.service';
 
 @Controller()
-@UseInterceptors(HandleLogInterceptor)
+@UseInterceptors(UsercenterHandleLogInterceptor)
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
