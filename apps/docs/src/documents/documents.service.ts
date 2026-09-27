@@ -2,12 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, Repository } from 'typeorm';
-import { DEFAULT_APP_CODE } from '../common/app-code';
 import { CategoriesService } from '../categories/categories.service';
 import { rpcFail } from '../common/rpc';
 import { policyOf, resolveDocKind, type DocKind } from '../common/doc-kinds';
 import {
-  DEFAULT_ABOUT,
   bodyHasBlocks,
   normalizeEditorDocument,
   normalizeKindProps,
@@ -20,6 +18,7 @@ import {
   type EditorJsDocument,
 } from '../common/shared';
 import { DocumentEntity } from '../entities';
+import type { DocVisibility } from './list-scope';
 
 type WriteInput = {
   appCode: string;
@@ -35,9 +34,11 @@ type WriteInput = {
   props?: Record<string, unknown>;
   tags?: string[];
   body: EditorJsDocument;
-  draft: boolean;
+  visibility?: DocVisibility;
   authorId?: string | null;
 };
+
+type VisibilityFilter = 'public-only' | 'feed' | 'any';
 
 @Injectable()
 export class DocumentsService {
@@ -80,7 +81,7 @@ export class DocumentsService {
       bodyFormat: row.bodyFormat || 'editorjs',
       authorId: row.authorId ?? null,
       body: normalizeEditorDocument(row.body),
-      draft: row.draft,
+      visibility: row.visibility === 'public' ? 'public' : 'private',
       publishedAt: row.publishedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -101,22 +102,70 @@ export class DocumentsService {
     limit?: number;
     page?: number;
     pageSize?: number;
-    includeDrafts: boolean;
+    visibilityFilter: VisibilityFilter;
+    /** feed：公开文 + 当前用户自己的私有文 */
+    viewerId?: string;
     treeOrder?: boolean;
+    /** 按作者过滤文章 */
+    authorId?: string;
+    /** workspace：本人文章 + 无作者旧文（可认领） */
+    authorScopedWorkspace?: boolean;
   }): Promise<{ posts: DocPostListItem[]; total: number }> {
     const qb = this.posts.createQueryBuilder('post');
     qb.andWhere('post.appCode = :appCode', { appCode: opts.appCode });
-    if (!opts.includeDrafts) {
-      qb.andWhere('post.draft = false');
+    if (opts.authorScopedWorkspace && opts.authorId) {
+      // authorId 为空的是接多用户前写的旧文，工作区暂时可见，编辑时会认领
+      qb.andWhere(`(post.authorId = :authorId OR post.authorId IS NULL)`, {
+        authorId: opts.authorId,
+      });
+    } else if (opts.authorId) {
+      qb.andWhere('post.authorId = :authorId', { authorId: opts.authorId });
+    }
+    if (opts.visibilityFilter === 'public-only') {
+      qb.andWhere(`post.visibility = 'public'`);
       qb.andWhere(`post.id NOT IN (
-        WITH RECURSIVE under_draft AS (
-          SELECT id FROM doc_documents WHERE draft = true AND app_code = :appCode
+        WITH RECURSIVE under_private AS (
+          SELECT id FROM doc_documents WHERE visibility = 'private' AND app_code = :appCode
           UNION ALL
-          SELECT p.id FROM doc_documents p INNER JOIN under_draft u ON p.parent_id = u.id
+          SELECT p.id FROM doc_documents p INNER JOIN under_private u ON p.parent_id = u.id
           WHERE p.app_code = :appCode
         )
-        SELECT id FROM under_draft
+        SELECT id FROM under_private
       )`);
+    } else if (opts.visibilityFilter === 'feed') {
+      if (opts.viewerId) {
+        qb.andWhere(
+          `(post.visibility = 'public' OR (post.visibility = 'private' AND post.authorId = :viewerId))`,
+          { viewerId: opts.viewerId },
+        );
+        // 必须再次传入 viewerId，否则 CTE 里 :viewerId 未绑定会把本人私有文也排除
+        qb.andWhere(
+          `post.id NOT IN (
+          WITH RECURSIVE under_hidden AS (
+            SELECT id FROM doc_documents
+            WHERE visibility = 'private'
+              AND (author_id IS DISTINCT FROM :viewerId)
+              AND app_code = :appCode
+            UNION ALL
+            SELECT p.id FROM doc_documents p INNER JOIN under_hidden u ON p.parent_id = u.id
+            WHERE p.app_code = :appCode
+          )
+          SELECT id FROM under_hidden
+        )`,
+          { viewerId: opts.viewerId },
+        );
+      } else {
+        qb.andWhere(`post.visibility = 'public'`);
+        qb.andWhere(`post.id NOT IN (
+          WITH RECURSIVE under_private AS (
+            SELECT id FROM doc_documents WHERE visibility = 'private' AND app_code = :appCode
+            UNION ALL
+            SELECT p.id FROM doc_documents p INNER JOIN under_private u ON p.parent_id = u.id
+            WHERE p.app_code = :appCode
+          )
+          SELECT id FROM under_private
+        )`);
+      }
     }
     if (opts.pageKind) {
       qb.andWhere('post.kind = :pageKind', { pageKind: opts.pageKind });
@@ -171,22 +220,58 @@ export class DocumentsService {
     };
   }
 
-  async listWorkspaceTree(appCode: string, includeDrafts: boolean): Promise<DocPostListItem[]> {
-    const { posts } = await this.list({ appCode, includeDrafts, treeOrder: true });
+  async listWorkspaceTree(
+    appCode: string,
+    authorId?: string,
+  ): Promise<DocPostListItem[]> {
+    const { posts } = await this.list({
+      appCode,
+      visibilityFilter: 'any',
+      treeOrder: true,
+      authorId,
+      authorScopedWorkspace: Boolean(authorId),
+    });
     return posts.filter((item) => policyOf(item.pageKind).tree);
+  }
+
+  /**
+   * 文章仅作者（或尚无 authorId 的旧数据）可改。
+   * 无 actorId 时放行：仅服务密钥迁移/运维路径应走到这里；用户 JWT 路径必有 actorId。
+   */
+  assertArticleOwner(post: DocPost, actorId: string | undefined): void {
+    if (!actorId) {
+      return;
+    }
+    if (post.authorId && post.authorId !== actorId) {
+      rpcFail(403, 'FORBIDDEN');
+    }
   }
 
   async findBySlug(
     appCode: string,
     slug: string,
-    includeDrafts: boolean,
+    opts: { mode: 'public' | 'feed' | 'any'; viewerId?: string },
   ): Promise<DocPost | null> {
     const row = await this.posts.findOne({ where: { appCode, slug } });
     if (!row) {
       return null;
     }
     const post = await this.toPost(row);
-    if (!includeDrafts && (post.draft || (await this.hasDraftAncestor(post.id)))) {
+    if (opts.mode === 'any') {
+      return post;
+    }
+    if (opts.mode === 'public') {
+      if (post.visibility !== 'public' || (await this.hasPrivateAncestor(post.id))) {
+        return null;
+      }
+      return post;
+    }
+    // feed：私有仅本人可见；祖先私有且非本人则不可见
+    const isOwner = Boolean(opts.viewerId && post.authorId === opts.viewerId);
+    if (post.visibility === 'private' && !isOwner) {
+      return null;
+    }
+    if (await this.hasPrivateAncestor(post.id, opts.viewerId)) {
       return null;
     }
     return post;
@@ -202,7 +287,10 @@ export class DocumentsService {
     return row ? this.toPost(row) : null;
   }
 
-  async listAncestors(postId: string, includeDrafts: boolean): Promise<DocPostListItem[]> {
+  async listAncestors(
+    postId: string,
+    includePrivate: boolean,
+  ): Promise<DocPostListItem[]> {
     const index = await this.loadAncestorIndex();
     const chainIds: string[] = [];
     let current = index.get(postId)?.parentId ?? null;
@@ -216,7 +304,7 @@ export class DocumentsService {
       if (!parent) {
         break;
       }
-      if (!includeDrafts && parent.draft) {
+      if (!includePrivate && parent.visibility === 'private') {
         break;
       }
       chainIds.unshift(current);
@@ -251,7 +339,7 @@ export class DocumentsService {
     if (policy.allowParent) {
       parentId = await this.resolveParent(appCode, input.parentId);
     }
-    const asDraft = !policy.allowDraft || parentId ? false : Boolean(input.draft);
+    const visibility = this.resolveVisibility(policy.allowPrivate, parentId, input.visibility);
     const rawTags =
       input.tags !== undefined
         ? tagsFromProps(propsWithTags({}, input.tags))
@@ -299,8 +387,8 @@ export class DocumentsService {
         bodyFormat: 'editorjs',
         body: input.body as unknown as Record<string, unknown>,
         authorId: input.authorId ?? null,
-        draft: asDraft,
-        publishedAt: asDraft ? null : now,
+        visibility,
+        publishedAt: visibility === 'public' ? now : null,
         createdAt: now,
         updatedAt: now,
       }),
@@ -316,6 +404,11 @@ export class DocumentsService {
     const existing = await this.findById(id);
     if (!existing) {
       return null;
+    }
+    this.assertArticleOwner(existing, input.authorId ?? undefined);
+    // 旧文无作者时，首次由当前用户认领
+    if (!existing.authorId && input.authorId) {
+      existing.authorId = input.authorId;
     }
     const appCode = existing.appCode;
     const pageKind = resolveDocKind(input.pageKind ?? existing.pageKind);
@@ -335,14 +428,22 @@ export class DocumentsService {
         rpcFail(400, 'INVALID_PARENT');
       }
     }
-    const asDraft = !policy.allowDraft || parentId ? false : Boolean(input.draft);
+    const visibility = this.resolveVisibility(
+      policy.allowPrivate,
+      parentId,
+      input.visibility ?? existing.visibility,
+    );
     if (!bodyHasBlocks(input.body) && bodyHasBlocks(existing.body)) {
       rpcFail(400, 'EMPTY_BODY');
     }
     const now = new Date();
     let publishedAt = existing.publishedAt ? new Date(existing.publishedAt) : null;
-    if (!asDraft && !publishedAt) {
-      publishedAt = now;
+    if (visibility === 'public') {
+      if (!publishedAt) {
+        publishedAt = now;
+      }
+    } else {
+      publishedAt = null;
     }
     const baseProps = input.props ?? existing.props;
     const rawTags =
@@ -387,7 +488,7 @@ export class DocumentsService {
         props: props as never,
         body: input.body as never,
         authorId: input.authorId ?? existing.authorId,
-        draft: asDraft,
+        visibility,
         publishedAt,
         updatedAt: now,
       },
@@ -395,12 +496,13 @@ export class DocumentsService {
     return this.findById(id);
   }
 
-  async createLinkedChild(parentId: string) {
+  async createLinkedChild(parentId: string, authorId?: string) {
     return this.dataSource.transaction(async () => {
       const parent = await this.findById(parentId);
       if (!parent || !policyOf(parent.pageKind).allowParent) {
         rpcFail(400, 'INVALID_PARENT');
       }
+      this.assertArticleOwner(parent, authorId);
       const child = await this.create({
         appCode: parent.appCode,
         title: '无标题',
@@ -410,7 +512,8 @@ export class DocumentsService {
         summary: '',
         coverUrl: '',
         body: starterArticleDocument(),
-        draft: false,
+        visibility: 'public',
+        authorId: authorId ?? parent.authorId ?? null,
       });
       const nextParent = await this.appendPageLink(parentId, child);
       if (!nextParent) {
@@ -420,11 +523,18 @@ export class DocumentsService {
     });
   }
 
-  async reparent(childId: string, newParentId: string | null) {
+  async reparent(childId: string, newParentId: string | null, actorId?: string) {
     return this.dataSource.transaction(async () => {
       const child = await this.findById(childId);
       if (!child || !policyOf(child.pageKind).allowParent) {
         rpcFail(404, 'NOT_FOUND');
+      }
+      this.assertArticleOwner(child, actorId);
+      if (newParentId) {
+        const parent = await this.findById(newParentId);
+        if (parent) {
+          this.assertArticleOwner(parent, actorId);
+        }
       }
       const resolvedParentId = await this.resolveParent(child.appCode, newParentId);
       if (resolvedParentId && (await this.wouldCreateCycle(childId, resolvedParentId))) {
@@ -442,17 +552,21 @@ export class DocumentsService {
         await this.stripPageLink(oldParentId, childId);
       }
       const now = new Date();
-      const asDraft = resolvedParentId ? false : child.draft;
+      const visibility: DocVisibility = resolvedParentId ? 'public' : child.visibility;
       let publishedAt = child.publishedAt ? new Date(child.publishedAt) : null;
-      if (!asDraft && !publishedAt) {
-        publishedAt = now;
+      if (visibility === 'public') {
+        if (!publishedAt) {
+          publishedAt = now;
+        }
+      } else {
+        publishedAt = null;
       }
       await this.posts.update(
         { id: childId },
         {
           parentId: resolvedParentId,
           treeSort: await this.nextTreeSort(child.appCode, resolvedParentId, 'article'),
-          draft: asDraft,
+          visibility,
           publishedAt,
           updatedAt: now,
         },
@@ -473,12 +587,13 @@ export class DocumentsService {
     });
   }
 
-  async remove(id: string): Promise<boolean> {
+  async remove(id: string, actorId?: string): Promise<boolean> {
     return this.dataSource.transaction(async () => {
       const existing = await this.findById(id);
       if (!existing) {
         return false;
       }
+      this.assertArticleOwner(existing, actorId);
       if (!policyOf(existing.pageKind).allowDelete) {
         rpcFail(400, 'PAGE_FIXED');
       }
@@ -493,28 +608,15 @@ export class DocumentsService {
     });
   }
 
-  async ensureAboutPage(appCode = DEFAULT_APP_CODE): Promise<DocPost> {
-    const existing = await this.findByKind(appCode, 'about');
-    if (existing) {
-      return existing;
+  private resolveVisibility(
+    allowPrivate: boolean,
+    parentId: string | null,
+    input?: DocVisibility,
+  ): DocVisibility {
+    if (parentId || !allowPrivate) {
+      return 'public';
     }
-    const cats = await this.categories.list(appCode);
-    return this.create({
-      appCode,
-      title: DEFAULT_ABOUT.name,
-      slug: `sys-about-${randomUUID().slice(0, 8)}`,
-      type: cats.find((item) => item.kind === 'article')?.slug ?? 'life',
-      pageKind: 'about',
-      summary: '',
-      coverUrl: '',
-      body: DEFAULT_ABOUT.body,
-      draft: false,
-      treeSort: -1,
-      props: {
-        avatar: DEFAULT_ABOUT.avatar,
-        skills: DEFAULT_ABOUT.skills,
-      },
-    });
+    return input ?? 'private';
   }
 
   private async collectSubtree(rootId: string): Promise<string[]> {
@@ -650,12 +752,17 @@ export class DocumentsService {
 
   private async loadAncestorIndex() {
     const rows = await this.posts.find({
-      select: { id: true, parentId: true, draft: true },
+      select: { id: true, parentId: true, visibility: true, authorId: true },
     });
     return new Map(rows.map((row) => [row.id, row]));
   }
 
-  private async hasDraftAncestor(postId: string) {
+  /**
+   * 是否有不可见的私有祖先。
+   * 无 viewerId：任意 private 祖先即不可见。
+   * 有 viewerId：仅「private 且非本人」的祖先才阻断。
+   */
+  private async hasPrivateAncestor(postId: string, viewerId?: string) {
     const index = await this.loadAncestorIndex();
     let current = index.get(postId)?.parentId ?? null;
     const seen = new Set<string>();
@@ -668,8 +775,10 @@ export class DocumentsService {
       if (!parent) {
         break;
       }
-      if (parent.draft) {
-        return true;
+      if (parent.visibility === 'private') {
+        if (!viewerId || parent.authorId !== viewerId) {
+          return true;
+        }
       }
       current = parent.parentId;
     }

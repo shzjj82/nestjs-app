@@ -37,33 +37,13 @@ export class InitDocsSchema1760000000000 implements MigrationInterface {
         props jsonb NOT NULL DEFAULT '{}'::jsonb,
         body_format varchar(32) NOT NULL DEFAULT 'editorjs',
         body jsonb NOT NULL,
-        draft boolean NOT NULL DEFAULT true,
+        visibility varchar(16) NOT NULL DEFAULT 'private',
         published_at timestamptz,
         author_id uuid,
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now()
       )
     `);
-    await this.addColumn(
-      queryRunner,
-      'doc_categories',
-      'app_code',
-      `varchar(64) NOT NULL DEFAULT 'blog'`,
-    );
-    await this.addColumn(
-      queryRunner,
-      'doc_documents',
-      'app_code',
-      `varchar(64) NOT NULL DEFAULT 'blog'`,
-    );
-    await this.addColumn(queryRunner, 'doc_documents', 'category_id', 'uuid');
-    await this.addColumn(
-      queryRunner,
-      'doc_documents',
-      'body_format',
-      `varchar(32) NOT NULL DEFAULT 'editorjs'`,
-    );
-    await this.addColumn(queryRunner, 'doc_documents', 'author_id', 'uuid');
     await queryRunner.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS uq_doc_categories_app_slug
       ON doc_categories (app_code, slug)
@@ -71,11 +51,6 @@ export class InitDocsSchema1760000000000 implements MigrationInterface {
     await queryRunner.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS uq_doc_documents_app_slug
       ON doc_documents (app_code, slug)
-    `);
-    await queryRunner.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS uq_doc_documents_app_about
-      ON doc_documents (app_code)
-      WHERE kind = 'about'
     `);
     await queryRunner.query(
       `CREATE INDEX IF NOT EXISTS idx_doc_categories_app_code ON doc_categories (app_code)`,
@@ -91,6 +66,9 @@ export class InitDocsSchema1760000000000 implements MigrationInterface {
     );
     await queryRunner.query(
       `CREATE INDEX IF NOT EXISTS idx_doc_documents_parent_id ON doc_documents (parent_id)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS idx_doc_documents_visibility ON doc_documents (visibility)`,
     );
     await queryRunner.query(`
       DO $$ BEGIN
@@ -113,19 +91,5 @@ export class InitDocsSchema1760000000000 implements MigrationInterface {
   async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP TABLE IF EXISTS doc_documents`);
     await queryRunner.query(`DROP TABLE IF EXISTS doc_categories`);
-  }
-
-  private async addColumn(
-    queryRunner: QueryRunner,
-    table: string,
-    column: string,
-    definition: string,
-  ) {
-    await queryRunner.query(`
-      DO $$ BEGIN
-        ALTER TABLE ${table} ADD COLUMN ${column} ${definition};
-      EXCEPTION WHEN duplicate_column THEN NULL;
-      END $$
-    `);
   }
 }

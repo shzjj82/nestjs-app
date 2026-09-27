@@ -1,44 +1,34 @@
 /**
  * 文档形态。应用隔离用 appCode（blog / kb / …），不要再把产品写进 kind。
  */
-export const DOC_KINDS = ['article', 'about'] as const;
+export const DOC_KINDS = ['article'] as const;
 export type DocKind = (typeof DOC_KINDS)[number];
 
 export type DocKindPolicy = {
-  /** 每个 appCode 最多一篇，如 about */
+  /** 每个 appCode 最多一篇 */
   unique: boolean;
   allowParent: boolean;
-  allowDraft: boolean;
+  /** 是否允许设为 private（子页强制 public） */
+  allowPrivate: boolean;
   allowDelete: boolean;
   allowKindChange: boolean;
   tree: boolean;
   publicBySlug: boolean;
   useCategoryTags: boolean;
-  extras: 'none' | 'about';
+  extras: 'none';
 };
 
 export const DOC_KIND_POLICIES: Record<DocKind, DocKindPolicy> = {
   article: {
     unique: false,
     allowParent: true,
-    allowDraft: true,
+    allowPrivate: true,
     allowDelete: true,
     allowKindChange: false,
     tree: true,
     publicBySlug: true,
     useCategoryTags: true,
     extras: 'none',
-  },
-  about: {
-    unique: true,
-    allowParent: false,
-    allowDraft: false,
-    allowDelete: false,
-    allowKindChange: false,
-    tree: true,
-    publicBySlug: false,
-    useCategoryTags: false,
-    extras: 'about',
   },
 };
 

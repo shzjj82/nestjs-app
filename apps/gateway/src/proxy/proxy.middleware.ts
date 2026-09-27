@@ -31,16 +31,28 @@ export class ProxyMiddleware implements NestMiddleware {
       const query = (req.query ?? {}) as Record<string, unknown>;
       const isDocsList =
         pathname === '/docs/posts' || pathname === '/docs/documents';
+      const scope =
+        typeof query.scope === 'string' ? query.scope.trim().toLowerCase() : '';
       const needsPrivilege =
         isDocsList &&
         (query.tree === '1' ||
           query.tree === 'true' ||
           query.includeDrafts === '1' ||
-          query.includeDrafts === 'true');
+          query.includeDrafts === 'true' ||
+          scope === 'mine' ||
+          scope === 'all');
+      // mine 必须用户 JWT；all 可用 docs-key。二者都先抬升鉴权，docs 服务再按 scope 细判。
       const auth = needsPrivilege
         ? [...new Set([...(route.auth ?? []), 'jwt' as const, 'docs-key' as const])]
         : route.auth;
-      const user = await this.auth.enforce(auth, req, route.permissions);
+      let user = await this.auth.enforce(auth, req, route.permissions);
+      // 公开 docs 路由不强制登录；若带了 Bearer，解析进 _session（feed 混入私有 / 读本人私有详情）
+      if (!user && this.auth.bearerToken(req)) {
+        user = await this.auth.fromRequest(req);
+        if (user) {
+          (req as Request & { user?: unknown }).user = user;
+        }
+      }
       this.logger.log(`${req.method} ${pathname} -> ${route.pattern}`);
       const payload = buildProxyPayload(
         req,

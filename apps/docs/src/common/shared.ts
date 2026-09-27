@@ -1,4 +1,4 @@
-import { isDocKind, policyOf, type DocKind } from './doc-kinds';
+import { isDocKind, type DocKind } from './doc-kinds';
 
 export type EditorJsBlock = {
   id?: string;
@@ -94,7 +94,7 @@ export type DocPost = {
   bodyFormat: string;
   authorId: string | null;
   body: EditorJsDocument;
-  draft: boolean;
+  visibility: 'private' | 'public';
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -237,13 +237,9 @@ export function propsWithAboutExtras(
 }
 
 export function normalizeKindProps(
-  kind: DocKind,
+  _kind: DocKind,
   props?: Record<string, unknown>,
-  extras?: Partial<AboutExtras>,
 ): Record<string, unknown> {
-  if (policyOf(kind).extras === 'about') {
-    return propsWithAboutExtras(props, extras);
-  }
   return { ...(props ?? {}) };
 }
 

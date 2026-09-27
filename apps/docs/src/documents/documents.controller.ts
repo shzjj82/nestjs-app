@@ -19,6 +19,12 @@ import {
   type PageKind,
 } from '../common/shared';
 import { DocumentsService } from './documents.service';
+import {
+  isTreeView,
+  parseVisibility,
+  resolveDocsListScope,
+  type DocVisibility,
+} from './list-scope';
 
 @Controller()
 @UseInterceptors(HandleLogInterceptor)
@@ -29,53 +35,49 @@ export class DocumentsController {
   async findAll(payload: Record<string, unknown> = {}) {
     const appCode = resolveAppCode(optionalString(payload.appCode));
     const privileged = payload._docsPrivileged === true;
-    const tree =
-      payload.tree === '1' || payload.tree === true || payload.tree === 'true';
-    const includeDrafts =
-      privileged &&
-      (payload.includeDrafts === true ||
-        payload.includeDrafts === '1' ||
-        payload.includeDrafts === 'true' ||
-        tree);
-    if (tree) {
+    const sessionAuthorId = sessionUserId(payload);
+    const scope = resolveDocsListScope(payload);
+    const tree = isTreeView(payload);
+
+    if (scope === 'mine') {
+      // mine 必须用户 JWT；仅 x-docs-key 不能冒充「我的工作区」
+      if (!sessionAuthorId) {
+        rpcFail(401, 'UNAUTHORIZED');
+      }
+      const posts = await this.posts.listWorkspaceTree(appCode, sessionAuthorId);
+      return { posts, total: posts.length };
+    }
+
+    if (scope === 'all') {
       if (!privileged) {
         rpcFail(401, 'UNAUTHORIZED');
       }
-      const posts = await this.posts.listWorkspaceTree(appCode, true);
-      return { posts, total: posts.length };
+      if (tree) {
+        // 全量工作区树（迁移/运维）；不按作者过滤
+        const posts = await this.posts.listWorkspaceTree(appCode, undefined);
+        return { posts, total: posts.length };
+      }
+      return this.listPage(payload, appCode, { visibilityFilter: 'any' });
     }
-    const pageKind =
-      typeof payload.pageKind === 'string' && isPageKind(payload.pageKind)
-        ? payload.pageKind
-        : undefined;
-    const parentId =
-      payload.parentId === 'null' || payload.parentId === null
-        ? null
-        : optionalString(payload.parentId);
-    const { posts, total } = await this.posts.list({
-      appCode,
-      type: optionalString(payload.type),
-      kind: payload.kind === 'article' ? 'article' : undefined,
-      pageKind,
-      parentId: parentId === undefined ? undefined : parentId,
-      limit: Number(payload.limit) || undefined,
-      page: Number(payload.page) || undefined,
-      pageSize: Number(payload.pageSize) || undefined,
-      includeDrafts,
-      treeOrder: Boolean(pageKind || parentId !== undefined),
+
+    if (scope === 'feed') {
+      return this.listPage(payload, appCode, {
+        visibilityFilter: 'feed',
+        viewerId: sessionAuthorId,
+        authorId: optionalString(payload.authorId),
+      });
+    }
+
+    // scope=public：已发布广场；结果不因是否带 JWT / docs-key 而变
+    return this.listPage(payload, appCode, {
+      visibilityFilter: 'public-only',
+      authorId: optionalString(payload.authorId),
     });
-    return {
-      posts,
-      total,
-      page: Number(payload.page) || 1,
-      pageSize: Number(payload.pageSize) || posts.length,
-    };
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_SPECIALS))
-  async specials(payload: Record<string, unknown> = {}) {
-    const appCode = resolveAppCode(optionalString(payload.appCode));
-    return { about: (await this.posts.findByKind(appCode, 'about')) ?? null };
+  async specials(_payload: Record<string, unknown> = {}) {
+    return { about: null };
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_FIND_ID))
@@ -83,6 +85,15 @@ export class DocumentsController {
     const post = await this.posts.findById(requiredString(payload.id, 'id'));
     if (!post) {
       rpcFail(404, 'NOT_FOUND');
+    }
+    const actorId = sessionUserId(payload);
+    // 私有文：非作者不可读；公开文工作区按 id：非作者也不可读
+    if (post.visibility === 'private') {
+      if (!actorId || (post.authorId && post.authorId !== actorId)) {
+        rpcFail(403, 'FORBIDDEN');
+      }
+    } else if (actorId && post.authorId && post.authorId !== actorId) {
+      rpcFail(403, 'FORBIDDEN');
     }
     return {
       post,
@@ -93,40 +104,54 @@ export class DocumentsController {
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_FIND_SLUG))
   async findSlug(payload: Record<string, unknown>) {
     const privileged = payload._docsPrivileged === true;
-    const includeDrafts =
+    const sessionAuthorId = sessionUserId(payload);
+    const forceAny =
       privileged &&
       (payload.includeDrafts === true ||
         payload.includeDrafts === '1' ||
-        payload.includeDrafts === 'true');
+        payload.includeDrafts === 'true' ||
+        payload.mode === 'any');
+    const mode: 'public' | 'feed' | 'any' = forceAny
+      ? 'any'
+      : sessionAuthorId
+        ? 'feed'
+        : 'public';
+    const includePrivate = mode !== 'public';
     const appCode = resolveAppCode(optionalString(payload.appCode));
     const post = await this.posts.findBySlug(
       appCode,
       requiredString(payload.slug, 'slug'),
-      includeDrafts,
+      { mode, viewerId: sessionAuthorId },
     );
     if (!post || !policyOf(post.pageKind).publicBySlug) {
       rpcFail(404, 'NOT_FOUND');
     }
-    const ancestors = await this.posts.listAncestors(post.id, includeDrafts);
+    const visibilityFilter =
+      mode === 'any' ? 'any' : mode === 'feed' ? 'feed' : 'public-only';
+    const ancestors = await this.posts.listAncestors(post.id, includePrivate);
     const { posts: siblings } = await this.posts.list({
       appCode: post.appCode,
       pageKind: post.pageKind,
       parentId: post.parentId ?? null,
-      includeDrafts,
+      visibilityFilter,
+      viewerId: sessionAuthorId,
       treeOrder: true,
     });
     const { posts: children } = await this.posts.list({
       appCode: post.appCode,
       pageKind: post.pageKind,
       parentId: post.id,
-      includeDrafts,
+      visibilityFilter,
+      viewerId: sessionAuthorId,
       treeOrder: true,
     });
     return {
       post,
       ancestors,
       siblings,
-      children: includeDrafts ? children : children.filter((item) => !item.draft),
+      children: includePrivate
+        ? children
+        : children.filter((item) => item.visibility === 'public'),
     };
   }
 
@@ -149,7 +174,7 @@ export class DocumentsController {
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_DELETE))
   async remove(payload: Record<string, unknown>) {
-    if (!(await this.posts.remove(requiredString(payload.id, 'id')))) {
+    if (!(await this.posts.remove(requiredString(payload.id, 'id'), sessionUserId(payload)))) {
       rpcFail(404, 'NOT_FOUND');
     }
     return null;
@@ -157,14 +182,60 @@ export class DocumentsController {
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_CHILDREN))
   createChild(payload: Record<string, unknown>) {
-    return this.posts.createLinkedChild(requiredString(payload.id, 'id'));
+    return this.posts.createLinkedChild(
+      requiredString(payload.id, 'id'),
+      sessionUserId(payload),
+    );
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_REPARENT))
   reparent(payload: Record<string, unknown>) {
     const raw = payload.parentId;
     const parentId = raw === undefined || raw === null ? null : String(raw);
-    return this.posts.reparent(requiredString(payload.id, 'id'), parentId);
+    return this.posts.reparent(
+      requiredString(payload.id, 'id'),
+      parentId,
+      sessionUserId(payload),
+    );
+  }
+
+  private async listPage(
+    payload: Record<string, unknown>,
+    appCode: string,
+    opts: {
+      visibilityFilter: 'public-only' | 'feed' | 'any';
+      viewerId?: string;
+      authorId?: string;
+    },
+  ) {
+    const pageKind =
+      typeof payload.pageKind === 'string' && isPageKind(payload.pageKind)
+        ? payload.pageKind
+        : undefined;
+    const parentId =
+      payload.parentId === 'null' || payload.parentId === null
+        ? null
+        : optionalString(payload.parentId);
+    const { posts, total } = await this.posts.list({
+      appCode,
+      type: optionalString(payload.type),
+      kind: payload.kind === 'article' ? 'article' : undefined,
+      pageKind,
+      parentId: parentId === undefined ? undefined : parentId,
+      limit: Number(payload.limit) || undefined,
+      page: Number(payload.page) || undefined,
+      pageSize: Number(payload.pageSize) || undefined,
+      visibilityFilter: opts.visibilityFilter,
+      viewerId: opts.viewerId,
+      treeOrder: Boolean(pageKind || parentId !== undefined),
+      authorId: opts.authorId,
+    });
+    return {
+      posts,
+      total,
+      page: Number(payload.page) || 1,
+      pageSize: Number(payload.pageSize) || posts.length,
+    };
   }
 
   private parseWrite(payload: Record<string, unknown>): {
@@ -181,7 +252,7 @@ export class DocumentsController {
     props?: Record<string, unknown>;
     tags?: string[];
     body: EditorJsDocument;
-    draft: boolean;
+    visibility: DocVisibility;
     authorId?: string | null;
   } {
     const title = requiredString(payload.title, 'title');
@@ -212,7 +283,10 @@ export class DocumentsController {
       props: asRecord(payload.props),
       tags: payload.tags === undefined ? undefined : normalizeTags(payload.tags),
       body,
-      draft: payload.draft === false || payload.draft === 'false' ? false : true,
+      visibility: parseVisibility(
+        payload.visibility !== undefined ? payload.visibility : payload.draft,
+        'private',
+      ),
       authorId: sessionUserId(payload),
     };
   }

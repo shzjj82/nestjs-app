@@ -1,4 +1,11 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryColumn,
+} from 'typeorm';
 import { CategoryEntity } from './category.entity';
 
 /**
@@ -20,7 +27,7 @@ export class DocumentEntity {
   @Column({ type: 'varchar', length: 200 })
   title!: string;
 
-  /** 文档形态：article / about */
+  /** 文档形态：目前仅 article */
   @Index()
   @Column({ type: 'varchar', length: 32, default: 'article' })
   kind!: string;
@@ -66,8 +73,10 @@ export class DocumentEntity {
   @Column({ name: 'author_id', type: 'uuid', nullable: true })
   authorId!: string | null;
 
-  @Column({ type: 'boolean', default: true })
-  draft!: boolean;
+  /** private | public；替代原 draft 布尔 */
+  @Index()
+  @Column({ type: 'varchar', length: 16, default: 'private' })
+  visibility!: string;
 
   @Column({ name: 'published_at', type: 'timestamptz', nullable: true })
   publishedAt!: Date | null;

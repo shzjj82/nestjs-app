@@ -2,7 +2,6 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DEFAULT_APP_CODE } from '../common/app-code';
 import { CategoriesService } from '../categories/categories.service';
-import { DocumentsService } from '../documents/documents.service';
 import { dropLegacySharedDocTables, openSharedDatabase } from './ensure-database';
 
 @Injectable()
@@ -11,7 +10,6 @@ export class SeedService implements OnModuleInit {
 
   constructor(
     private readonly categories: CategoriesService,
-    private readonly posts: DocumentsService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -24,7 +22,6 @@ export class SeedService implements OnModuleInit {
       await dropLegacySharedDocTables(this.logger);
     }
     await this.categories.ensureDefaults(DEFAULT_APP_CODE);
-    await this.posts.ensureAboutPage(DEFAULT_APP_CODE);
     this.logger.log(`文档服务已就绪：appCode=${DEFAULT_APP_CODE}`);
   }
 
@@ -77,7 +74,7 @@ export class SeedService implements OnModuleInit {
         await this.dataSource.query(
           `INSERT INTO doc_documents
             (id, app_code, slug, title, kind, category, category_id, parent_id, tree_sort,
-             summary, cover_url, props, body_format, body, draft, published_at, author_id,
+             summary, cover_url, props, body_format, body, visibility, published_at, author_id,
              created_at, updated_at)
            VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
            ON CONFLICT (id) DO NOTHING`,
@@ -95,7 +92,8 @@ export class SeedService implements OnModuleInit {
             row.props ?? {},
             row.body_format ?? 'editorjs',
             row.body ?? { time: Date.now(), version: '2.30.7', blocks: [] },
-            row.draft ?? true,
+            row.visibility ??
+              (row.draft === false || row.draft === 'false' ? 'public' : 'private'),
             row.published_at ?? null,
             row.author_id ?? null,
             row.created_at,
