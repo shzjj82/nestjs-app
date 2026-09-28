@@ -1,3 +1,8 @@
+import { config as loadEnv } from 'dotenv';
+import { resolve } from 'path';
+
+loadEnv({ path: resolve(process.cwd(), '.env') });
+
 function readEnv(name: string, fallback: string): string {
   const value = process.env[name];
   return value && value.length > 0 ? value : fallback;
@@ -19,6 +24,21 @@ export function databaseUrl(): string {
   }
   const { user, password, host, port, database } = postgresConfig();
   return `postgres://${user}:${password}@${host}:${port}/${database}`;
+}
+
+/** wechat 默认独立库 `wechat`；可用 WECHAT_DATABASE_URL 覆盖 */
+export function wechatDatabaseUrl(): string {
+  if (process.env.WECHAT_DATABASE_URL) {
+    return process.env.WECHAT_DATABASE_URL;
+  }
+  const shared = databaseUrl();
+  try {
+    const parsed = new URL(shared);
+    parsed.pathname = '/wechat';
+    return parsed.toString();
+  } catch {
+    return shared.replace(/\/[^/?]+(\?|$)/, '/wechat$1');
+  }
 }
 
 /** docs 默认独立库 `docs`；可用 DOCS_DATABASE_URL 覆盖 */

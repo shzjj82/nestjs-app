@@ -6,6 +6,7 @@ import {
   ORDER_CLIENT,
   UPLOAD_CLIENT,
   USER_CLIENT,
+  WECHAT_CLIENT,
 } from '@app/common';
 import { ClientHub } from './client.hub';
 import { MqttProxy } from './mqtt.proxy';
@@ -29,6 +30,10 @@ import { MqttProxy } from './mqtt.proxy';
         name: UPLOAD_CLIENT,
         ...mqttClientOptions('gateway-upload'),
       },
+      {
+        name: WECHAT_CLIENT,
+        ...mqttClientOptions('gateway-wechat'),
+      },
     ]),
   ],
   providers: [MqttProxy, ClientHub],
@@ -40,6 +45,7 @@ export class MqttModule implements OnModuleInit {
     @Inject(ORDER_CLIENT) private readonly orderClient: ClientProxy,
     @Inject(DOCS_CLIENT) private readonly docsClient: ClientProxy,
     @Inject(UPLOAD_CLIENT) private readonly uploadClient: ClientProxy,
+    @Inject(WECHAT_CLIENT) private readonly wechatClient: ClientProxy,
   ) {}
 
   async onModuleInit() {
@@ -48,6 +54,7 @@ export class MqttModule implements OnModuleInit {
       this.orderClient.connect(),
       this.docsClient.connect(),
       this.uploadClient.connect(),
+      this.wechatClient.connect(),
     ]);
   }
 }

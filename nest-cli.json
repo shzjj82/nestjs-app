@@ -55,6 +55,15 @@
         "tsConfigPath": "apps/upload/tsconfig.app.json"
       }
     },
+    "wechat": {
+      "type": "application",
+      "root": "apps/wechat",
+      "entryFile": "main",
+      "sourceRoot": "apps/wechat/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/wechat/tsconfig.app.json"
+      }
+    },
     "common": {
       "type": "library",
       "root": "libs/common",

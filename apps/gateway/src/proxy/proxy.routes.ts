@@ -21,6 +21,8 @@ export const PROXY_HTTP_PATHS: RouteInfo[] = [
   { path: 'orders/{*path}', method: RequestMethod.ALL },
   { path: 'upload', method: RequestMethod.ALL },
   { path: 'upload/{*path}', method: RequestMethod.ALL },
+  { path: 'wechat', method: RequestMethod.ALL },
+  { path: 'wechat/{*path}', method: RequestMethod.ALL },
 ];
 
 export function requestPathname(req: { path?: string; url: string }): string {

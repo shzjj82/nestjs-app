@@ -2,9 +2,13 @@ x-app-env: &app-env
   MQTT_URL: mqtt://mosquitto:1883
   DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/${POSTGRES_DB:-nestjs}
   DOCS_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/docs
+  WECHAT_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/wechat
   REDIS_URL: redis://redis:6379
   UPLOAD_API_KEY: ${UPLOAD_API_KEY:-dev-upload-key}
   DOCS_SERVICE_KEY: ${DOCS_SERVICE_KEY:-dev-docs-key}
+  APP_VERSION: ${APP_VERSION:-0.0.1}
+  EXPECTED_APP_VERSION: ${EXPECTED_APP_VERSION:-${APP_VERSION:-0.0.1}}
+  CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3100,http://127.0.0.1:3100}
 
 x-app-depends: &app-depends
   mosquitto:
@@ -79,13 +83,11 @@ services:
     restart: unless-stopped
     environment:
       <<: *app-env
-      WECHAT_MOCK: ${WECHAT_MOCK:-1}
-      ALIPAY_MOCK: ${ALIPAY_MOCK:-1}
       SEED_APP_CODE: ${SEED_APP_CODE:-web}
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin123}
       WECHAT_APP_ID: ${WECHAT_APP_ID:-}
-      WECHAT_SECRET: ${WECHAT_SECRET:-}
+      WECHAT_MP_CODE: ${WECHAT_MP_CODE:-wechat}
       ALIPAY_APP_ID: ${ALIPAY_APP_ID:-}
       ALIPAY_PRIVATE_KEY: ${ALIPAY_PRIVATE_KEY:-}
     depends_on: *app-depends
@@ -123,6 +125,21 @@ services:
     environment:
       <<: *app-env
       INSTANCE_ID: upload-1
+    depends_on: *app-depends
+
+  wechat:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        APP_NAME: wechat
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      INSTANCE_ID: wechat-1
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_SECRET: ${WECHAT_SECRET:-}
+      WECHAT_MP_CODE: ${WECHAT_MP_CODE:-wechat}
     depends_on: *app-depends
 
 volumes:

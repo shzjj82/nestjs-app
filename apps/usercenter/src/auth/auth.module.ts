@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { RedisInfraModule } from '@app/common';
+import { ClientsModule } from '@nestjs/microservices';
+import { mqttClientOptions, RedisInfraModule, WECHAT_CLIENT } from '@app/common';
 import { AppsModule } from '../apps/apps.module';
 import { UserIdentityEntity } from '../entities';
 import { RbacModule } from '../rbac/rbac.module';
@@ -17,6 +18,12 @@ import { WechatClient } from './wechat.client';
     AppsModule,
     UsersModule,
     RbacModule,
+    ClientsModule.register([
+      {
+        name: WECHAT_CLIENT,
+        ...mqttClientOptions('usercenter-wechat'),
+      },
+    ]),
   ],
   controllers: [AuthController],
   providers: [AuthService, WechatClient, AlipayClient],

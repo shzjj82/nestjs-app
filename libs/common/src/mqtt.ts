@@ -12,6 +12,30 @@ export function instanceId(service: string): string {
   );
 }
 
+export function appVersion(): string {
+  return process.env.APP_VERSION ?? process.env.npm_package_version ?? '0.0.1';
+}
+
+export interface ServiceHealth {
+  status: 'ok' | 'up' | 'down';
+  service: string;
+  instance: string;
+  version: string;
+}
+
+export function serviceHealth(
+  service: string,
+  extras: Record<string, unknown> = {},
+): ServiceHealth & Record<string, unknown> {
+  return {
+    status: 'up',
+    service,
+    instance: instanceId(service),
+    version: appVersion(),
+    ...extras,
+  };
+}
+
 export function mqttBrokerOptions(service: string) {
   return {
     url: mqttBrokerUrl(),

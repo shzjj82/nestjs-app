@@ -48,6 +48,7 @@ export function createHandleLogInterceptor(
 
 export const DocsHandleLogInterceptor = createHandleLogInterceptor('Docs', 'docs');
 export const UploadHandleLogInterceptor = createHandleLogInterceptor('Upload', 'upload');
+export const WechatHandleLogInterceptor = createHandleLogInterceptor('Wechat', 'wechat');
 export const UsercenterHandleLogInterceptor = createHandleLogInterceptor(
   'Usercenter',
   'usercenter',

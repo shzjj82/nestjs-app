@@ -1,4 +1,4 @@
-import { DOCS_CLIENT, MQTT_PATTERNS, ORDER_CLIENT, UPLOAD_CLIENT, USER_CLIENT } from './patterns';
+import { DOCS_CLIENT, MQTT_PATTERNS, ORDER_CLIENT, UPLOAD_CLIENT, USER_CLIENT, WECHAT_CLIENT } from './patterns';
 import { PERMISSIONS } from './types';
 
 export type GatewayAuth = 'jwt' | 'admin' | 'docs-key' | 'upload-key';
@@ -317,6 +317,52 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
     client: UPLOAD_CLIENT,
     pattern: MQTT_PATTERNS.UPLOAD_DELETE,
     auth: ['jwt', 'upload-key'],
+  },
+  {
+    method: 'GET',
+    path: '/wechat/health',
+    client: WECHAT_CLIENT,
+    pattern: MQTT_PATTERNS.WECHAT_HEALTH,
+  },
+  {
+    method: 'GET',
+    path: '/wechat/miniprograms',
+    client: WECHAT_CLIENT,
+    pattern: MQTT_PATTERNS.WECHAT_MP_FIND_ALL,
+    auth: ['jwt'],
+    permissions: [PERMISSIONS.WECHAT_MANAGE],
+  },
+  {
+    method: 'POST',
+    path: '/wechat/miniprograms',
+    client: WECHAT_CLIENT,
+    pattern: MQTT_PATTERNS.WECHAT_MP_CREATE,
+    auth: ['jwt'],
+    permissions: [PERMISSIONS.WECHAT_MANAGE],
+  },
+  {
+    method: 'PATCH',
+    path: '/wechat/miniprograms/:id',
+    client: WECHAT_CLIENT,
+    pattern: MQTT_PATTERNS.WECHAT_MP_UPDATE,
+    auth: ['jwt'],
+    permissions: [PERMISSIONS.WECHAT_MANAGE],
+  },
+  {
+    method: 'POST',
+    path: '/wechat/qrcode',
+    client: WECHAT_CLIENT,
+    pattern: MQTT_PATTERNS.WECHAT_QRCODE,
+    auth: ['jwt'],
+    permissions: [PERMISSIONS.WECHAT_QRCODE],
+    override: true,
+  },
+  {
+    method: 'POST',
+    path: '/wechat/phone',
+    client: WECHAT_CLIENT,
+    pattern: MQTT_PATTERNS.WECHAT_PHONE,
+    auth: ['jwt'],
   },
 ];
 

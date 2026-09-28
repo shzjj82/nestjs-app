@@ -20,11 +20,19 @@
 npm run infra:up
 ```
 
-再启动 gateway、usercenter、order、docs、upload：
+再启动 gateway、usercenter、order、docs、upload、wechat：
 
 ```bash
 npm run start:dev
 ```
+
+管理后台（Next.js，端口 3100）：
+
+```bash
+npm run start:admin
+```
+
+浏览器打开 http://localhost:3100 ，用超级管理员 `admin` / `admin123` 登录（由 usercenter 首次启动种子写入，见 `SEED_ADMIN_*`）。
 
 停止依赖：`npm run infra:down`，看日志：`npm run infra:logs`。
 
@@ -122,10 +130,10 @@ curl 'http://localhost:3000/users?keyword=carol' \
 
 ### 接入端（多套微信 / 支付宝小程序）
 
-`uc_clients` 用你们的 **appCode** 区分接入端。微信小程序存微信 appId / appSecret，支付宝小程序存支付宝 appId / 私钥。列表不回传密钥。
+`uc_clients` 用你们的 **appCode** 区分接入端。微信小程序在用户中心只存 **wechatAppId**（指向哪一套），**appSecret 在微信服务登记**，列表不回传密钥。
 
 ```bash
-# 微信登录
+# 微信登录（openid 由 wechat 服务按 appId 兑换）
 curl -X POST http://localhost:3000/auth/wechat \
   -H 'Content-Type: application/json' \
   -d '{"appCode":"wechat","code":"wx-login-code","nickname":"小程序用户","phone":"13800138000"}'
@@ -135,19 +143,54 @@ curl -X POST http://localhost:3000/auth/alipay \
   -H 'Content-Type: application/json' \
   -d '{"appCode":"alipay","code":"alipay-auth-code","nickname":"支付宝用户"}'
 
-# 再登记一套微信 / 支付宝（需要 client.manage）
+# 再登记一套用户中心接入端，wechatAppId 必须已在微信服务存在
 curl -X POST http://localhost:3000/clients \
   -H "Authorization: Bearer <token>" \
   -H 'Content-Type: application/json' \
-  -d '{"appCode":"mall","name":"商城小程序","type":"wechat_mp","wechatAppId":"wxaaaaaaaa","wechatSecret":"secret-a"}'
-
-curl -X POST http://localhost:3000/clients \
-  -H "Authorization: Bearer <token>" \
-  -H 'Content-Type: application/json' \
-  -d '{"appCode":"pay","name":"支付小程序","type":"alipay_mp","alipayAppId":"2021xxxx","alipayPrivateKey":"-----BEGIN PRIVATE KEY-----"}'
+  -d '{"appCode":"mall","name":"商城小程序","type":"wechat_mp","wechatAppId":"wxaaaaaaaa"}'
 ```
 
-本地 `WECHAT_MOCK=1` 时，微信 `code` 映射成 `mock-${wechatAppId}-${code}`；支付宝在 `ALIPAY_MOCK=1` 或同样开了 `WECHAT_MOCK` 时走 mock。登录可带 `phone`，与账密账号合并。
+登录可带 `phone`，与账密账号合并。微信登录签发的 token 会话里会带 **wechatAppId**（真正的微信小程序 appId），刷新后仍保留，用来区分属于哪一套小程序；`appId` 仍是用户中心接入端 appCode。
+
+### 微信服务（多套 appId / secret）
+
+独立进程 + 独立库 `wechat`。在这里维护多套小程序凭证，并提供 access_token、openid 兑换、小程序码、手机号。不存用户。
+
+```bash
+# 列出已登记小程序（不回传 secret）
+curl http://localhost:3000/wechat/miniprograms \
+  -H "Authorization: Bearer <token>"
+
+# 登记两套小程序（需要 wechat.manage）
+curl -X POST http://localhost:3000/wechat/miniprograms \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"code":"mall","name":"商城","appId":"wxaaaaaaaa","secret":"secret-a"}'
+
+curl -X POST http://localhost:3000/wechat/miniprograms \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"code":"crm","name":"客服","appId":"wxbbbbbbbb","secret":"secret-b"}'
+
+# 轮换某一套的 secret
+curl -X PATCH http://localhost:3000/wechat/miniprograms/<id> \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"secret":"secret-a-rotated"}'
+
+# 小程序码（需要 wechat.qrcode），用业务 code 或微信 appId
+curl -X POST http://localhost:3000/wechat/qrcode \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"code":"mall","scene":"order=1","page":"pages/index/index"}' \
+  -o qrcode.png
+
+# 手机号：mpCode/appId 选小程序，phoneCode 是 getPhoneNumber 的动态令牌
+curl -X POST http://localhost:3000/wechat/phone \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"mpCode":"mall","phoneCode":"the-phone-code"}'
+```
 
 ### 绑定手机号（合并账号）
 
@@ -205,7 +248,22 @@ Excel「功能点」表头：`模块 / 功能编码 / 功能名称 / 描述 / �
 - `GET|POST|PATCH|DELETE /roles` 、 `PUT /roles/:id/permissions` — `role.manage`
 - `GET|POST|PATCH|DELETE /permissions` — `permission.manage`
 - `GET /permissions/export` / `POST /permissions/import` — Excel，手写覆盖
+- `GET|POST|PATCH /wechat/miniprograms` — `wechat.manage`，多套 appId / secret
+- `POST /wechat/qrcode` — `wechat.qrcode`，返回 PNG
+- `POST /wechat/phone` — 登录后按已登记小程序换手机号
+- `GET /health` — 聚合 gateway / usercenter / order / docs / upload / wechat 状态与版本
 - `GET /orders` / `GET /orders/:id` — 无需登录
+
+## 管理后台
+
+独立 Next.js 应用 [`apps/admin`](apps/admin)（Tailwind + shadcn 风格），端口 **3100**，经 gateway 管理用户/角色/功能点/租户/微信小程序/文档/上传与运维状态。
+
+```bash
+npm run start:admin
+# 默认账号 admin / admin123（usercenter 种子）
+```
+
+详见 [`apps/admin/README.md`](apps/admin/README.md)。
 - `POST /orders` — 需要登录，并注入 `operatorId`
 
 ```bash

@@ -4,6 +4,13 @@ export interface ServiceEnvelope<T> {
   instance: string;
 }
 
+export interface UserIdentityInfo {
+  provider: string;
+  identifier: string;
+  unionid: string | null;
+  appCode: string | null;
+}
+
 export interface User {
   id: string;
   username: string | null;
@@ -14,8 +21,11 @@ export interface User {
   status: number;
   appCodes?: string[];
   providers?: string[];
+  identities?: UserIdentityInfo[];
   roles?: string[];
   permissions?: string[];
+  /** 当前 token 所属微信小程序 appId，仅微信登录会话 */
+  wechatAppId?: string;
 }
 
 export interface Order {
@@ -58,7 +68,10 @@ export interface AuthSession {
   token: string;
   refreshToken?: string;
   userId: string;
+  /** 用户中心接入端 appCode */
   appId: string;
+  /** 微信小程序 appId；仅微信登录会话存在，用来区分属于哪一套小程序 */
+  wechatAppId?: string;
   username: string | null;
   nickname: string;
   role: 'user' | 'admin';
@@ -72,6 +85,7 @@ export interface AuthResult {
   refreshToken: string;
   refreshExpiresIn: number;
   user: User;
+  wechatAppId?: string;
 }
 
 export interface RefreshTokenDto {
@@ -143,6 +157,22 @@ export interface PermissionInfo {
   sort: number;
 }
 
+export interface WechatMiniProgram {
+  id: string;
+  code: string;
+  name: string;
+  appId: string;
+  hasSecret: boolean;
+  status: number;
+}
+
+export interface WechatSession {
+  openid: string;
+  unionid?: string;
+  sessionKey?: string;
+  appId: string;
+}
+
 export const PERMISSIONS = {
   USER_QUERY: 'user.query',
   USER_CREATE: 'user.create',
@@ -153,4 +183,6 @@ export const PERMISSIONS = {
   PERMISSION_MANAGE: 'permission.manage',
   PERMISSION_IMPORT: 'permission.import',
   PERMISSION_EXPORT: 'permission.export',
+  WECHAT_MANAGE: 'wechat.manage',
+  WECHAT_QRCODE: 'wechat.qrcode',
 } as const;

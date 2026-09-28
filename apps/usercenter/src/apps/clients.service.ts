@@ -53,7 +53,7 @@ export class ClientsService {
         name,
         type,
         wechatAppId: optionalString(payload.wechatAppId) ?? null,
-        wechatSecret: optionalString(payload.wechatSecret) ?? null,
+        wechatSecret: null,
         alipayAppId: optionalString(payload.alipayAppId) ?? null,
         alipayPrivateKey: optionalString(payload.alipayPrivateKey) ?? null,
         status: 1,
@@ -81,9 +81,6 @@ export class ClientsService {
     if (payload.wechatAppId !== undefined) {
       client.wechatAppId = optionalString(payload.wechatAppId) ?? null;
     }
-    if (payload.wechatSecret !== undefined) {
-      client.wechatSecret = optionalString(payload.wechatSecret) ?? null;
-    }
     if (payload.alipayAppId !== undefined) {
       client.alipayAppId = optionalString(payload.alipayAppId) ?? null;
     }
@@ -104,7 +101,7 @@ export class ClientsService {
       name: client.name,
       type: client.type,
       wechatAppId: client.wechatAppId,
-      hasWechatSecret: !!client.wechatSecret,
+      hasWechatSecret: false,
       alipayAppId: client.alipayAppId,
       hasAlipayPrivateKey: !!client.alipayPrivateKey,
       status: client.status,

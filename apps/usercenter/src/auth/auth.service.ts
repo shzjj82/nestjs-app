@@ -76,16 +76,10 @@ export class AuthService {
   async loginByWechat(payload: Record<string, unknown>): Promise<AuthResult> {
     const client = await this.requireClient(payload, 'wechat_mp');
     const code = requiredString(payload.code, 'code');
-    if (!client.wechatAppId || !client.wechatSecret) {
-      if (process.env.WECHAT_MOCK !== '1') {
-        rpcFail(400, `接入端 ${client.appCode} 未配置微信 appId / appSecret`);
-      }
+    if (!client.wechatAppId) {
+      rpcFail(400, `接入端 ${client.appCode} 未配置 wechatAppId（对应微信服务登记的 appId 或 code）`);
     }
-    const session = await this.wechatClient.code2session(
-      client.wechatAppId || client.appCode,
-      client.wechatSecret || 'mock-secret',
-      code,
-    );
+    const session = await this.wechatClient.code2session(client.wechatAppId, code);
     return this.loginByIdentity({
       client,
       provider: 'wechat_mp',
@@ -94,6 +88,7 @@ export class AuthService {
       nickname: optionalString(payload.nickname) ?? '微信用户',
       avatar: optionalString(payload.avatar),
       phone: optionalString(payload.phone),
+      wechatAppId: session.appId || client.wechatAppId,
     });
   }
 
@@ -101,13 +96,11 @@ export class AuthService {
     const client = await this.requireClient(payload, 'alipay_mp');
     const code = requiredString(payload.code, 'code');
     if (!client.alipayAppId || !client.alipayPrivateKey) {
-      if (process.env.ALIPAY_MOCK !== '1' && process.env.WECHAT_MOCK !== '1') {
-        rpcFail(400, `接入端 ${client.appCode} 未配置支付宝 appId / 私钥`);
-      }
+      rpcFail(400, `接入端 ${client.appCode} 未配置支付宝 appId / 私钥`);
     }
     const session = await this.alipayClient.code2session(
-      client.alipayAppId || client.appCode,
-      client.alipayPrivateKey || 'mock-secret',
+      client.alipayAppId,
+      client.alipayPrivateKey,
       code,
     );
     return this.loginByIdentity({
@@ -133,7 +126,7 @@ export class AuthService {
     if (bound.user.status !== 1) {
       rpcFail(403, '账号已停用');
     }
-    return this.issue(bound.user.id, session.appId);
+    return this.issue(bound.user.id, session.appId, session.wechatAppId);
   }
 
   async refresh(payload: Record<string, unknown>): Promise<AuthResult> {
@@ -148,7 +141,7 @@ export class AuthService {
       rpcFail(403, '账号已停用');
     }
     await this.tokens.revokeByRefresh(refreshToken);
-    return this.issue(user.id, record.appId);
+    return this.issue(user.id, record.appId, record.wechatAppId);
   }
 
   async logout(payload: Record<string, unknown>) {
@@ -170,7 +163,11 @@ export class AuthService {
     const user = await this.users.findEntity(session.userId);
     const publicUser = await this.users.toPublic(user);
     const rbac = await this.rbac.loadUserRbac(user.id);
-    return { ...publicUser, ...rbac };
+    return {
+      ...publicUser,
+      ...rbac,
+      wechatAppId: session.wechatAppId,
+    };
   }
 
   private async loginByIdentity(input: {
@@ -181,6 +178,7 @@ export class AuthService {
     nickname: string;
     avatar?: string;
     phone?: string;
+    wechatAppId?: string;
   }): Promise<AuthResult> {
     let identity = await this.identities.findOne({
       where: {
@@ -245,7 +243,7 @@ export class AuthService {
         avatar: input.avatar,
       });
     }
-    return this.issue(userId, input.client.appCode);
+    return this.issue(userId, input.client.appCode, input.wechatAppId);
   }
 
   private async requireClient(
@@ -264,13 +262,18 @@ export class AuthService {
     return clientCodeOf(payload) ?? 'web';
   }
 
-  private async issue(userId: string, appId: string): Promise<AuthResult> {
+  private async issue(
+    userId: string,
+    appId: string,
+    wechatAppId?: string,
+  ): Promise<AuthResult> {
     const user = await this.users.findEntity(userId);
     const rbac = await this.rbac.loadUserRbac(userId);
     const publicUser = await this.users.toPublic(user);
     const pair = await this.tokens.issue({
       userId,
       appId,
+      wechatAppId: wechatAppId || undefined,
       username: user.username,
       nickname: user.nickname,
       role: rbac.roles.includes('admin') ? 'admin' : 'user',
@@ -282,7 +285,8 @@ export class AuthService {
       expiresIn: pair.expiresIn,
       refreshToken: pair.refreshToken,
       refreshExpiresIn: pair.refreshExpiresIn,
-      user: { ...publicUser, ...rbac },
+      user: { ...publicUser, ...rbac, wechatAppId: wechatAppId || undefined },
+      wechatAppId: wechatAppId || undefined,
     };
   }
 }

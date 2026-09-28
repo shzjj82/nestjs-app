@@ -2,12 +2,14 @@ export const USER_CLIENT = 'USER_CLIENT';
 export const ORDER_CLIENT = 'ORDER_CLIENT';
 export const DOCS_CLIENT = 'DOCS_CLIENT';
 export const UPLOAD_CLIENT = 'UPLOAD_CLIENT';
+export const WECHAT_CLIENT = 'WECHAT_CLIENT';
 
 export const MQTT_GROUPS = {
   USERCENTER: 'usercenter',
   ORDER: 'order',
   DOCS: 'docs',
   UPLOAD: 'upload',
+  WECHAT: 'wechat',
 } as const;
 
 export const MQTT_PATTERNS = {
@@ -62,6 +64,13 @@ export const MQTT_PATTERNS = {
   UPLOAD_ENQUEUE: 'upload.enqueue',
   UPLOAD_JOB: 'upload.job',
   UPLOAD_DELETE: 'upload.delete',
+  WECHAT_HEALTH: 'wechat.health',
+  WECHAT_MP_FIND_ALL: 'wechat.mp.findAll',
+  WECHAT_MP_CREATE: 'wechat.mp.create',
+  WECHAT_MP_UPDATE: 'wechat.mp.update',
+  WECHAT_CODE2SESSION: 'wechat.code2session',
+  WECHAT_QRCODE: 'wechat.qrcode',
+  WECHAT_PHONE: 'wechat.phone',
 } as const;
 
 export function sharePattern(group: string, pattern: string): string {

@@ -29,6 +29,8 @@ const DEFAULT_PERMISSIONS: Array<{
   { module: '权限', code: PERMISSIONS.PERMISSION_MANAGE, name: '管理功能点', description: '维护全局功能点目录', sort: 80 },
   { module: '权限', code: PERMISSIONS.PERMISSION_IMPORT, name: '导入权限', description: 'Excel 导入功能点与角色勾选', sort: 90 },
   { module: '权限', code: PERMISSIONS.PERMISSION_EXPORT, name: '导出权限', description: 'Excel 导出功能点与角色勾选', sort: 100 },
+  { module: '微信', code: PERMISSIONS.WECHAT_MANAGE, name: '管理小程序', description: '登记多套微信小程序 appId / secret', sort: 110 },
+  { module: '微信', code: PERMISSIONS.WECHAT_QRCODE, name: '生成小程序码', description: '按小程序生成 QR 码', sort: 120 },
 ];
 
 @Injectable()
@@ -57,14 +59,11 @@ export class SeedService implements OnModuleInit {
       'web',
     );
     await this.ensureClient('wechat', '默认微信小程序', 'wechat_mp', {
-      wechatAppId: process.env.WECHAT_APP_ID ?? (process.env.WECHAT_MOCK === '1' ? 'wechat' : null),
-      wechatSecret: process.env.WECHAT_SECRET ?? (process.env.WECHAT_MOCK === '1' ? 'mock-secret' : null),
+      wechatAppId: process.env.WECHAT_APP_ID ?? null,
     });
     await this.ensureClient('alipay', '默认支付宝小程序', 'alipay_mp', {
-      alipayAppId: process.env.ALIPAY_APP_ID ?? (process.env.ALIPAY_MOCK === '1' || process.env.WECHAT_MOCK === '1' ? 'alipay' : null),
-      alipayPrivateKey:
-        process.env.ALIPAY_PRIVATE_KEY ??
-        (process.env.ALIPAY_MOCK === '1' || process.env.WECHAT_MOCK === '1' ? 'mock-secret' : null),
+      alipayAppId: process.env.ALIPAY_APP_ID ?? null,
+      alipayPrivateKey: process.env.ALIPAY_PRIVATE_KEY ?? null,
     });
     await this.ensureRbac();
     await this.ensureAdmin();

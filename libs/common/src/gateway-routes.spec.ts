@@ -91,4 +91,14 @@ describe('matchRoute', () => {
       'upload-key',
     ]);
   });
+
+  it('protects wechat miniprogram admin and qrcode override', () => {
+    expect(matchRoute('GET', '/wechat/miniprograms')?.permissions).toEqual([
+      'wechat.manage',
+    ]);
+    expect(matchRoute('POST', '/wechat/qrcode')?.override).toBe(true);
+    expect(matchRoute('POST', '/wechat/qrcode')?.permissions).toEqual([
+      'wechat.qrcode',
+    ]);
+  });
 });

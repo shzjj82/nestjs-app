@@ -1,6 +1,6 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-import { DocsHandleLogInterceptor, instanceId, MQTT_PATTERNS } from '@app/common';
+import { DocsHandleLogInterceptor, MQTT_PATTERNS, serviceHealth } from '@app/common';
 import { docsPattern } from './common/rpc';
 
 @Controller()
@@ -8,6 +8,6 @@ import { docsPattern } from './common/rpc';
 export class DocsController {
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_HEALTH))
   health() {
-    return { status: 'up', instance: instanceId('docs') };
+    return serviceHealth('docs');
   }
 }

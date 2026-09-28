@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { serviceHealth } from '@app/common';
 import type { CreateOrderDto, Order } from '@app/common';
 
 @Injectable()
@@ -6,7 +7,7 @@ export class OrderService {
   private readonly orders = new Map<string, Order>();
 
   health() {
-    return { status: 'ok' };
+    return serviceHealth('order');
   }
 
   findAll(): Order[] {

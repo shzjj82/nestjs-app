@@ -324,6 +324,10 @@ export class UsersService {
       where: { userId: user.id },
       relations: ['client'],
     });
+    const roleRows = await this.userRoles.find({
+      where: { userId: user.id },
+      relations: ['role'],
+    });
     const providers = new Set<string>(identityRows.map((row) => row.provider));
     if (user.passwordHash) {
       providers.add('password');
@@ -335,6 +339,12 @@ export class UsersService {
           .filter((code): code is string => !!code),
       ),
     ];
+    const identities = identityRows.map((row) => ({
+      provider: row.provider,
+      identifier: row.identifier,
+      unionid: row.unionid,
+      appCode: row.client?.appCode ?? null,
+    }));
     return {
       id: user.id,
       username: user.username,
@@ -345,6 +355,8 @@ export class UsersService {
       status: user.status,
       appCodes,
       providers: [...providers],
+      identities,
+      roles: roleRows.map((row) => row.role?.code).filter(Boolean) as string[],
     };
   }
 }

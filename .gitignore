@@ -3,5 +3,10 @@ dist
 coverage
 .data
 .env
+.env.local
 *.log
 .DS_Store
+.next
+apps/admin/.next
+apps/admin/node_modules
+apps/admin/.env.local

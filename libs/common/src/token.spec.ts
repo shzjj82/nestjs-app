@@ -74,6 +74,19 @@ describe('TokenStore', () => {
     expect(pair.refreshExpiresIn).toBeGreaterThan(pair.expiresIn);
   });
 
+  it('keeps wechatAppId on access and refresh records', async () => {
+    const { redis } = createMemoryRedis();
+    const store = new TokenStore(redis as never);
+    const pair = await store.issue({
+      ...baseSession,
+      wechatAppId: 'wxaaaaaaaa',
+    });
+    const loaded = await store.get(pair.session.token);
+    const refresh = await store.getRefresh(pair.refreshToken);
+    expect(loaded?.wechatAppId).toBe('wxaaaaaaaa');
+    expect(refresh?.wechatAppId).toBe('wxaaaaaaaa');
+  });
+
   it('revokes access and its refresh token together', async () => {
     const { redis } = createMemoryRedis();
     const store = new TokenStore(redis as never);

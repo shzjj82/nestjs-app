@@ -4,6 +4,7 @@ import { MqttModule } from '../mqtt/mqtt.module';
 import { OrdersOverrideController } from './orders.controller';
 import { PermissionsFileController } from './permissions-file.controller';
 import { UploadOverrideController } from './upload.controller';
+import { WechatQrcodeController } from './wechat-qrcode.controller';
 
 @Module({
   imports: [AuthModule, MqttModule],
@@ -11,6 +12,7 @@ import { UploadOverrideController } from './upload.controller';
     OrdersOverrideController,
     PermissionsFileController,
     UploadOverrideController,
+    WechatQrcodeController,
   ],
 })
 export class OverridesModule {}
