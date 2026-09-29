@@ -1,22 +1,27 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '@/components/data-table';
+import type { FilterField } from '@/components/filter-bar';
+import { actionsColumn } from '@/lib/admin-table-columns';
+import type { AdminColumnDef } from '@/lib/admin-table-types';
+import { KeyRound, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/api';
+import { DataTableRowActions } from '@/components/data-table-row-actions';
+import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-
 interface Role {
   id: string;
   code: string;
@@ -33,12 +38,26 @@ interface Permission {
   module: string;
 }
 
+const ROLE_FILTERS: FilterField<Role>[] = [
+  {
+    id: 'name',
+    type: 'text',
+    label: '名称',
+    placeholder: '搜索角色名称 / 编码...',
+    accessor: (row) => `${row.name} ${row.code}`,
+  },
+];
+
+const EMPTY_ROLE = { code: '', name: '', description: '' };
+
 export default function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [permOpen, setPermOpen] = useState(false);
   const [selected, setSelected] = useState<Role | null>(null);
   const [permIds, setPermIds] = useState<string[]>([]);
-  const [form, setForm] = useState({ code: '', name: '', description: '' });
+  const [form, setForm] = useState(EMPTY_ROLE);
 
   async function load() {
     const [r, p] = await Promise.all([
@@ -53,17 +72,19 @@ export default function RolesPage() {
     load().catch((err) => toast.error(err.message));
   }, []);
 
-  function selectRole(role: Role) {
+  const openPermDialog = useCallback((role: Role) => {
     setSelected(role);
     setPermIds(role.permissionIds ?? []);
-  }
+    setPermOpen(true);
+  }, []);
 
   async function createRole(e: React.FormEvent) {
     e.preventDefault();
     try {
       await adminFetch('/roles', { method: 'POST', body: JSON.stringify(form) });
       toast.success('角色已创建');
-      setForm({ code: '', name: '', description: '' });
+      setForm(EMPTY_ROLE);
+      setCreateOpen(false);
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '创建失败');
@@ -81,7 +102,8 @@ export default function RolesPage() {
       await load();
       const refreshed = await adminFetch<Role[]>('/roles');
       const next = refreshed.find((r) => r.id === selected.id);
-      if (next) selectRole(next);
+      if (next) setSelected(next);
+      setPermOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '保存失败');
     }
@@ -92,98 +114,125 @@ export default function RolesPage() {
     return acc;
   }, {});
 
+  const columns = useMemo<AdminColumnDef<Role>[]>(
+    () => [
+      {
+        accessorKey: 'code',
+        header: '编码',
+        meta: { label: '编码' },
+        cell: ({ row }) => <span className="font-mono text-xs">{row.original.code}</span>,
+      },
+      {
+        accessorKey: 'name',
+        header: '名称',
+        meta: { label: '名称' },
+      },
+      {
+        id: 'permissions',
+        header: '功能点',
+        accessorFn: (row) => row.permissionCodes?.length ?? 0,
+        meta: { label: '功能点数' },
+        cell: ({ row }) => row.original.permissionCodes?.length ?? 0,
+      },
+      actionsColumn({
+        id: 'actions',
+        header: () => <span className="sr-only">操作</span>,
+        meta: { label: '操作' },
+        cell: ({ row }) => (
+          <DataTableRowActions
+            actions={[
+              { label: '配置权限', icon: KeyRound, onSelect: () => openPermDialog(row.original) },
+            ]}
+          />
+        ),
+      }),
+    ],
+    [openPermDialog],
+  );
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">角色权限组</h1>
-        <p className="text-sm text-muted-foreground">维护角色并勾选功能点</p>
-      </div>
+    <>
+      <PageHeader
+        title="角色权限组"
+        description="维护角色并勾选功能点"
+        actions={
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus />
+            新建角色
+          </Button>
+        }
+      />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>角色列表</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>编码</TableHead>
-                  <TableHead>名称</TableHead>
-                  <TableHead>功能点</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {roles.map((role) => (
-                  <TableRow key={role.id}>
-                    <TableCell className="font-mono text-xs">{role.code}</TableCell>
-                    <TableCell>{role.name}</TableCell>
-                    <TableCell>{role.permissionCodes?.length ?? 0}</TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="outline" onClick={() => selectRole(role)}>
-                        配置权限
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <DataTable columns={columns} data={roles} filters={ROLE_FILTERS} emptyMessage="暂无角色" />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>新建角色</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-3" onSubmit={createRole}>
-              <div className="space-y-1">
-                <Label>编码</Label>
-                <Input
-                  value={form.code}
-                  onChange={(e) => setForm({ ...form, code: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>名称</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>描述</Label>
-                <Textarea
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                />
-              </div>
-              <Button type="submit" className="w-full">
-                创建
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>新建角色</DialogTitle>
+            <DialogDescription>创建后可继续配置功能点</DialogDescription>
+          </DialogHeader>
+          <form id="role-create" className="space-y-4" onSubmit={createRole}>
+            <div className="space-y-2">
+              <Label>编码</Label>
+              <Input
+                value={form.code}
+                onChange={(e) => setForm({ ...form, code: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>名称</Label>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>描述</Label>
+              <Textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+              />
+            </div>
+          </form>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+              取消
+            </Button>
+            <Button type="submit" form="role-create">
+              创建
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {selected && (
-        <Card>
-          <CardHeader>
-            <CardTitle>为「{selected.name}」勾选功能点</CardTitle>
-            <CardDescription>{selected.code}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <Dialog open={permOpen} onOpenChange={setPermOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>配置功能点</DialogTitle>
+            <DialogDescription>
+              {selected ? (
+                <>
+                  {selected.name}{' '}
+                  <span className="font-mono text-xs">({selected.code})</span>
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
             {Object.entries(grouped).map(([module, items]) => (
               <div key={module}>
-                <div className="mb-2 text-sm font-medium">{module}</div>
-                <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                <div className="mb-2 text-sm font-medium text-muted-foreground">{module}</div>
+                <div className="grid gap-2 sm:grid-cols-2">
                   {items.map((p) => (
-                    <label key={p.id} className="flex items-center gap-2 rounded border p-2 text-sm">
+                    <label
+                      key={p.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-md border bg-muted/20 p-2.5 text-sm transition-colors hover:bg-muted/40"
+                    >
                       <input
                         type="checkbox"
+                        className="h-4 w-4 rounded border-input"
                         checked={permIds.includes(p.id)}
                         onChange={(e) => {
                           setPermIds((prev) =>
@@ -204,10 +253,15 @@ export default function RolesPage() {
                 </div>
               </div>
             ))}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPermOpen(false)}>
+              取消
+            </Button>
             <Button onClick={savePermissions}>保存权限</Button>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -2,11 +2,18 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { PageHeader } from '@/components/page-header';
 import { adminFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 
 interface UploadResult {
   key?: string;
@@ -103,13 +110,11 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">上传管理</h1>
-        <p className="text-sm text-muted-foreground">
-          同步/异步上传与按 key 删除（无对象列表接口）
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="上传管理"
+        description="同步/异步上传与按 key 删除（无对象列表接口）"
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -117,53 +122,60 @@ export default function UploadPage() {
             <CardTitle>上传文件</CardTitle>
             <CardDescription>走网关 /upload</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form className="space-y-3">
-              <div className="space-y-1">
-                <Label>前缀</Label>
-                <Input value={prefix} onChange={(e) => setPrefix(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label>文件</Label>
+          <CardContent className="flex flex-col gap-4">
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="upload-prefix">前缀</FieldLabel>
                 <Input
+                  id="upload-prefix"
+                  value={prefix}
+                  onChange={(e) => setPrefix(e.target.value)}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="upload-file">文件</FieldLabel>
+                <Input
+                  id="upload-file"
                   type="file"
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 />
-              </div>
-              <div className="flex gap-2">
-                <Button type="button" onClick={upload}>
-                  同步上传
-                </Button>
-                <Button type="button" variant="outline" onClick={uploadAsync}>
-                  异步入队
-                </Button>
-              </div>
-            </form>
-            {last && (
-              <pre className="mt-4 overflow-auto rounded bg-muted p-3 text-xs">
+              </Field>
+            </FieldGroup>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={upload}>
+                同步上传
+              </Button>
+              <Button type="button" variant="outline" onClick={uploadAsync}>
+                异步入队
+              </Button>
+            </div>
+            {last ? (
+              <pre className="overflow-auto rounded-lg bg-muted p-3 text-xs">
                 {JSON.stringify(last, null, 2)}
               </pre>
-            )}
+            ) : null}
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
           <Card>
             <CardHeader>
               <CardTitle>查询异步任务</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <Input
-                placeholder="jobId"
-                value={jobId}
-                onChange={(e) => setJobId(e.target.value)}
-              />
-              <Button onClick={checkJob}>查询</Button>
-              {job && (
-                <pre className="overflow-auto rounded bg-muted p-3 text-xs">
+            <CardContent className="flex flex-col gap-3">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="jobId"
+                  value={jobId}
+                  onChange={(e) => setJobId(e.target.value)}
+                />
+                <Button onClick={checkJob}>查询</Button>
+              </div>
+              {job ? (
+                <pre className="overflow-auto rounded-lg bg-muted p-3 text-xs">
                   {JSON.stringify(job, null, 2)}
                 </pre>
-              )}
+              ) : null}
             </CardContent>
           </Card>
 
@@ -171,7 +183,7 @@ export default function UploadPage() {
             <CardHeader>
               <CardTitle>删除对象</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="flex gap-2">
               <Input
                 placeholder="object key"
                 value={objectKey}
@@ -184,6 +196,6 @@ export default function UploadPage() {
           </Card>
         </div>
       </div>
-    </div>
+    </>
   );
 }

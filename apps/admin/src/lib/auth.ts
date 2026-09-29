@@ -5,6 +5,8 @@ export interface AdminUser {
   id: string;
   username: string | null;
   nickname: string;
+  phone?: string | null;
+  email?: string | null;
   roles?: string[];
   permissions?: string[];
   wechatAppId?: string;

@@ -1,23 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { DataTable } from '@/components/data-table';
+import type { AdminColumnDef } from '@/lib/admin-table-types';
+import { FolderPlus, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/api';
+import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SelectField } from '@/components/select-field';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-
 interface Client {
   appCode: string;
   name: string;
@@ -38,18 +41,21 @@ interface Category {
   name: string;
 }
 
+const EMPTY_DOC = { title: '', slug: '', content: '', visibility: 'public' };
+const EMPTY_CAT = { name: '', slug: '' };
+
 export default function DocsPage() {
   const [tenants, setTenants] = useState<Client[]>([]);
   const [appCode, setAppCode] = useState('web');
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [form, setForm] = useState({
-    title: '',
-    slug: '',
-    content: '',
-    visibility: 'public',
-  });
-  const [catForm, setCatForm] = useState({ name: '', slug: '' });
+  const [docOpen, setDocOpen] = useState(false);
+  const [catOpen, setCatOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY_DOC);
+  const [catForm, setCatForm] = useState(EMPTY_CAT);
+  const [docPage, setDocPage] = useState(1);
+  const [docPageSize, setDocPageSize] = useState(20);
+  const [docTotal, setDocTotal] = useState(0);
 
   async function loadTenants() {
     const clients = await adminFetch<Client[]>('/clients');
@@ -59,20 +65,32 @@ export default function DocsPage() {
     }
   }
 
-  async function loadDocs(code = appCode) {
+  async function loadDocs(
+    code = appCode,
+    page = docPage,
+    pageSize = docPageSize,
+  ) {
     const qs = new URLSearchParams({
       appCode: code,
       scope: 'all',
-      page: '1',
-      pageSize: '50',
+      page: String(page),
+      pageSize: String(pageSize),
     });
-    const result = await adminFetch<{ posts?: DocItem[]; items?: DocItem[] } | DocItem[]>(
-      `/docs/documents?${qs}`,
-    );
+    const result = await adminFetch<
+      | { posts?: DocItem[]; items?: DocItem[]; total?: number; page?: number; pageSize?: number }
+      | DocItem[]
+    >(`/docs/documents?${qs}`);
     if (Array.isArray(result)) {
       setDocs(result);
+      setDocTotal(result.length);
+      setDocPage(1);
+      setDocPageSize(result.length || pageSize);
     } else {
-      setDocs(result.posts ?? result.items ?? []);
+      const list = result.posts ?? result.items ?? [];
+      setDocs(list);
+      setDocTotal(result.total ?? list.length);
+      if (result.page) setDocPage(result.page);
+      if (result.pageSize) setDocPageSize(result.pageSize);
     }
     const cats = await adminFetch<{ categories?: Category[] } | Category[]>(
       `/docs/categories?appCode=${encodeURIComponent(code)}`,
@@ -81,19 +99,19 @@ export default function DocsPage() {
   }
 
   useEffect(() => {
-    loadTenants()
-      .then(() => loadDocs())
-      .catch((err) => toast.error(err.message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadTenants().catch((err) => toast.error(err.message));
   }, []);
+
+  useEffect(() => {
+    loadDocs(appCode, docPage, docPageSize).catch((err) =>
+      toast.error(err instanceof Error ? err.message : '加载失败'),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appCode, docPage, docPageSize]);
 
   async function onAppChange(code: string) {
     setAppCode(code);
-    try {
-      await loadDocs(code);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '加载失败');
-    }
+    setDocPage(1);
   }
 
   async function createDoc(e: React.FormEvent) {
@@ -111,7 +129,8 @@ export default function DocsPage() {
         }),
       });
       toast.success('文档已创建');
-      setForm({ title: '', slug: '', content: '', visibility: 'public' });
+      setForm(EMPTY_DOC);
+      setDocOpen(false);
       await loadDocs();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '创建失败');
@@ -131,137 +150,194 @@ export default function DocsPage() {
         }),
       });
       toast.success('分类已创建');
-      setCatForm({ name: '', slug: '' });
+      setCatForm(EMPTY_CAT);
+      setCatOpen(false);
       await loadDocs();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '创建失败');
     }
   }
 
+  const tenantOptions = tenants.map((t) => ({
+    value: t.appCode,
+    label: `${t.name} (${t.appCode})`,
+  }));
+
+  const docColumns = useMemo<AdminColumnDef<DocItem>[]>(
+    () => [
+      {
+        accessorKey: 'title',
+        header: '标题',
+        meta: { label: '标题' },
+      },
+      {
+        accessorKey: 'slug',
+        header: 'slug',
+        meta: { label: 'slug' },
+        cell: ({ row }) => <span className="font-mono text-xs">{row.original.slug}</span>,
+      },
+      {
+        accessorKey: 'visibility',
+        header: '可见性',
+        meta: { label: '可见性' },
+        cell: ({ row }) => (
+          <Badge variant="outline">{row.original.visibility || '—'}</Badge>
+        ),
+      },
+    ],
+    [],
+  );
+
+  const categoryColumns = useMemo<AdminColumnDef<Category>[]>(
+    () => [
+      {
+        accessorKey: 'name',
+        header: '名称',
+        meta: { label: '名称' },
+      },
+      {
+        accessorKey: 'slug',
+        header: 'slug',
+        meta: { label: 'slug' },
+        cell: ({ row }) => (
+          <span className="font-mono text-xs text-muted-foreground">{row.original.slug}</span>
+        ),
+      },
+    ],
+    [],
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">文档空间</h1>
-          <p className="text-sm text-muted-foreground">按租户 appCode 隔离</p>
-        </div>
-        <div className="space-y-1">
-          <Label>当前租户</Label>
-          <select
-            className="flex h-10 rounded-md border border-input bg-background px-3 text-sm"
-            value={appCode}
-            onChange={(e) => onAppChange(e.target.value)}
-          >
-            {tenants.map((t) => (
-              <option key={t.appCode} value={t.appCode}>
-                {t.name} ({t.appCode})
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+    <>
+      <PageHeader
+        title="文档空间"
+        description="按租户 appCode 隔离文档与分类"
+        actions={
+          <>
+            {tenantOptions.length > 0 ? (
+              <div className="w-48">
+                <SelectField
+                  label="当前租户"
+                  value={appCode}
+                  onChange={onAppChange}
+                  options={tenantOptions}
+                />
+              </div>
+            ) : null}
+            <Button variant="outline" onClick={() => setCatOpen(true)}>
+              <FolderPlus />
+              新建分类
+            </Button>
+            <Button onClick={() => setDocOpen(true)}>
+              <Plus />
+              新建文档
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>文档列表</CardTitle>
-            <CardDescription>共 {docs.length} 篇</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>标题</TableHead>
-                  <TableHead>slug</TableHead>
-                  <TableHead>可见性</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {docs.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell>{d.title}</TableCell>
-                    <TableCell className="font-mono text-xs">{d.slug}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{d.visibility || '—'}</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>新建文档</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-3" onSubmit={createDoc}>
-                <div className="space-y-1">
-                  <Label>标题</Label>
-                  <Input
-                    value={form.title}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>slug（可选）</Label>
-                  <Input
-                    value={form.slug}
-                    onChange={(e) => setForm({ ...form, slug: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>内容</Label>
-                  <Textarea
-                    value={form.content}
-                    onChange={(e) => setForm({ ...form, content: e.target.value })}
-                    rows={6}
-                  />
-                </div>
-                <Button type="submit" className="w-full">
-                  创建
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>分类</CardTitle>
-              <CardDescription>共 {categories.length} 个</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <ul className="space-y-1 text-sm">
-                {categories.map((c) => (
-                  <li key={c.id}>
-                    {c.name}{' '}
-                    <span className="font-mono text-xs text-muted-foreground">{c.slug}</span>
-                  </li>
-                ))}
-              </ul>
-              <form className="space-y-2" onSubmit={createCategory}>
-                <Input
-                  placeholder="分类名称"
-                  value={catForm.name}
-                  onChange={(e) => setCatForm({ ...catForm, name: e.target.value })}
-                  required
-                />
-                <Input
-                  placeholder="slug（可选）"
-                  value={catForm.slug}
-                  onChange={(e) => setCatForm({ ...catForm, slug: e.target.value })}
-                />
-                <Button type="submit" size="sm" className="w-full">
-                  添加分类
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+        <div className="lg:col-span-2">
+            <DataTable
+              columns={docColumns}
+              data={docs}
+              emptyMessage="暂无文档"
+              pagination={{
+                mode: 'server',
+                page: docPage,
+                pageSize: docPageSize,
+                total: docTotal,
+                onChange: ({ page, pageSize }) => {
+                  setDocPage(page);
+                  setDocPageSize(pageSize);
+                },
+              }}
+            />
         </div>
+
+          <DataTable
+            columns={categoryColumns}
+            data={categories}
+            emptyMessage="暂无分类"
+            enableRowSelection={false}
+          />
       </div>
-    </div>
+
+      <Dialog open={docOpen} onOpenChange={setDocOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>新建文档</DialogTitle>
+            <DialogDescription>将创建在租户 {appCode} 下</DialogDescription>
+          </DialogHeader>
+          <form id="doc-create" className="space-y-4" onSubmit={createDoc}>
+            <div className="space-y-2">
+              <Label>标题</Label>
+              <Input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>slug（可选）</Label>
+              <Input
+                value={form.slug}
+                onChange={(e) => setForm({ ...form, slug: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>内容</Label>
+              <Textarea
+                value={form.content}
+                onChange={(e) => setForm({ ...form, content: e.target.value })}
+                rows={8}
+              />
+            </div>
+          </form>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDocOpen(false)}>
+              取消
+            </Button>
+            <Button type="submit" form="doc-create">
+              创建
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={catOpen} onOpenChange={setCatOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>新建分类</DialogTitle>
+            <DialogDescription>将创建在租户 {appCode} 下</DialogDescription>
+          </DialogHeader>
+          <form id="cat-create" className="space-y-4" onSubmit={createCategory}>
+            <div className="space-y-2">
+              <Label>分类名称</Label>
+              <Input
+                value={catForm.name}
+                onChange={(e) => setCatForm({ ...catForm, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>slug（可选）</Label>
+              <Input
+                value={catForm.slug}
+                onChange={(e) => setCatForm({ ...catForm, slug: e.target.value })}
+              />
+            </div>
+          </form>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCatOpen(false)}>
+              取消
+            </Button>
+            <Button type="submit" form="cat-create">
+              添加分类
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -14,6 +14,7 @@ export interface RefreshRecord {
   token: string;
   accessToken: string;
   userId: string;
+  accountId?: string;
   appId: string;
   wechatAppId?: string;
 }
@@ -38,6 +39,7 @@ export class TokenStore {
       token: refreshToken,
       accessToken,
       userId: session.userId,
+      accountId: session.accountId,
       appId: session.appId,
       wechatAppId: session.wechatAppId,
     };

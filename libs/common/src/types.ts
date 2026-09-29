@@ -4,24 +4,33 @@ export interface ServiceEnvelope<T> {
   instance: string;
 }
 
-export interface UserIdentityInfo {
-  provider: string;
+export type AccountType = 'password' | 'wechat_mp' | 'alipay_mp';
+
+export interface UserAccountInfo {
+  id: string;
+  type: AccountType;
   identifier: string;
-  unionid: string | null;
-  appCode: string | null;
+  status: number;
+  roles: string[];
+  roleIds: string[];
+  roleNames: string[];
+  lastLoginAt: string | null;
+  createdAt: string;
 }
 
 export interface User {
   id: string;
+  /** 账密账户的登录名；无账密账户时为 null */
   username: string | null;
   nickname: string;
   phone: string | null;
   email: string | null;
   avatar: string | null;
   status: number;
-  appCodes?: string[];
-  providers?: string[];
-  identities?: UserIdentityInfo[];
+  createdAt?: string;
+  accounts?: UserAccountInfo[];
+  /** 当前会话账户（仅 /auth/me 与登录结果） */
+  accountId?: string;
   roles?: string[];
   permissions?: string[];
   /** 当前 token 所属微信小程序 appId，仅微信登录会话 */
@@ -54,7 +63,6 @@ export interface PageQuery {
   page?: number;
   pageSize?: number;
   keyword?: string;
-  appCode?: string;
 }
 
 export interface PageResult<T> {
@@ -68,6 +76,8 @@ export interface AuthSession {
   token: string;
   refreshToken?: string;
   userId: string;
+  /** 登录所用账户；角色与权限来自该账户 */
+  accountId?: string;
   /** 用户中心接入端 appCode */
   appId: string;
   /** 微信小程序 appId；仅微信登录会话存在，用来区分属于哪一套小程序 */

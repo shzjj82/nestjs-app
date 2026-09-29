@@ -1,53 +1,55 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { PageResult, User } from '@app/common';
-import { hash } from 'bcrypt';
-import { DataSource, In, Repository } from 'typeorm';
-import {
-  ClientEntity,
-  RoleEntity,
-  UserEntity,
-  UserIdentityEntity,
-  UserRoleEntity,
-} from '../entities';
+import { DataSource, Repository } from 'typeorm';
+import { AccountEntity, UserEntity } from '../entities';
 import { optionalString, requiredString, rpcFail, toPage } from '../rpc';
 import { normalizePhone, pickSurvivor, tryNormalizePhone } from './account-merge';
+import { AccountsService } from './accounts.service';
 
-const PASSWORD_ROUNDS = 10;
+const PLACEHOLDER_NICKNAMES = new Set(['', '微信用户', '支付宝用户']);
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(UserEntity)
     private readonly users: Repository<UserEntity>,
-    @InjectRepository(UserRoleEntity)
-    private readonly userRoles: Repository<UserRoleEntity>,
-    @InjectRepository(RoleEntity)
-    private readonly roles: Repository<RoleEntity>,
-    @InjectRepository(UserIdentityEntity)
-    private readonly identities: Repository<UserIdentityEntity>,
+    private readonly accounts: AccountsService,
     private readonly dataSource: DataSource,
   ) {}
 
   async findAll(payload: Record<string, unknown>): Promise<PageResult<User>> {
     const { page, pageSize, skip } = toPage(payload.page, payload.pageSize);
     const keyword = optionalString(payload.keyword);
-    const appCode = optionalString(payload.appCode) ?? optionalString(payload.appId);
+    const roleCodes = stringList(payload.role);
+    const statuses = stringList(payload.status)
+      .map((s) => Number(s))
+      .filter((n) => n === 0 || n === 1);
 
     const qb = this.users
       .createQueryBuilder('u')
-      .leftJoin(UserIdentityEntity, 'i', 'i.userId = u.id')
-      .leftJoin(ClientEntity, 'c', 'c.id = i.clientId')
-      .orderBy('u.createdAt', 'DESC')
-      .distinct(true);
+      .orderBy('u.createdAt', 'DESC');
 
-    if (appCode) {
-      qb.andWhere('c.appCode = :appCode', { appCode });
+    if (statuses.length > 0) {
+      qb.andWhere('u.status IN (:...statuses)', { statuses });
     }
     if (keyword) {
       qb.andWhere(
-        '(u.username ILIKE :kw OR u.nickname ILIKE :kw OR u.phone ILIKE :kw OR u.email ILIKE :kw)',
+        `(u.nickname ILIKE :kw OR u.phone ILIKE :kw OR u.email ILIKE :kw OR EXISTS (
+          SELECT 1 FROM uc_accounts a WHERE a.user_id = u.id AND a.identifier ILIKE :kw
+        ))`,
         { kw: `%${keyword}%` },
+      );
+    }
+    if (roleCodes.length > 0) {
+      qb.andWhere(
+        `EXISTS (
+          SELECT 1 FROM uc_accounts a
+          JOIN uc_account_roles ar ON ar.account_id = a.id
+          JOIN uc_roles r ON r.id = ar.role_id
+          WHERE a.user_id = u.id AND r.code IN (:...roleCodes)
+        )`,
+        { roleCodes },
       );
     }
 
@@ -69,13 +71,18 @@ export class UsersService {
     return user;
   }
 
-  async findByUsernameOrPhone(account: string): Promise<UserEntity | null> {
-    const phone = tryNormalizePhone(account);
-    return this.users.findOne({
-      where: phone
-        ? [{ username: account.trim() }, { phone }]
-        : [{ username: account.trim() }],
-    });
+  /** 登录名或手机号 → 账密账户 */
+  async findPasswordAccount(login: string): Promise<AccountEntity | null> {
+    const byIdentifier = await this.accounts.findPassword(login);
+    if (byIdentifier) {
+      return byIdentifier;
+    }
+    const phone = tryNormalizePhone(login);
+    if (!phone) {
+      return null;
+    }
+    const user = await this.findByPhone(phone);
+    return user ? this.accounts.findPasswordByUser(user.id) : null;
   }
 
   async findByPhone(phone: string): Promise<UserEntity | null> {
@@ -99,7 +106,10 @@ export class UsersService {
       return { user: await this.users.save(current), mergedFromUserId: null };
     }
 
-    const survivor = pickSurvivor(current, owner);
+    const survivor = pickSurvivor(
+      { user: current, hasPasswordAccount: !!(await this.accounts.findPasswordByUser(current.id)) },
+      { user: owner, hasPasswordAccount: !!(await this.accounts.findPasswordByUser(owner.id)) },
+    );
     const loser = survivor.id === current.id ? owner : current;
     await this.mergeUsers(survivor, loser, phone);
     return {
@@ -108,64 +118,23 @@ export class UsersService {
     };
   }
 
-  private async mergeUsers(
-    survivor: UserEntity,
-    loser: UserEntity,
-    phone: string,
-  ) {
+  private async mergeUsers(survivor: UserEntity, loser: UserEntity, phone: string) {
     await this.dataSource.transaction(async (manager) => {
-      const identities = manager.getRepository(UserIdentityEntity);
-      const userRoles = manager.getRepository(UserRoleEntity);
+      const accounts = manager.getRepository(AccountEntity);
       const users = manager.getRepository(UserEntity);
 
-      const loserIdentities = await identities.find({
-        where: { userId: loser.id },
-      });
-      for (const identity of loserIdentities) {
-        const dup = await identities.findOne({
-          where: {
-            clientId: identity.clientId,
-            provider: identity.provider,
-            identifier: identity.identifier,
-          },
-        });
-        if (dup) {
-          await identities.remove(identity);
-          continue;
-        }
-        identity.userId = survivor.id;
-        await identities.save(identity);
-      }
+      await accounts.update(
+        { userId: loser.id },
+        { userId: survivor.id, updatedAt: new Date() },
+      );
 
-      const loserRoles = await userRoles.find({ where: { userId: loser.id } });
-      for (const row of loserRoles) {
-        const exists = await userRoles.findOne({
-          where: { userId: survivor.id, roleId: row.roleId },
-        });
-        if (exists) {
-          await userRoles.remove(row);
-          continue;
-        }
-        row.userId = survivor.id;
-        await userRoles.save(row);
-      }
-
-      if (!survivor.username && loser.username) {
-        survivor.username = loser.username;
-      }
-      if (!survivor.passwordHash && loser.passwordHash) {
-        survivor.passwordHash = loser.passwordHash;
-      }
       if (!survivor.email && loser.email) {
         survivor.email = loser.email;
       }
       if (
-        (!survivor.nickname ||
-          survivor.nickname === '微信用户' ||
-          survivor.nickname === '支付宝用户') &&
+        PLACEHOLDER_NICKNAMES.has(survivor.nickname ?? '') &&
         loser.nickname &&
-        loser.nickname !== '微信用户' &&
-        loser.nickname !== '支付宝用户'
+        !PLACEHOLDER_NICKNAMES.has(loser.nickname)
       ) {
         survivor.nickname = loser.nickname;
       }
@@ -173,7 +142,6 @@ export class UsersService {
         survivor.avatar = loser.avatar;
       }
 
-      loser.username = null;
       loser.phone = null;
       loser.email = null;
       await users.save(loser);
@@ -188,26 +156,22 @@ export class UsersService {
   async createByAdmin(payload: Record<string, unknown>): Promise<User> {
     const username = requiredString(payload.username, 'username');
     const password = requiredString(payload.password, 'password');
-    await this.assertUsernameFree(username);
+    await this.accounts.assertIdentifierFree(username);
     const rawPhone = optionalString(payload.phone);
     const phone = rawPhone ? normalizePhone(rawPhone) : undefined;
-    if (phone) {
-      const taken = await this.findByPhone(phone);
-      if (taken) {
-        rpcFail(409, '手机号已被占用');
-      }
+    if (phone && (await this.findByPhone(phone))) {
+      rpcFail(409, '手机号已被占用');
     }
     const user = await this.createUser({
-      username,
-      password,
       nickname: optionalString(payload.nickname) ?? username,
       phone,
       email: optionalString(payload.email),
     });
+    const account = await this.accounts.createPassword(user.id, username, password);
     const roleCodes = Array.isArray(payload.roleCodes)
       ? payload.roleCodes.map(String)
       : ['user'];
-    await this.assignRoleCodes(user.id, roleCodes);
+    await this.accounts.assignRoleCodes(account.id, roleCodes);
     return this.toPublic(user);
   }
 
@@ -220,8 +184,7 @@ export class UsersService {
       const phone = optionalString(payload.phone) ?? null;
       if (phone && phone !== user.phone) {
         const normalized = normalizePhone(phone);
-        const taken = await this.users.findOne({ where: { phone: normalized } });
-        if (taken) {
+        if (await this.findByPhone(normalized)) {
           rpcFail(409, '手机号已被占用');
         }
         user.phone = normalized;
@@ -245,37 +208,30 @@ export class UsersService {
     if (payload.status !== undefined) {
       user.status = Number(payload.status) === 0 ? 0 : 1;
     }
-    if (payload.password) {
-      user.passwordHash = await hash(String(payload.password), PASSWORD_ROUNDS);
-    }
     user.updatedAt = new Date();
     return this.toPublic(await this.users.save(user));
   }
 
-  async assignRolesByPayload(payload: Record<string, unknown>): Promise<User> {
-    const user = await this.findEntity(requiredString(payload.id, 'id'));
-    const roleIds = Array.isArray(payload.roleIds)
-      ? payload.roleIds.map(String)
-      : [];
-    await this.assignRoleIds(user.id, roleIds);
-    return this.toPublic(user);
+  async updateAccount(payload: Record<string, unknown>): Promise<User> {
+    const account = await this.accounts.update(payload);
+    return this.findOne(account.userId);
+  }
+
+  async assignAccountRoles(payload: Record<string, unknown>): Promise<User> {
+    const account = await this.accounts.findEntity(requiredString(payload.id, 'id'));
+    const roleIds = Array.isArray(payload.roleIds) ? payload.roleIds.map(String) : [];
+    await this.accounts.assignRoleIds(account.id, roleIds);
+    return this.findOne(account.userId);
   }
 
   async createUser(input: {
-    username?: string | null;
-    password?: string;
     nickname: string;
     phone?: string | null;
     email?: string | null;
     avatar?: string | null;
   }): Promise<UserEntity> {
-    const passwordHash = input.password
-      ? await hash(input.password, PASSWORD_ROUNDS)
-      : null;
     return this.users.save(
       this.users.create({
-        username: input.username ?? null,
-        passwordHash,
         nickname: input.nickname,
         phone: input.phone ? normalizePhone(input.phone) : null,
         email: input.email ?? null,
@@ -285,78 +241,33 @@ export class UsersService {
     );
   }
 
-  async assertUsernameFree(username: string) {
-    const exists = await this.users.findOne({ where: { username } });
-    if (exists) {
-      rpcFail(409, `用户名 ${username} 已存在`);
-    }
-  }
-
-  async assignRoleCodes(userId: string, codes: string[]) {
-    const roles = codes.length
-      ? await this.roles.find({ where: { code: In(codes) } })
-      : [];
-    await this.replaceRoles(userId, roles);
-  }
-
-  async assignRoleIds(userId: string, roleIds: string[]) {
-    const roles = roleIds.length
-      ? await this.roles.find({ where: { id: In(roleIds) } })
-      : [];
-    await this.replaceRoles(userId, roles);
-  }
-
-  async replaceRoles(userId: string, next: RoleEntity[]) {
-    const current = await this.userRoles.find({ where: { userId } });
-    if (current.length) {
-      await this.userRoles.remove(current);
-    }
-    if (!next.length) {
-      return;
-    }
-    await this.userRoles.save(
-      next.map((role) => this.userRoles.create({ userId, roleId: role.id })),
-    );
-  }
-
   async toPublic(user: UserEntity): Promise<User> {
-    const identityRows = await this.identities.find({
-      where: { userId: user.id },
-      relations: ['client'],
-    });
-    const roleRows = await this.userRoles.find({
-      where: { userId: user.id },
-      relations: ['role'],
-    });
-    const providers = new Set<string>(identityRows.map((row) => row.provider));
-    if (user.passwordHash) {
-      providers.add('password');
-    }
-    const appCodes = [
-      ...new Set(
-        identityRows
-          .map((row) => row.client?.appCode)
-          .filter((code): code is string => !!code),
-      ),
-    ];
-    const identities = identityRows.map((row) => ({
-      provider: row.provider,
-      identifier: row.identifier,
-      unionid: row.unionid,
-      appCode: row.client?.appCode ?? null,
-    }));
+    const accounts = await this.accounts.toInfoList(
+      await this.accounts.listByUser(user.id),
+    );
     return {
       id: user.id,
-      username: user.username,
+      username: accounts.find((a) => a.type === 'password')?.identifier ?? null,
       nickname: user.nickname,
       phone: user.phone,
       email: user.email,
       avatar: user.avatar,
       status: user.status,
-      appCodes,
-      providers: [...providers],
-      identities,
-      roles: roleRows.map((row) => row.role?.code).filter(Boolean) as string[],
+      createdAt: user.createdAt.toISOString(),
+      accounts,
     };
   }
+}
+
+function stringList(value: unknown): string[] {
+  if (value == null || value === '') return [];
+  if (Array.isArray(value)) {
+    return value.map(String).map((s) => s.trim()).filter(Boolean);
+  }
+  const text = String(value).trim();
+  if (!text) return [];
+  if (text.includes(',')) {
+    return text.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  return [text];
 }

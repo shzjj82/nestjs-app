@@ -1,13 +1,10 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
+/** 用户（自然人）资料；登录凭证与角色在 AccountEntity */
 @Entity('uc_users')
 export class UserEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
-
-  @Index({ unique: true })
-  @Column({ type: 'varchar', length: 64, nullable: true })
-  username: string | null;
 
   @Index({ unique: true })
   @Column({ type: 'varchar', length: 32, nullable: true })
@@ -16,9 +13,6 @@ export class UserEntity {
   @Index({ unique: true })
   @Column({ type: 'varchar', length: 128, nullable: true })
   email: string | null;
-
-  @Column({ name: 'password_hash', type: 'varchar', length: 128, nullable: true })
-  passwordHash: string | null;
 
   @Column({ type: 'varchar', length: 64, default: '' })
   nickname: string;

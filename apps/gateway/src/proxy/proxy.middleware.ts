@@ -53,6 +53,7 @@ export class ProxyMiddleware implements NestMiddleware {
           ? {
               token: user.token,
               userId: user.id,
+              accountId: user.accountId,
               appId: user.appId,
               wechatAppId: user.wechatAppId,
               username: user.username ?? null,

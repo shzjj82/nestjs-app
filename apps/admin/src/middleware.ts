@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PUBLIC = ['/login', '/api/auth/login'];
+const PUBLIC = ['/login', '/api/auth/login', '/api/auth/logout'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -13,11 +13,20 @@ export function middleware(req: NextRequest) {
   }
 
   const token = req.cookies.get('admin_access_token')?.value;
-  if (!token && !pathname.startsWith('/api/')) {
-    const url = req.nextUrl.clone();
-    url.pathname = '/login';
-    url.searchParams.set('from', pathname);
-    return NextResponse.redirect(url);
+
+  if (!token) {
+    if (pathname.startsWith('/api/proxy')) {
+      return NextResponse.json(
+        { success: false, code: 401, message: '未登录', data: null },
+        { status: 401 },
+      );
+    }
+    if (!pathname.startsWith('/api/')) {
+      const url = req.nextUrl.clone();
+      url.pathname = '/login';
+      url.searchParams.set('from', pathname);
+      return NextResponse.redirect(url);
+    }
   }
 
   return NextResponse.next();

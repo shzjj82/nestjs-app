@@ -60,6 +60,7 @@ export class AuthService {
     }
     return {
       id: session.userId,
+      accountId: session.accountId,
       name: session.nickname,
       role: session.role,
       appId: session.appId,

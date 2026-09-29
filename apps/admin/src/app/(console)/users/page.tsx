@@ -1,303 +1,327 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Ban, CircleCheck, Eye } from 'lucide-react';
 import { toast } from 'sonner';
-import { adminFetch } from '@/lib/api';
+
+import { DataTable } from '@/components/data-table';
+import { DataTableRowActions } from '@/components/data-table-row-actions';
+import { type FilterField, type FilterValues, filtersToSearchParams } from '@/components/filter-bar';
+import { PageHeader } from '@/components/page-header';
+import { StatusBadge } from '@/components/status-badge';
+import { type RoleOption, UserAccountCard } from '@/components/user-account-card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-
-interface UserIdentity {
-  provider: string;
-  identifier: string;
-  unionid: string | null;
-  appCode: string | null;
-}
-
-interface User {
-  id: string;
-  username: string | null;
-  nickname: string;
-  phone: string | null;
-  email: string | null;
-  status: number;
-  appCodes?: string[];
-  providers?: string[];
-  identities?: UserIdentity[];
-  roles?: string[];
-}
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { actionsColumn } from '@/lib/admin-table-columns';
+import type { AdminColumnDef } from '@/lib/admin-table-types';
+import { ACCOUNT_TYPE_META, type CenterUser, formatDateTime } from '@/lib/accounts';
+import { adminFetch } from '@/lib/api';
 
 interface PageResult {
-  items: User[];
+  items: CenterUser[];
   total: number;
   page: number;
   pageSize: number;
 }
 
-interface Role {
-  id: string;
-  code: string;
-  name: string;
+const STATUS_OPTIONS = [
+  { label: '正常', value: '1' },
+  { label: '停用', value: '0' },
+];
+
+function errorMessage(err: unknown, fallback: string) {
+  return err instanceof Error ? err.message : fallback;
 }
 
 export default function UsersPage() {
-  const [keyword, setKeyword] = useState('');
-  const [appCode, setAppCode] = useState('');
+  const [filters, setFilters] = useState<FilterValues>({});
   const [data, setData] = useState<PageResult | null>(null);
-  const [selected, setSelected] = useState<User | null>(null);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [roleIds, setRoleIds] = useState<string[]>([]);
-  const [form, setForm] = useState({
-    username: '',
-    password: '',
-    nickname: '',
-    phone: '',
-  });
+  const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [selected, setSelected] = useState<CenterUser | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const qs = new URLSearchParams();
-    if (keyword) qs.set('keyword', keyword);
-    if (appCode) qs.set('appCode', appCode);
-    qs.set('page', '1');
-    qs.set('pageSize', '50');
-    const result = await adminFetch<PageResult>(`/users?${qs}`);
-    setData(result);
-  }, [keyword, appCode]);
+    try {
+      const qs = filtersToSearchParams(filters);
+      qs.set('page', String(page));
+      qs.set('pageSize', String(pageSize));
+      setData(await adminFetch<PageResult>(`/users?${qs}`));
+    } catch (err) {
+      toast.error(errorMessage(err, '加载失败'));
+    }
+  }, [filters, page, pageSize]);
 
   useEffect(() => {
-    load().catch((err) => toast.error(err.message));
-    adminFetch<Role[]>('/roles')
-      .then(setRoles)
-      .catch(() => undefined);
+    load();
   }, [load]);
 
-  async function openDetail(id: string) {
+  useEffect(() => {
+    adminFetch<RoleOption[]>('/roles')
+      .then(setRoles)
+      .catch(() => undefined);
+  }, []);
+
+  const handleFiltersChange = useCallback((next: FilterValues) => {
+    setFilters(next);
+    setPage(1);
+  }, []);
+
+  const filterFields = useMemo<FilterField<CenterUser>[]>(
+    () => [
+      { id: 'keyword', type: 'text', label: '关键词', placeholder: '搜索昵称 / 手机 / 邮箱 / 登录名...' },
+      {
+        id: 'role',
+        type: 'multiSelect',
+        label: '角色',
+        options: roles.map((r) => ({ label: r.name, value: r.code })),
+      },
+      { id: 'status', type: 'multiSelect', label: '状态', options: STATUS_OPTIONS },
+    ],
+    [roles],
+  );
+
+  const openDetail = useCallback(async (id: string) => {
     try {
-      const [user, allRoles] = await Promise.all([
-        adminFetch<User>(`/users/${id}`),
-        adminFetch<Role[]>('/roles'),
-      ]);
-      setRoles(allRoles);
-      setSelected(user);
-      const matched = allRoles
-        .filter((r) => user.roles?.includes(r.code))
-        .map((r) => r.id);
-      setRoleIds(matched);
+      setSelected(await adminFetch<CenterUser>(`/users/${id}`));
+      setDetailOpen(true);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '加载失败');
+      toast.error(errorMessage(err, '加载失败'));
+    }
+  }, []);
+
+  const toggleUserStatus = useCallback(
+    async (user: CenterUser) => {
+      try {
+        await adminFetch(`/users/${user.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: user.status === 1 ? 0 : 1 }),
+        });
+        toast.success(user.status === 1 ? '用户已停用' : '用户已启用');
+        await load();
+      } catch (err) {
+        toast.error(errorMessage(err, '操作失败'));
+      }
+    },
+    [load],
+  );
+
+  async function updateAccount(path: string, init: RequestInit, message: string) {
+    try {
+      setSelected(await adminFetch<CenterUser>(path, init));
+      toast.success(message);
+      await load();
+    } catch (err) {
+      toast.error(errorMessage(err, '操作失败'));
     }
   }
 
-  async function createUser(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      await adminFetch('/users', {
-        method: 'POST',
-        body: JSON.stringify(form),
-      });
-      toast.success('已创建用户');
-      setForm({ username: '', password: '', nickname: '', phone: '' });
-      await load();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '创建失败');
-    }
-  }
+  const columns = useMemo<AdminColumnDef<CenterUser>[]>(
+    () => [
+      {
+        accessorKey: 'nickname',
+        header: '用户',
+        meta: { label: '用户' },
+        cell: ({ row }) => (
+          <div className="min-w-0">
+            <div className="truncate font-medium">{row.original.nickname || '—'}</div>
+            <div className="truncate text-xs text-muted-foreground">
+              {row.original.email || row.original.id.slice(0, 8)}
+            </div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'phone',
+        header: '手机',
+        meta: { label: '手机' },
+        cell: ({ row }) => row.original.phone || '—',
+      },
+      {
+        id: 'accounts',
+        header: '关联账户',
+        accessorFn: (row) => row.accounts?.length ?? 0,
+        meta: { label: '关联账户' },
+        cell: ({ row }) => {
+          const accounts = row.original.accounts ?? [];
+          if (!accounts.length) return <span className="text-muted-foreground">—</span>;
+          return (
+            <div className="flex flex-wrap gap-1">
+              {accounts.map((account) => {
+                const meta = ACCOUNT_TYPE_META[account.type];
+                const Icon = meta?.icon;
+                return (
+                  <Badge
+                    key={account.id}
+                    variant="outline"
+                    className={account.status === 1 ? undefined : 'opacity-50'}
+                    title={`${meta?.label ?? account.type}：${account.identifier}`}
+                  >
+                    {Icon ? <Icon /> : null}
+                    <span className="max-w-28 truncate">
+                      {account.type === 'password' ? account.identifier : meta?.label}
+                    </span>
+                  </Badge>
+                );
+              })}
+            </div>
+          );
+        },
+      },
+      {
+        id: 'roles',
+        header: '角色',
+        enableSorting: false,
+        accessorFn: (row) =>
+          [...new Set((row.accounts ?? []).flatMap((a) => a.roleNames))].join(', '),
+        meta: { label: '角色' },
+        cell: ({ row }) => {
+          const names = [...new Set((row.original.accounts ?? []).flatMap((a) => a.roleNames))];
+          if (!names.length) return <span className="text-muted-foreground">—</span>;
+          return (
+            <div className="flex flex-wrap gap-1">
+              {names.map((name) => (
+                <Badge key={name} variant="secondary">
+                  {name}
+                </Badge>
+              ))}
+            </div>
+          );
+        },
+      },
+      {
+        id: 'status',
+        accessorFn: (row) => String(row.status),
+        header: '状态',
+        meta: { label: '状态' },
+        cell: ({ row }) => <StatusBadge active={row.original.status === 1} />,
+      },
+      {
+        accessorKey: 'createdAt',
+        header: '注册时间',
+        meta: { label: '注册时间' },
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">
+            {formatDateTime(row.original.createdAt)}
+          </span>
+        ),
+      },
+      actionsColumn({
+        id: 'actions',
+        header: () => <span className="sr-only">操作</span>,
+        meta: { label: '操作' },
+        cell: ({ row }) => (
+          <DataTableRowActions
+            actions={[
+              { label: '账户与角色', icon: Eye, onSelect: () => openDetail(row.original.id) },
+              {
+                label: row.original.status === 1 ? '停用用户' : '启用用户',
+                icon: row.original.status === 1 ? Ban : CircleCheck,
+                variant: row.original.status === 1 ? 'destructive' : 'default',
+                separatorBefore: true,
+                onSelect: () => toggleUserStatus(row.original),
+              },
+            ]}
+          />
+        ),
+      }),
+    ],
+    [openDetail, toggleUserStatus],
+  );
 
-  async function saveRoles() {
-    if (!selected) return;
-    try {
-      await adminFetch(`/users/${selected.id}/roles`, {
-        method: 'PUT',
-        body: JSON.stringify({ roleIds }),
-      });
-      toast.success('角色已更新');
-      await openDetail(selected.id);
-      await load();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '更新失败');
-    }
-  }
+  const accounts = selected?.accounts ?? [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">用户账号</h1>
-        <p className="text-sm text-muted-foreground">用户列表、详情与关联身份</p>
-      </div>
+    <>
+      <PageHeader
+        title="用户"
+        description="一个用户可关联多个登录账户，角色按账户分配"
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>筛选</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
-          <Input
-            placeholder="关键词（用户名/昵称/手机）"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            className="max-w-xs"
-          />
-          <Input
-            placeholder="租户 appCode"
-            value={appCode}
-            onChange={(e) => setAppCode(e.target.value)}
-            className="max-w-xs"
-          />
-          <Button onClick={() => load().catch((e) => toast.error(e.message))}>查询</Button>
-        </CardContent>
-      </Card>
+      <DataTable
+        columns={columns}
+        data={data?.items ?? []}
+        filters={filterFields}
+        onFiltersChange={handleFiltersChange}
+        emptyMessage="暂无用户"
+        pagination={{
+          mode: 'server',
+          page: data?.page ?? page,
+          pageSize: data?.pageSize ?? pageSize,
+          total: data?.total ?? 0,
+          onChange: ({ page: nextPage, pageSize: nextSize }) => {
+            setPage(nextPage);
+            setPageSize(nextSize);
+          },
+        }}
+      />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>用户列表</CardTitle>
-            <CardDescription>共 {data?.total ?? 0} 人</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>用户名</TableHead>
-                  <TableHead>昵称</TableHead>
-                  <TableHead>手机</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>租户</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(data?.items ?? []).map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell>{u.username || '—'}</TableCell>
-                    <TableCell>{u.nickname}</TableCell>
-                    <TableCell>{u.phone || '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant={u.status === 1 ? 'success' : 'danger'}>
-                        {u.status === 1 ? '正常' : '停用'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs">{(u.appCodes ?? []).join(', ') || '—'}</TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="outline" onClick={() => openDetail(u.id)}>
-                        详情
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>创建账号</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-3" onSubmit={createUser}>
-                <div className="space-y-1">
-                  <Label>用户名</Label>
-                  <Input
-                    value={form.username}
-                    onChange={(e) => setForm({ ...form, username: e.target.value })}
-                    required
-                  />
+      <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
+        <SheetContent className="w-full gap-0 data-[side=right]:sm:max-w-lg">
+          <SheetHeader className="border-b">
+            <SheetTitle className="flex items-center gap-2">
+              {selected?.nickname || '用户详情'}
+              {selected ? <StatusBadge active={selected.status === 1} /> : null}
+            </SheetTitle>
+            <SheetDescription className="font-mono text-xs">{selected?.id}</SheetDescription>
+          </SheetHeader>
+          {selected ? (
+            <div className="flex-1 space-y-5 overflow-y-auto p-4">
+              <dl className="grid grid-cols-[5rem_1fr] gap-y-2 text-sm">
+                <dt className="text-muted-foreground">手机</dt>
+                <dd>{selected.phone || '—'}</dd>
+                <dt className="text-muted-foreground">邮箱</dt>
+                <dd>{selected.email || '—'}</dd>
+                <dt className="text-muted-foreground">注册时间</dt>
+                <dd>{formatDateTime(selected.createdAt)}</dd>
+              </dl>
+              <Separator />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium">关联账户</div>
+                  <span className="text-xs text-muted-foreground">共 {accounts.length} 个</span>
                 </div>
-                <div className="space-y-1">
-                  <Label>密码</Label>
-                  <Input
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>昵称</Label>
-                  <Input
-                    value={form.nickname}
-                    onChange={(e) => setForm({ ...form, nickname: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>手机</Label>
-                  <Input
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  />
-                </div>
-                <Button type="submit" className="w-full">
-                  创建
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          {selected && (
-            <Card>
-              <CardHeader>
-                <CardTitle>{selected.nickname}</CardTitle>
-                <CardDescription>{selected.username || selected.id}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="mb-2 text-sm font-medium">关联身份</div>
-                  {(selected.identities ?? []).length === 0 ? (
-                    <p className="text-sm text-muted-foreground">无第三方身份</p>
-                  ) : (
-                    <ul className="space-y-2 text-sm">
-                      {selected.identities!.map((id, idx) => (
-                        <li key={idx} className="rounded border p-2">
-                          <div>{id.provider}</div>
-                          <div className="font-mono text-xs">{id.identifier}</div>
-                          <div className="text-xs text-muted-foreground">
-                            appCode: {id.appCode || '—'}
-                            {id.unionid ? ` · unionid: ${id.unionid}` : ''}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <div>
-                  <div className="mb-2 text-sm font-medium">分配角色</div>
-                  <div className="space-y-2">
-                    {roles.map((role) => (
-                      <label key={role.id} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={roleIds.includes(role.id)}
-                          onChange={(e) => {
-                            setRoleIds((prev) =>
-                              e.target.checked
-                                ? [...prev, role.id]
-                                : prev.filter((id) => id !== role.id),
-                            );
-                          }}
-                        />
-                        {role.name} ({role.code})
-                      </label>
-                    ))}
-                  </div>
-                  <Button className="mt-3 w-full" onClick={saveRoles}>
-                    保存角色
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-    </div>
+                {accounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">该用户暂无账户</p>
+                ) : (
+                  accounts.map((account) => (
+                    <UserAccountCard
+                      key={`${account.id}:${account.roleIds.join(',')}`}
+                      account={account}
+                      roles={roles}
+                      onSaveRoles={(roleIds) =>
+                        updateAccount(
+                          `/accounts/${account.id}/roles`,
+                          { method: 'PUT', body: JSON.stringify({ roleIds }) },
+                          '账户角色已更新',
+                        )
+                      }
+                      onToggleStatus={() =>
+                        updateAccount(
+                          `/accounts/${account.id}`,
+                          {
+                            method: 'PATCH',
+                            body: JSON.stringify({ status: account.status === 1 ? 0 : 1 }),
+                          },
+                          account.status === 1 ? '账户已停用' : '账户已启用',
+                        )
+                      }
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

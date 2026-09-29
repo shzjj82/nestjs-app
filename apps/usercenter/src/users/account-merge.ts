@@ -19,15 +19,14 @@ export function normalizePhone(raw: string): string {
   return phone;
 }
 
-export function pickSurvivor(current: UserEntity, other: UserEntity): UserEntity {
-  const currentScore = accountScore(current);
-  const otherScore = accountScore(other);
-  if (otherScore !== currentScore) {
-    return otherScore > currentScore ? other : current;
-  }
-  return current.createdAt <= other.createdAt ? current : other;
+export interface MergeCandidate {
+  user: UserEntity;
+  hasPasswordAccount: boolean;
 }
 
-function accountScore(user: UserEntity): number {
-  return (user.passwordHash ? 2 : 0) + (user.username ? 1 : 0);
+export function pickSurvivor(current: MergeCandidate, other: MergeCandidate): UserEntity {
+  if (current.hasPasswordAccount !== other.hasPasswordAccount) {
+    return current.hasPasswordAccount ? current.user : other.user;
+  }
+  return current.user.createdAt <= other.user.createdAt ? current.user : other.user;
 }

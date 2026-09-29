@@ -29,8 +29,13 @@ export class UsersController {
     return this.users.update(payload);
   }
 
-  @MessagePattern(ucPattern(MQTT_PATTERNS.USER_ASSIGN_ROLES))
-  assignRoles(payload: Record<string, unknown>) {
-    return this.users.assignRolesByPayload(payload);
+  @MessagePattern(ucPattern(MQTT_PATTERNS.ACCOUNT_UPDATE))
+  updateAccount(payload: Record<string, unknown>) {
+    return this.users.updateAccount(payload);
+  }
+
+  @MessagePattern(ucPattern(MQTT_PATTERNS.ACCOUNT_ASSIGN_ROLES))
+  assignAccountRoles(payload: Record<string, unknown>) {
+    return this.users.assignAccountRoles(payload);
   }
 }

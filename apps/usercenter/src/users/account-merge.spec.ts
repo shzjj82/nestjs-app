@@ -4,10 +4,8 @@ import type { UserEntity } from '../entities';
 function user(partial: Partial<UserEntity>): UserEntity {
   return {
     id: 'id',
-    username: null,
     phone: null,
     email: null,
-    passwordHash: null,
     nickname: '',
     avatar: null,
     status: 1,
@@ -31,18 +29,22 @@ describe('normalizePhone', () => {
 });
 
 describe('pickSurvivor', () => {
-  it('prefers the password account over a wechat-only user', () => {
-    const passwordUser = user({
-      id: 'pwd',
-      username: 'shzjj8882',
-      passwordHash: 'hash',
-    });
-    const wechatUser = user({
-      id: 'wx',
-      nickname: '微信用户',
-      createdAt: new Date('2026-01-02'),
-    });
+  it('prefers the user holding a password account over a wechat-only user', () => {
+    const passwordUser = { user: user({ id: 'pwd' }), hasPasswordAccount: true };
+    const wechatUser = {
+      user: user({ id: 'wx', nickname: '微信用户', createdAt: new Date('2025-12-01') }),
+      hasPasswordAccount: false,
+    };
     expect(pickSurvivor(wechatUser, passwordUser).id).toBe('pwd');
     expect(pickSurvivor(passwordUser, wechatUser).id).toBe('pwd');
+  });
+
+  it('falls back to the older user when both are equal', () => {
+    const older = { user: user({ id: 'old' }), hasPasswordAccount: false };
+    const newer = {
+      user: user({ id: 'new', createdAt: new Date('2026-02-01') }),
+      hasPasswordAccount: false,
+    };
+    expect(pickSurvivor(newer, older).id).toBe('old');
   });
 });

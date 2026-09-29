@@ -23,6 +23,12 @@ describe('matchRoute', () => {
     expect(route?.auth).toEqual(['jwt']);
   });
 
+  it('protects change-password with jwt', () => {
+    const route = matchRoute('POST', '/auth/change-password');
+    expect(route?.pattern).toBe(MQTT_PATTERNS.AUTH_CHANGE_PASSWORD);
+    expect(route?.auth).toEqual(['jwt']);
+  });
+
   it('protects client admin routes', () => {
     const route = matchRoute('POST', '/clients');
     expect(route?.pattern).toBe(MQTT_PATTERNS.CLIENT_CREATE);

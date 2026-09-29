@@ -243,7 +243,8 @@ Excel「功能点」表头：`模块 / 功能编码 / 功能名称 / 描述 / �
 - `GET /auth/me` — 需要登录
 - `POST /auth/logout` — 可带 access Token，或 body 里只传 `refreshToken`
 - `GET /users` / `GET /users/:id` — `user.query`
-- `POST /users` / `PATCH /users/:id` / `PUT /users/:id/roles` — 对应用户权限
+- `POST /users` / `PATCH /users/:id` — 对应用户权限
+- `PATCH /accounts/:id`（启停 / 重置密码）/ `PUT /accounts/:id/roles`（角色挂在账户上）— 对应用户权限
 - `GET|POST|PATCH /clients` — `client.manage`，Web / 微信 / 支付宝接入端
 - `GET|POST|PATCH|DELETE /roles` 、 `PUT /roles/:id/permissions` — `role.manage`
 - `GET|POST|PATCH|DELETE /permissions` — `permission.manage`

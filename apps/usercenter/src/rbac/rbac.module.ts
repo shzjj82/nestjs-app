@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
+  AccountRoleEntity,
   PermissionEntity,
   RoleEntity,
   RolePermissionEntity,
-  UserRoleEntity,
 } from '../entities';
 import { ExcelService } from './excel.service';
 import { PermissionsController } from './permissions.controller';
@@ -17,7 +17,7 @@ import { RolesController } from './roles.controller';
       RoleEntity,
       PermissionEntity,
       RolePermissionEntity,
-      UserRoleEntity,
+      AccountRoleEntity,
     ]),
   ],
   controllers: [RolesController, PermissionsController],

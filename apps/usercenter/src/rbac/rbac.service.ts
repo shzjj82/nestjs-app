@@ -3,10 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { PermissionInfo, RoleInfo } from '@app/common';
 import { In, Repository } from 'typeorm';
 import {
+  AccountRoleEntity,
   PermissionEntity,
   RoleEntity,
   RolePermissionEntity,
-  UserRoleEntity,
 } from '../entities';
 import { optionalString, requiredString, rpcFail } from '../rpc';
 
@@ -19,13 +19,13 @@ export class RbacService {
     private readonly permissions: Repository<PermissionEntity>,
     @InjectRepository(RolePermissionEntity)
     private readonly rolePermissions: Repository<RolePermissionEntity>,
-    @InjectRepository(UserRoleEntity)
-    private readonly userRoles: Repository<UserRoleEntity>,
+    @InjectRepository(AccountRoleEntity)
+    private readonly accountRoles: Repository<AccountRoleEntity>,
   ) {}
 
-  async loadUserRbac(userId: string) {
-    const rows = await this.userRoles.find({
-      where: { userId },
+  async loadAccountRbac(accountId: string) {
+    const rows = await this.accountRoles.find({
+      where: { accountId },
       relations: ['role'],
     });
     const roleCodes = rows.map((row) => row.role.code);

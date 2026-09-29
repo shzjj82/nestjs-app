@@ -48,4 +48,9 @@ export class AuthController {
   bindPhone(payload: Record<string, unknown>) {
     return this.auth.bindPhone(payload);
   }
+
+  @MessagePattern(ucPattern(MQTT_PATTERNS.AUTH_CHANGE_PASSWORD))
+  changePassword(payload: Record<string, unknown>) {
+    return this.auth.changePassword(payload);
+  }
 }

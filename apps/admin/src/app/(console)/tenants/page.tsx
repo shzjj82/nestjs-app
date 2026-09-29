@@ -1,22 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable } from '@/components/data-table';
+import type { FilterField } from '@/components/filter-bar';
+import { actionsColumn } from '@/lib/admin-table-columns';
+import type { AdminColumnDef } from '@/lib/admin-table-types';
+import { Ban, CircleCheck, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/api';
+import { DataTableRowActions } from '@/components/data-table-row-actions';
+import { PageHeader } from '@/components/page-header';
+import { StatusBadge } from '@/components/status-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-
+import { SelectField } from '@/components/select-field';
 interface Client {
   id: string;
   appCode: string;
@@ -35,15 +42,32 @@ const TYPES = [
   { value: 'app', label: 'App' },
 ];
 
+const FILTERS: FilterField<Client>[] = [
+  { id: 'name', type: 'text', label: '名称', placeholder: '搜索名称 / appCode...', accessor: (row) => `${row.name} ${row.appCode}` },
+  { id: 'type', type: 'multiSelect', label: '类型', options: TYPES },
+  {
+    id: 'status',
+    type: 'multiSelect',
+    label: '状态',
+    options: [
+      { label: '启用', value: '1' },
+      { label: '停用', value: '0' },
+    ],
+  },
+];
+
+const EMPTY_FORM = {
+  appCode: '',
+  name: '',
+  type: 'web',
+  wechatAppId: '',
+  alipayAppId: '',
+};
+
 export default function TenantsPage() {
   const [items, setItems] = useState<Client[]>([]);
-  const [form, setForm] = useState({
-    appCode: '',
-    name: '',
-    type: 'web',
-    wechatAppId: '',
-    alipayAppId: '',
-  });
+  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
 
   async function load() {
     setItems(await adminFetch<Client[]>('/clients'));
@@ -67,14 +91,15 @@ export default function TenantsPage() {
         }),
       });
       toast.success('租户已创建');
-      setForm({ appCode: '', name: '', type: 'web', wechatAppId: '', alipayAppId: '' });
+      setForm(EMPTY_FORM);
+      setCreateOpen(false);
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '创建失败');
     }
   }
 
-  async function toggleStatus(client: Client) {
+  const toggleStatus = useCallback(async (client: Client) => {
     try {
       await adminFetch(`/clients/${client.id}`, {
         method: 'PATCH',
@@ -85,118 +110,150 @@ export default function TenantsPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '更新失败');
     }
-  }
+  }, []);
+
+  const columns = useMemo<AdminColumnDef<Client>[]>(
+    () => [
+      {
+        accessorKey: 'appCode',
+        header: 'appCode',
+        meta: { label: 'appCode' },
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">{row.original.appCode}</span>
+        ),
+      },
+      {
+        accessorKey: 'name',
+        header: '名称',
+        meta: { label: '名称' },
+      },
+      {
+        accessorKey: 'type',
+        header: '类型',
+        meta: { label: '类型' },
+        cell: ({ row }) => (
+          <Badge variant="outline">
+            {TYPES.find((t) => t.value === row.original.type)?.label ?? row.original.type}
+          </Badge>
+        ),
+      },
+      {
+        accessorKey: 'wechatAppId',
+        header: '微信 appId',
+        meta: { label: '微信 appId' },
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">{row.original.wechatAppId || '—'}</span>
+        ),
+      },
+      {
+        id: 'status',
+        accessorFn: (row) => String(row.status),
+        header: '状态',
+        meta: { label: '状态' },
+        cell: ({ row }) => (
+          <StatusBadge active={row.original.status === 1} activeLabel="启用" />
+        ),
+      },
+      actionsColumn({
+        id: 'actions',
+        header: () => <span className="sr-only">操作</span>,
+        meta: { label: '操作' },
+        cell: ({ row }) => {
+          const active = row.original.status === 1;
+          return (
+            <DataTableRowActions
+              actions={[
+                {
+                  label: active ? '停用' : '启用',
+                  icon: active ? Ban : CircleCheck,
+                  variant: active ? 'destructive' : 'default',
+                  onSelect: () => toggleStatus(row.original),
+                },
+              ]}
+            />
+          );
+        },
+      }),
+    ],
+    [toggleStatus],
+  );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">租户平台</h1>
-        <p className="text-sm text-muted-foreground">
-          接入端 appCode（如 blog），对应文档空间与微信登录指针
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="租户平台"
+        description="接入端 appCode（如 blog），对应文档空间与微信登录指针"
+        actions={
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus />
+            新建租户
+          </Button>
+        }
+      />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>接入端列表</CardTitle>
-            <CardDescription>共 {items.length} 个</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>appCode</TableHead>
-                  <TableHead>名称</TableHead>
-                  <TableHead>类型</TableHead>
-                  <TableHead>微信 appId</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-mono text-xs">{c.appCode}</TableCell>
-                    <TableCell>{c.name}</TableCell>
-                    <TableCell>{c.type}</TableCell>
-                    <TableCell className="font-mono text-xs">{c.wechatAppId || '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant={c.status === 1 ? 'success' : 'danger'}>
-                        {c.status === 1 ? '启用' : '停用'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="outline" onClick={() => toggleStatus(c)}>
-                        {c.status === 1 ? '停用' : '启用'}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <DataTable
+          columns={columns}
+          data={items}
+          filters={FILTERS}
+          emptyMessage="暂无租户，点击右上角新建"
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>新建租户</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-3" onSubmit={create}>
-              <div className="space-y-1">
-                <Label>appCode</Label>
-                <Input
-                  value={form.appCode}
-                  onChange={(e) => setForm({ ...form, appCode: e.target.value })}
-                  placeholder="blog"
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>名称</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>类型</Label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={form.type}
-                  onChange={(e) => setForm({ ...form, type: e.target.value })}
-                >
-                  {TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <Label>微信 appId / code（可选）</Label>
-                <Input
-                  value={form.wechatAppId}
-                  onChange={(e) => setForm({ ...form, wechatAppId: e.target.value })}
-                  placeholder="指向微信服务已登记的 appId"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>支付宝 appId（可选）</Label>
-                <Input
-                  value={form.alipayAppId}
-                  onChange={(e) => setForm({ ...form, alipayAppId: e.target.value })}
-                />
-              </div>
-              <Button type="submit" className="w-full">
-                创建
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>新建租户</DialogTitle>
+            <DialogDescription>创建新的接入端 appCode，用于隔离文档与用户身份</DialogDescription>
+          </DialogHeader>
+          <form id="tenant-create" className="space-y-4" onSubmit={create}>
+            <div className="space-y-2">
+              <Label>appCode</Label>
+              <Input
+                value={form.appCode}
+                onChange={(e) => setForm({ ...form, appCode: e.target.value })}
+                placeholder="blog"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>名称</Label>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+              />
+            </div>
+            <SelectField
+              label="类型"
+              value={form.type}
+              onChange={(type) => setForm({ ...form, type })}
+              options={TYPES}
+            />
+            <div className="space-y-2">
+              <Label>微信 appId / code（可选）</Label>
+              <Input
+                value={form.wechatAppId}
+                onChange={(e) => setForm({ ...form, wechatAppId: e.target.value })}
+                placeholder="指向微信服务已登记的 appId"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>支付宝 appId（可选）</Label>
+              <Input
+                value={form.alipayAppId}
+                onChange={(e) => setForm({ ...form, alipayAppId: e.target.value })}
+              />
+            </div>
+          </form>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+              取消
+            </Button>
+            <Button type="submit" form="tenant-create">
+              创建
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

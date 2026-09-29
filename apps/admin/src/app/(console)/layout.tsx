@@ -1,5 +1,6 @@
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { Sidebar } from '@/components/sidebar';
+import { ConsoleShell } from '@/components/console-shell';
 import { fetchMe, isAdmin } from '@/lib/auth';
 
 export default async function ConsoleLayout({
@@ -12,12 +13,12 @@ export default async function ConsoleLayout({
     redirect('/login');
   }
 
+  const cookieStore = await cookies();
+  const sidebarOpen = cookieStore.get('sidebar_state')?.value !== 'false';
+
   return (
-    <div className="flex min-h-screen bg-muted/20">
-      <Sidebar user={user} />
-      <main className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-7xl p-6 md:p-8">{children}</div>
-      </main>
-    </div>
+    <ConsoleShell user={user} defaultSidebarOpen={sidebarOpen}>
+      {children}
+    </ConsoleShell>
   );
 }

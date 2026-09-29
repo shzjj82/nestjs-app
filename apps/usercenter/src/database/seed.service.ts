@@ -2,15 +2,16 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PERMISSIONS } from '@app/common';
 import { hash } from 'bcrypt';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import type { ClientType } from '../entities';
 import {
+  AccountEntity,
+  AccountRoleEntity,
   ClientEntity,
   PermissionEntity,
   RoleEntity,
   RolePermissionEntity,
   UserEntity,
-  UserRoleEntity,
 } from '../entities';
 
 const DEFAULT_PERMISSIONS: Array<{
@@ -23,7 +24,7 @@ const DEFAULT_PERMISSIONS: Array<{
   { module: '用户', code: PERMISSIONS.USER_QUERY, name: '查询用户', description: '查看用户列表与详情', sort: 10 },
   { module: '用户', code: PERMISSIONS.USER_CREATE, name: '创建用户', description: '后台创建用户', sort: 20 },
   { module: '用户', code: PERMISSIONS.USER_UPDATE, name: '更新用户', description: '编辑用户资料', sort: 30 },
-  { module: '用户', code: PERMISSIONS.USER_ASSIGN_ROLE, name: '分配角色', description: '给用户勾选角色组', sort: 50 },
+  { module: '用户', code: PERMISSIONS.USER_ASSIGN_ROLE, name: '分配角色', description: '给账户勾选角色组', sort: 50 },
   { module: '接入端', code: PERMISSIONS.CLIENT_MANAGE, name: '管理接入端', description: '维护 Web / 微信 / 支付宝小程序', sort: 60 },
   { module: '角色', code: PERMISSIONS.ROLE_MANAGE, name: '管理角色', description: '维护全局角色组并勾选功能点', sort: 70 },
   { module: '权限', code: PERMISSIONS.PERMISSION_MANAGE, name: '管理功能点', description: '维护全局功能点目录', sort: 80 },
@@ -48,8 +49,10 @@ export class SeedService implements OnModuleInit {
     private readonly permissions: Repository<PermissionEntity>,
     @InjectRepository(RolePermissionEntity)
     private readonly rolePermissions: Repository<RolePermissionEntity>,
-    @InjectRepository(UserRoleEntity)
-    private readonly userRoles: Repository<UserRoleEntity>,
+    @InjectRepository(AccountEntity)
+    private readonly accounts: Repository<AccountEntity>,
+    @InjectRepository(AccountRoleEntity)
+    private readonly accountRoles: Repository<AccountRoleEntity>,
   ) {}
 
   async onModuleInit() {
@@ -157,25 +160,32 @@ export class SeedService implements OnModuleInit {
   private async ensureAdmin() {
     const username = process.env.SEED_ADMIN_USERNAME ?? 'admin';
     const password = process.env.SEED_ADMIN_PASSWORD ?? 'admin123';
-    let user = await this.users.findOne({ where: { username } });
-    if (!user) {
-      user = await this.users.save(
-        this.users.create({
-          username,
+    let account = await this.accounts.findOne({
+      where: { type: 'password', identifier: username, clientId: IsNull() },
+    });
+    if (!account) {
+      const user = await this.users.save(
+        this.users.create({ nickname: '管理员', status: 1 }),
+      );
+      account = await this.accounts.save(
+        this.accounts.create({
+          userId: user.id,
+          type: 'password',
+          identifier: username,
           passwordHash: await hash(password, 10),
-          nickname: '管理员',
+          clientId: null,
           status: 1,
         }),
       );
     }
     const adminRole = await this.roles.findOne({ where: { code: 'admin' } });
     if (adminRole) {
-      const assigned = await this.userRoles.findOne({
-        where: { userId: user.id, roleId: adminRole.id },
+      const assigned = await this.accountRoles.findOne({
+        where: { accountId: account.id, roleId: adminRole.id },
       });
       if (!assigned) {
-        await this.userRoles.save(
-          this.userRoles.create({ userId: user.id, roleId: adminRole.id }),
+        await this.accountRoles.save(
+          this.accountRoles.create({ accountId: account.id, roleId: adminRole.id }),
         );
       }
     }

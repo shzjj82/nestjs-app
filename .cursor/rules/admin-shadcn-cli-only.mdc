@@ -1,0 +1,42 @@
+---
+description: apps/admin 的 UI 统一用 shadcn（CLI 安装）+ Tailwind，禁止手写组件库代码和自定义 CSS
+globs: apps/admin/**/*
+alwaysApply: false
+---
+
+# admin UI：shadcn 组件（仅 CLI 安装）+ Tailwind
+
+适用于 `apps/admin` 里的**所有** UI，不只是表格。
+
+## 组件
+
+- 需要按钮、表单、弹窗、下拉、侧栏、面包屑、卡片、提示等，先用 shadcn 现成组件。
+- **只能通过 CLI 引入**，在 `apps/admin` 下执行：
+  - 官方：`npx shadcn@latest add <name> -y`
+  - tablecn：`npx shadcn@latest add @tablecn/<name> -y`
+- `src/components/ui/`、`src/components/data-table/` 只放 CLI 生成的文件，不要手写或从文档粘贴。
+- 需要定制时，在 CLI 生成的文件上做最小改动，或在应用层组件里封装（如 `admin-data-table.tsx`、`select-field.tsx`、`sidebar.tsx`）。
+- 图标用 `lucide-react`（`components.json` 的 `iconLibrary`），不要再引入其他图标库。
+
+## 样式
+
+- 只用 Tailwind 工具类和 `globals.css` 里的 shadcn 主题变量（`bg-card`、`text-muted-foreground`、`border` 等）。
+- **不要**新建 `.css` 文件或自定义 CSS 类（如 `.console-*`）；布局用 Tailwind 写在 JSX 里。
+- `globals.css` 由 `shadcn init` 维护：颜色是 `oklch`，`@theme` 里用 `var(--x)`，不要再包 `hsl()`。
+
+## 示例
+
+```tsx
+// ❌ 手写面板 + 自定义类
+<div className="console-panel">…</div>
+
+// ✅ CLI 安装 card 后使用
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+<Card><CardHeader><CardTitle>上传文件</CardTitle></CardHeader><CardContent>…</CardContent></Card>
+```
+
+```bash
+cd apps/admin
+npx shadcn@latest add card field select sidebar breadcrumb -y
+npx shadcn@latest add @tablecn/data-table @tablecn/data-table-filter-menu -y --overwrite
+```
