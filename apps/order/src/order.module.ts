@@ -1,6 +1,13 @@
 import { Inject, Module, OnModuleInit } from '@nestjs/common';
 import { ClientProxy, ClientsModule } from '@nestjs/microservices';
-import { mqttClientOptions, USER_CLIENT } from '@app/common';
+import {
+  ApiDocsModule,
+  MQTT_GROUPS,
+  MQTT_PATTERNS,
+  mqttClientOptions,
+  sharePattern,
+  USER_CLIENT,
+} from '@app/common';
 import { OrderController } from './order.controller';
 import { OrderService } from './order.service';
 
@@ -12,6 +19,11 @@ import { OrderService } from './order.service';
         ...mqttClientOptions('order-to-user'),
       },
     ]),
+    ApiDocsModule.forService({
+      service: 'order',
+      label: '订单模块',
+      pattern: sharePattern(MQTT_GROUPS.ORDER, MQTT_PATTERNS.ORDER_API_DOCS),
+    }),
   ],
   controllers: [OrderController],
   providers: [OrderService],

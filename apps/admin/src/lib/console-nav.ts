@@ -36,13 +36,18 @@ export const CONSOLE_NAV_GROUPS: ConsoleNavGroup[] = [
     ],
   },
   {
-    label: '租户',
+    label: '业务中心',
     items: [
-      { href: '/tenants', label: '租户平台', icon: Building2, keywords: ['tenant', 'appCode', 'client'] },
+      {
+        href: '/businesses',
+        label: '业务管理',
+        icon: Building2,
+        keywords: ['business', 'bizCode', 'tenant', '租户', 'appCode', 'client', '接入端', '能力包'],
+      },
     ],
   },
   {
-    label: '业务',
+    label: '业务应用',
     items: [
       { href: '/wechat', label: '微信小程序', icon: MessageCircle, keywords: ['wechat', 'appId', '小程序码'] },
       { href: '/docs', label: '文档空间', icon: FileText, keywords: ['docs', '文档', '分类'] },

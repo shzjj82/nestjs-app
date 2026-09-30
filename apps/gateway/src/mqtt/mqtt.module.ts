@@ -1,6 +1,7 @@
 import { Inject, Module, OnModuleInit } from '@nestjs/common';
 import { ClientProxy, ClientsModule } from '@nestjs/microservices';
 import {
+  AGENTS_CLIENT,
   DOCS_CLIENT,
   mqttClientOptions,
   ORDER_CLIENT,
@@ -34,6 +35,10 @@ import { MqttProxy } from './mqtt.proxy';
         name: WECHAT_CLIENT,
         ...mqttClientOptions('gateway-wechat'),
       },
+      {
+        name: AGENTS_CLIENT,
+        ...mqttClientOptions('gateway-agents'),
+      },
     ]),
   ],
   providers: [MqttProxy, ClientHub],
@@ -46,6 +51,7 @@ export class MqttModule implements OnModuleInit {
     @Inject(DOCS_CLIENT) private readonly docsClient: ClientProxy,
     @Inject(UPLOAD_CLIENT) private readonly uploadClient: ClientProxy,
     @Inject(WECHAT_CLIENT) private readonly wechatClient: ClientProxy,
+    @Inject(AGENTS_CLIENT) private readonly agentsClient: ClientProxy,
   ) {}
 
   async onModuleInit() {
@@ -55,6 +61,7 @@ export class MqttModule implements OnModuleInit {
       this.docsClient.connect(),
       this.uploadClient.connect(),
       this.wechatClient.connect(),
+      this.agentsClient.connect(),
     ]);
   }
 }

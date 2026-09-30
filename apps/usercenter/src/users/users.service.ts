@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { TokenStore } from '@app/common';
 import type { PageResult, User } from '@app/common';
 import { DataSource, Repository } from 'typeorm';
 import { AccountEntity, UserEntity } from '../entities';
@@ -16,6 +17,7 @@ export class UsersService {
     private readonly users: Repository<UserEntity>,
     private readonly accounts: AccountsService,
     private readonly dataSource: DataSource,
+    private readonly tokens: TokenStore,
   ) {}
 
   async findAll(payload: Record<string, unknown>): Promise<PageResult<User>> {
@@ -221,6 +223,7 @@ export class UsersService {
     const account = await this.accounts.findEntity(requiredString(payload.id, 'id'));
     const roleIds = Array.isArray(payload.roleIds) ? payload.roleIds.map(String) : [];
     await this.accounts.assignRoleIds(account.id, roleIds);
+    await this.tokens.revokeAll(account.userId);
     return this.findOne(account.userId);
   }
 

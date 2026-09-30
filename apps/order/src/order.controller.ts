@@ -3,6 +3,7 @@ import { ClientProxy, MessagePattern, RpcException } from '@nestjs/microservices
 import { lastValueFrom, TimeoutError } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import {
+  ApiDoc,
   MQTT_GROUPS,
   MQTT_PATTERNS,
   sharePattern,
@@ -25,11 +26,13 @@ export class OrderController {
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.ORDER, MQTT_PATTERNS.ORDER_FIND_ALL))
+  @ApiDoc({ name: '订单列表' })
   findAll() {
     return this.orderService.findAll();
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.ORDER, MQTT_PATTERNS.ORDER_FIND_ONE))
+  @ApiDoc({ name: '订单详情' })
   findOne(payload: { id: string }) {
     const order = this.orderService.findOne(payload.id);
     if (!order) {
@@ -39,6 +42,7 @@ export class OrderController {
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.ORDER, MQTT_PATTERNS.ORDER_CREATE))
+  @ApiDoc({ name: '创建订单', description: '下单前校验用户存在' })
   async create(payload: CreateOrderDto) {
     await this.assertUserExists(payload.userId);
     return this.orderService.create(payload);

@@ -10,6 +10,8 @@ export const PROXY_HTTP_PATHS: RouteInfo[] = [
   { path: 'users', method: RequestMethod.ALL },
   { path: 'users/{*path}', method: RequestMethod.ALL },
   { path: 'accounts/{*path}', method: RequestMethod.ALL },
+  { path: 'businesses', method: RequestMethod.ALL },
+  { path: 'businesses/{*path}', method: RequestMethod.ALL },
   { path: 'clients', method: RequestMethod.ALL },
   { path: 'clients/{*path}', method: RequestMethod.ALL },
   { path: 'docs', method: RequestMethod.ALL },
@@ -24,6 +26,8 @@ export const PROXY_HTTP_PATHS: RouteInfo[] = [
   { path: 'upload/{*path}', method: RequestMethod.ALL },
   { path: 'wechat', method: RequestMethod.ALL },
   { path: 'wechat/{*path}', method: RequestMethod.ALL },
+  { path: 'agents', method: RequestMethod.ALL },
+  { path: 'agents/{*path}', method: RequestMethod.ALL },
 ];
 
 export function requestPathname(req: { path?: string; url: string }): string {
@@ -31,11 +35,15 @@ export function requestPathname(req: { path?: string; url: string }): string {
   return pathname === '' ? '/' : pathname;
 }
 
+/**
+ * 业务 code 只认网关校验后的 _bizCode；前端传入的 appCode / _bizCode 一律丢弃。
+ */
 export function buildProxyPayload(
   req: { query?: unknown; body?: unknown },
   params: Record<string, string>,
   session?: AuthSession | null,
   token?: string | null,
+  bizCode?: string | null,
 ) {
   const query = (req.query ?? {}) as Record<string, unknown>;
   const body =
@@ -43,12 +51,20 @@ export function buildProxyPayload(
       ? (req.body as Record<string, unknown>)
       : {};
   const merged = { ...query, ...body, ...params };
-  const { _session: _ignoredSession, _token: _ignoredToken, ...rest } = merged;
+  const {
+    _session: _ignoredSession,
+    _token: _ignoredToken,
+    _bizCode: _ignoredBizCode,
+    _docsPrivileged: _ignoredPrivileged,
+    appCode: _ignoredAppCode,
+    ...rest
+  } = merged;
   return {
     ...rest,
     appId: rest.appId ?? session?.appId,
     _session: session ?? null,
     _token: token ?? null,
-    _docsPrivileged: rest._docsPrivileged ?? false,
+    _bizCode: bizCode ?? null,
+    _docsPrivileged: false,
   };
 }

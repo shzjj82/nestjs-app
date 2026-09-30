@@ -3,6 +3,7 @@ export const ORDER_CLIENT = 'ORDER_CLIENT';
 export const DOCS_CLIENT = 'DOCS_CLIENT';
 export const UPLOAD_CLIENT = 'UPLOAD_CLIENT';
 export const WECHAT_CLIENT = 'WECHAT_CLIENT';
+export const AGENTS_CLIENT = 'AGENTS_CLIENT';
 
 export const MQTT_GROUPS = {
   USERCENTER: 'usercenter',
@@ -10,10 +11,12 @@ export const MQTT_GROUPS = {
   DOCS: 'docs',
   UPLOAD: 'upload',
   WECHAT: 'wechat',
+  AGENTS: 'agents',
 } as const;
 
 export const MQTT_PATTERNS = {
   USER_HEALTH: 'user.health',
+  USER_API_DOCS: 'user.apiDocs',
   USER_FIND_ALL: 'user.findAll',
   USER_FIND_ONE: 'user.findOne',
   USER_CREATE: 'user.create',
@@ -29,6 +32,13 @@ export const MQTT_PATTERNS = {
   AUTH_ME: 'auth.me',
   AUTH_BIND_PHONE: 'auth.bindPhone',
   AUTH_CHANGE_PASSWORD: 'auth.changePassword',
+  BUSINESS_FIND_ALL: 'business.findAll',
+  BUSINESS_FIND_ONE: 'business.findOne',
+  BUSINESS_CREATE: 'business.create',
+  BUSINESS_UPDATE: 'business.update',
+  BUSINESS_SET_PERMISSIONS: 'business.setPermissions',
+  BUSINESS_MEMBER_FIND_ALL: 'business.member.findAll',
+  BUSINESS_MEMBER_UPDATE: 'business.member.update',
   CLIENT_FIND_ALL: 'client.findAll',
   CLIENT_CREATE: 'client.create',
   CLIENT_UPDATE: 'client.update',
@@ -44,10 +54,12 @@ export const MQTT_PATTERNS = {
   PERMISSION_EXPORT: 'permission.export',
   PERMISSION_IMPORT: 'permission.import',
   ORDER_HEALTH: 'order.health',
+  ORDER_API_DOCS: 'order.apiDocs',
   ORDER_FIND_ALL: 'order.findAll',
   ORDER_FIND_ONE: 'order.findOne',
   ORDER_CREATE: 'order.create',
   DOC_HEALTH: 'doc.health',
+  DOC_API_DOCS: 'doc.apiDocs',
   DOC_POST_FIND_ALL: 'doc.post.findAll',
   DOC_POST_FIND_SLUG: 'doc.post.findSlug',
   DOC_POST_FIND_ID: 'doc.post.findId',
@@ -62,17 +74,23 @@ export const MQTT_PATTERNS = {
   DOC_CATEGORY_UPDATE: 'doc.category.update',
   DOC_CATEGORY_DELETE: 'doc.category.delete',
   UPLOAD_HEALTH: 'upload.health',
+  UPLOAD_API_DOCS: 'upload.apiDocs',
   UPLOAD_PUT: 'upload.put',
   UPLOAD_ENQUEUE: 'upload.enqueue',
   UPLOAD_JOB: 'upload.job',
   UPLOAD_DELETE: 'upload.delete',
   WECHAT_HEALTH: 'wechat.health',
+  WECHAT_API_DOCS: 'wechat.apiDocs',
   WECHAT_MP_FIND_ALL: 'wechat.mp.findAll',
   WECHAT_MP_CREATE: 'wechat.mp.create',
   WECHAT_MP_UPDATE: 'wechat.mp.update',
   WECHAT_CODE2SESSION: 'wechat.code2session',
   WECHAT_QRCODE: 'wechat.qrcode',
   WECHAT_PHONE: 'wechat.phone',
+  AGENTS_HEALTH: 'agents.health',
+  AGENTS_API_DOCS: 'agents.apiDocs',
+  AGENTS_CHAT: 'agents.chat',
+  AGENTS_CHAT_STATUS: 'agents.chat.status',
 } as const;
 
 export function sharePattern(group: string, pattern: string): string {

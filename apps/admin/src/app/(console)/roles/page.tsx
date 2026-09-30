@@ -10,6 +10,9 @@ import { toast } from 'sonner';
 import { adminFetch } from '@/lib/api';
 import { DataTableRowActions } from '@/components/data-table-row-actions';
 import { PageHeader } from '@/components/page-header';
+import { PermissionChecklist } from '@/components/permission-checklist';
+import { SelectField } from '@/components/select-field';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,23 +25,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-interface Role {
-  id: string;
-  code: string;
-  name: string;
-  description: string | null;
-  permissionIds: string[];
-  permissionCodes: string[];
-}
+import {
+  type Business,
+  type BusinessRole,
+  type Permission,
+  PLATFORM_ROLE_SCOPE,
+} from '@/lib/businesses';
 
-interface Permission {
-  id: string;
-  code: string;
-  name: string;
-  module: string;
-}
-
-const ROLE_FILTERS: FilterField<Role>[] = [
+const ROLE_FILTERS: FilterField<BusinessRole>[] = [
   {
     id: 'name',
     type: 'text',
@@ -51,28 +45,41 @@ const ROLE_FILTERS: FilterField<Role>[] = [
 const EMPTY_ROLE = { code: '', name: '', description: '' };
 
 export default function RolesPage() {
-  const [roles, setRoles] = useState<Role[]>([]);
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [businessId, setBusinessId] = useState('');
+  const [roles, setRoles] = useState<BusinessRole[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [permOpen, setPermOpen] = useState(false);
-  const [selected, setSelected] = useState<Role | null>(null);
+  const [selected, setSelected] = useState<BusinessRole | null>(null);
   const [permIds, setPermIds] = useState<string[]>([]);
   const [form, setForm] = useState(EMPTY_ROLE);
 
-  async function load() {
-    const [r, p] = await Promise.all([
-      adminFetch<Role[]>('/roles'),
-      adminFetch<Permission[]>('/permissions'),
-    ]);
-    setRoles(r);
-    setPermissions(p);
-  }
+  const business = businesses.find((b) => b.id === businessId) ?? null;
 
   useEffect(() => {
-    load().catch((err) => toast.error(err.message));
+    Promise.all([
+      adminFetch<Business[]>('/businesses'),
+      adminFetch<Permission[]>('/permissions'),
+    ])
+      .then(([b, p]) => {
+        setBusinesses(b);
+        setPermissions(p);
+        setBusinessId((prev) => prev || b[0]?.id || '');
+      })
+      .catch((err) => toast.error(err.message));
   }, []);
 
-  const openPermDialog = useCallback((role: Role) => {
+  const loadRoles = useCallback(async () => {
+    if (!businessId) return;
+    setRoles(await adminFetch<BusinessRole[]>(`/roles?businessId=${businessId}`));
+  }, [businessId]);
+
+  useEffect(() => {
+    loadRoles().catch((err) => toast.error(err.message));
+  }, [loadRoles]);
+
+  const openPermDialog = useCallback((role: BusinessRole) => {
     setSelected(role);
     setPermIds(role.permissionIds ?? []);
     setPermOpen(true);
@@ -81,11 +88,14 @@ export default function RolesPage() {
   async function createRole(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await adminFetch('/roles', { method: 'POST', body: JSON.stringify(form) });
+      await adminFetch('/roles', {
+        method: 'POST',
+        body: JSON.stringify({ ...form, businessId }),
+      });
       toast.success('角色已创建');
       setForm(EMPTY_ROLE);
       setCreateOpen(false);
-      await load();
+      await loadRoles();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '创建失败');
     }
@@ -98,23 +108,22 @@ export default function RolesPage() {
         method: 'PUT',
         body: JSON.stringify({ permissionIds: permIds }),
       });
-      toast.success('权限已更新');
-      await load();
-      const refreshed = await adminFetch<Role[]>('/roles');
-      const next = refreshed.find((r) => r.id === selected.id);
-      if (next) setSelected(next);
+      toast.success('权限已更新，持有该角色的用户需重新登录');
       setPermOpen(false);
+      await loadRoles();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '保存失败');
     }
   }
 
-  const grouped = permissions.reduce<Record<string, Permission[]>>((acc, item) => {
-    (acc[item.module] ||= []).push(item);
-    return acc;
-  }, {});
+  // 业务角色只能在能力包范围内勾选；平台级角色不受能力包约束
+  const selectablePermissions = useMemo(() => {
+    if (!selected?.businessId || !business) return permissions;
+    const allowed = new Set(business.permissionIds);
+    return permissions.filter((p) => allowed.has(p.id));
+  }, [selected, business, permissions]);
 
-  const columns = useMemo<AdminColumnDef<Role>[]>(
+  const columns = useMemo<AdminColumnDef<BusinessRole>[]>(
     () => [
       {
         accessorKey: 'code',
@@ -126,6 +135,17 @@ export default function RolesPage() {
         accessorKey: 'name',
         header: '名称',
         meta: { label: '名称' },
+        cell: ({ row }) => (
+          <span className="flex items-center gap-2">
+            {row.original.name}
+            {row.original.businessId === null ? (
+              <Badge variant="secondary">{PLATFORM_ROLE_SCOPE}</Badge>
+            ) : null}
+            {business?.defaultRoleId === row.original.id ? (
+              <Badge variant="outline">默认</Badge>
+            ) : null}
+          </span>
+        ),
       },
       {
         id: 'permissions',
@@ -147,50 +167,67 @@ export default function RolesPage() {
         ),
       }),
     ],
-    [openPermDialog],
+    [openPermDialog, business],
   );
 
   return (
     <>
       <PageHeader
         title="角色权限组"
-        description="维护角色并勾选功能点"
+        description="角色归属于业务；业务角色的功能点受该业务能力包限制，平台级角色在所有业务生效"
         actions={
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus />
-            新建角色
-          </Button>
+          <>
+            {businesses.length > 0 ? (
+              <div className="w-48">
+                <SelectField
+                  label="业务"
+                  value={businessId}
+                  onChange={setBusinessId}
+                  options={businesses.map((b) => ({ value: b.id, label: `${b.name} (${b.code})` }))}
+                />
+              </div>
+            ) : null}
+            <Button onClick={() => setCreateOpen(true)} disabled={!businessId}>
+              <Plus />
+              新建角色
+            </Button>
+          </>
         }
       />
 
-        <DataTable columns={columns} data={roles} filters={ROLE_FILTERS} emptyMessage="暂无角色" />
+      <DataTable columns={columns} data={roles} filters={ROLE_FILTERS} emptyMessage="暂无角色" />
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>新建角色</DialogTitle>
-            <DialogDescription>创建后可继续配置功能点</DialogDescription>
+            <DialogDescription>
+              将创建在业务 {business?.name}（{business?.code}）下，编码在业务内唯一
+            </DialogDescription>
           </DialogHeader>
           <form id="role-create" className="space-y-4" onSubmit={createRole}>
             <div className="space-y-2">
-              <Label>编码</Label>
+              <Label htmlFor="role-code">编码</Label>
               <Input
+                id="role-code"
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value })}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label>名称</Label>
+              <Label htmlFor="role-name">名称</Label>
               <Input
+                id="role-name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label>描述</Label>
+              <Label htmlFor="role-desc">描述</Label>
               <Textarea
+                id="role-desc"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
@@ -216,44 +253,18 @@ export default function RolesPage() {
                 <>
                   {selected.name}{' '}
                   <span className="font-mono text-xs">({selected.code})</span>
+                  {selected.businessId ? ' · 仅列出业务能力包内的功能点' : ' · 平台级角色'}
                 </>
               ) : null}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            {Object.entries(grouped).map(([module, items]) => (
-              <div key={module}>
-                <div className="mb-2 text-sm font-medium text-muted-foreground">{module}</div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {items.map((p) => (
-                    <label
-                      key={p.id}
-                      className="flex cursor-pointer items-center gap-2 rounded-md border bg-muted/20 p-2.5 text-sm transition-colors hover:bg-muted/40"
-                    >
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-input"
-                        checked={permIds.includes(p.id)}
-                        onChange={(e) => {
-                          setPermIds((prev) =>
-                            e.target.checked
-                              ? [...prev, p.id]
-                              : prev.filter((id) => id !== p.id),
-                          );
-                        }}
-                      />
-                      <span>
-                        {p.name}
-                        <span className="ml-1 font-mono text-xs text-muted-foreground">
-                          {p.code}
-                        </span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          <PermissionChecklist
+            idPrefix="role-perm"
+            permissions={selectablePermissions}
+            value={permIds}
+            onChange={setPermIds}
+            emptyMessage="该业务能力包为空，请先在「业务管理」中配置能力包"
+          />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setPermOpen(false)}>
               取消

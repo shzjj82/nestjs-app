@@ -1,4 +1,5 @@
 import { uploadMaxBytes } from '@app/common';
+import { bizPrefix, requireBizCode } from './biz-scope';
 import { asRecord, requiredString, rpcFail } from './rpc';
 import type { IncomingFile } from './types';
 
@@ -9,7 +10,10 @@ export function readIncomingFile(payload: unknown): IncomingFile {
     typeof data.contentType === 'string' && data.contentType.trim()
       ? data.contentType.trim()
       : 'application/octet-stream';
-  const prefix = typeof data.prefix === 'string' ? data.prefix : '';
+  const prefix = bizPrefix(
+    requireBizCode(data),
+    typeof data.prefix === 'string' ? data.prefix : '',
+  );
   const base64 = requiredString(data.base64, 'file');
   let body: Buffer;
   try {

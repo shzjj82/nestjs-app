@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
+  AccountEntity,
   AccountRoleEntity,
+  BusinessEntity,
+  BusinessPermissionEntity,
   PermissionEntity,
   RoleEntity,
   RolePermissionEntity,
@@ -18,6 +21,9 @@ import { RolesController } from './roles.controller';
       PermissionEntity,
       RolePermissionEntity,
       AccountRoleEntity,
+      AccountEntity,
+      BusinessEntity,
+      BusinessPermissionEntity,
     ]),
   ],
   controllers: [RolesController, PermissionsController],

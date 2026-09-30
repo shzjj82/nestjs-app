@@ -1,14 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { PLATFORM_BIZ_CODE, TokenStore } from '@app/common';
 import type { PermissionInfo, RoleInfo } from '@app/common';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import {
+  AccountEntity,
   AccountRoleEntity,
+  BusinessEntity,
+  BusinessPermissionEntity,
   PermissionEntity,
   RoleEntity,
   RolePermissionEntity,
 } from '../entities';
 import { optionalString, requiredString, rpcFail } from '../rpc';
+import { mergeBusinessRbac, type RoleGrant } from './rbac-merge';
 
 @Injectable()
 export class RbacService {
@@ -21,44 +26,85 @@ export class RbacService {
     private readonly rolePermissions: Repository<RolePermissionEntity>,
     @InjectRepository(AccountRoleEntity)
     private readonly accountRoles: Repository<AccountRoleEntity>,
+    @InjectRepository(AccountEntity)
+    private readonly accounts: Repository<AccountEntity>,
+    @InjectRepository(BusinessEntity)
+    private readonly businesses: Repository<BusinessEntity>,
+    @InjectRepository(BusinessPermissionEntity)
+    private readonly businessPermissions: Repository<BusinessPermissionEntity>,
+    private readonly tokens: TokenStore,
   ) {}
 
-  async loadAccountRbac(accountId: string) {
+  /**
+   * 会话权限 = 该账户的平台级角色 + 该用户在当前业务下的角色（与业务能力包取交集）。
+   */
+  async loadAccountRbac(accountId: string, businessId: string) {
+    const account = await this.accounts.findOne({ where: { id: accountId } });
+    if (!account) {
+      return { roles: [] as string[], permissions: [] as string[] };
+    }
+    const userAccounts = await this.accounts.find({ where: { userId: account.userId } });
     const rows = await this.accountRoles.find({
-      where: { accountId },
+      where: { accountId: In(userAccounts.map((a) => a.id)) },
       relations: ['role'],
     });
-    const roleCodes = rows.map((row) => row.role.code);
-    const roleIds = rows.map((row) => row.roleId);
-    if (!roleIds.length) {
-      return { roles: roleCodes, permissions: [] as string[] };
-    }
-    const links = await this.rolePermissions.find({
-      where: { roleId: In(roleIds) },
+    const platformRoles = rows
+      .filter((row) => row.accountId === accountId && row.role && row.role.businessId === null)
+      .map((row) => row.role);
+    const businessRoles = rows
+      .filter((row) => row.role?.businessId === businessId)
+      .map((row) => row.role);
+
+    const roleIds = [...platformRoles, ...businessRoles].map((role) => role.id);
+    const links = roleIds.length
+      ? await this.rolePermissions.find({
+          where: { roleId: In(roleIds) },
+          relations: ['permission'],
+        })
+      : [];
+    const grant = (role: RoleEntity): RoleGrant => ({
+      code: role.code,
+      permissions: links
+        .filter((link) => link.roleId === role.id)
+        .map((link) => link.permission.code),
+    });
+    const capabilityLinks = await this.businessPermissions.find({
+      where: { businessId },
       relations: ['permission'],
     });
-    const permissions = [
-      ...new Set(links.map((link) => link.permission.code)),
-    ];
-    return { roles: roleCodes, permissions };
+    return mergeBusinessRbac({
+      platformRoles: platformRoles.map(grant),
+      businessRoles: businessRoles.map(grant),
+      capability: new Set(capabilityLinks.map((link) => link.permission.code)),
+    });
   }
 
-  async listRoles(_payload: Record<string, unknown> = {}): Promise<RoleInfo[]> {
-    const roles = await this.roles.find({ order: { createdAt: 'ASC' } });
+  /** 传 businessId 时返回该业务角色及平台级角色；否则返回全部 */
+  async listRoles(payload: Record<string, unknown> = {}): Promise<RoleInfo[]> {
+    const businessId = optionalString(payload.businessId);
+    const roles = await this.roles.find({
+      where: businessId ? [{ businessId }, { businessId: IsNull() }] : {},
+      order: { createdAt: 'ASC' },
+    });
     return Promise.all(roles.map((role) => this.toRoleInfo(role)));
   }
 
   async createRole(payload: Record<string, unknown>): Promise<RoleInfo> {
     const code = requiredString(payload.code, 'code');
     const name = requiredString(payload.name, 'name');
-    const exists = await this.roles.findOne({ where: { code } });
+    const businessId = requiredString(payload.businessId, 'businessId');
+    if (!(await this.businesses.findOne({ where: { id: businessId } }))) {
+      rpcFail(404, `业务 ${businessId} 不存在`);
+    }
+    const exists = await this.roles.findOne({ where: { code, businessId } });
     if (exists) {
-      rpcFail(409, `角色 ${code} 已存在`);
+      rpcFail(409, `角色 ${code} 在该业务下已存在`);
     }
     const saved = await this.roles.save(
       this.roles.create({
         code,
         name,
+        businessId,
         description: optionalString(payload.description) ?? null,
         isSystem: false,
       }),
@@ -82,7 +128,10 @@ export class RbacService {
     if (role.isSystem) {
       rpcFail(400, '系统角色不能删除');
     }
+    const holders = await this.holderUserIds(role.id);
+    await this.businesses.update({ defaultRoleId: role.id }, { defaultRoleId: null });
     await this.roles.remove(role);
+    await this.revokeUsers(holders);
     return { ok: true };
   }
 
@@ -95,7 +144,20 @@ export class RbacService {
       ? await this.permissions.find({ where: { id: In(permissionIds) } })
       : [];
     await this.replaceRolePermissions(role.id, permissions);
+    await this.revokeUsers(await this.holderUserIds(role.id));
     return this.toRoleInfo(role);
+  }
+
+  /** 角色变更后吊销持有者的会话，让新权限立即生效 */
+  async revokeUsers(userIds: string[]) {
+    for (const userId of new Set(userIds)) {
+      await this.tokens.revokeAll(userId);
+    }
+  }
+
+  private async holderUserIds(roleId: string): Promise<string[]> {
+    const links = await this.accountRoles.find({ where: { roleId }, relations: ['account'] });
+    return links.map((link) => link.account?.userId).filter((id): id is string => !!id);
   }
 
   async listPermissions(_payload: Record<string, unknown> = {}): Promise<PermissionInfo[]> {
@@ -148,8 +210,13 @@ export class RbacService {
     return { ok: true };
   }
 
+  /** Excel 导入导出只处理平台范围的角色（平台级 + 平台业务），避免跨业务同名角色冲突 */
   async listAllRoles(): Promise<RoleEntity[]> {
-    return this.roles.find({ order: { createdAt: 'ASC' } });
+    const platform = await this.businesses.findOne({ where: { code: PLATFORM_BIZ_CODE } });
+    return this.roles.find({
+      where: platform ? [{ businessId: IsNull() }, { businessId: platform.id }] : { businessId: IsNull() },
+      order: { createdAt: 'ASC' },
+    });
   }
 
   async listAllPermissions(): Promise<PermissionEntity[]> {
@@ -251,7 +318,18 @@ export class RbacService {
   }
 
   private async grantToAdminRole(permission: PermissionEntity) {
-    const admin = await this.roles.findOne({ where: { code: 'admin' } });
+    const platform = await this.businesses.findOne({ where: { code: PLATFORM_BIZ_CODE } });
+    if (platform) {
+      const linked = await this.businessPermissions.findOne({
+        where: { businessId: platform.id, permissionId: permission.id },
+      });
+      if (!linked) {
+        await this.businessPermissions.save(
+          this.businessPermissions.create({ businessId: platform.id, permissionId: permission.id }),
+        );
+      }
+    }
+    const admin = await this.roles.findOne({ where: { code: 'admin', businessId: IsNull() } });
     if (!admin) {
       return;
     }
@@ -292,6 +370,7 @@ export class RbacService {
     });
     return {
       id: role.id,
+      businessId: role.businessId,
       code: role.code,
       name: role.name,
       description: role.description,

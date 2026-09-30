@@ -1,6 +1,6 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-import { MQTT_PATTERNS, WechatHandleLogInterceptor } from '@app/common';
+import { ApiDoc, MQTT_PATTERNS, WechatHandleLogInterceptor } from '@app/common';
 import { wechatPattern } from '../common/rpc';
 import { WechatApiService } from './wechat-api.service';
 
@@ -20,6 +20,7 @@ export class WechatApiController {
   }
 
   @MessagePattern(wechatPattern(MQTT_PATTERNS.WECHAT_PHONE))
+  @ApiDoc({ name: '获取微信手机号', description: '用 getPhoneNumber 的 code 换手机号' })
   phone(payload: Record<string, unknown>) {
     return this.api.phone(payload);
   }

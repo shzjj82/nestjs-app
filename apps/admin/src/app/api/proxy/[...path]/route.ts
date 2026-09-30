@@ -2,9 +2,12 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import {
   ACCESS_COOKIE,
+  BIZ_HEADER,
   REFRESH_COOKIE,
+  adminBizCode,
+  gatewayUnavailableResponse,
   gatewayUrl,
-  type ApiResponse,
+  readApiResponse,
 } from '@/lib/api';
 import { cookieOptions } from '@/lib/auth';
 
@@ -17,15 +20,15 @@ async function refreshAccessToken(refreshToken: string): Promise<{
   try {
     const res = await fetch(`${gatewayUrl()}/auth/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', [BIZ_HEADER]: adminBizCode() },
       body: JSON.stringify({ refreshToken }),
     });
-    const json = (await res.json()) as ApiResponse<{
+    const json = await readApiResponse<{
       token: string;
       refreshToken: string;
       expiresIn: number;
       refreshExpiresIn: number;
-    }>;
+    }>(res);
     if (!res.ok || !json.success || !json.data) {
       return null;
     }
@@ -84,7 +87,9 @@ async function proxy(req: NextRequest, params: { path: string[] }) {
         ? await req.arrayBuffer()
         : await req.text();
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    [BIZ_HEADER]: req.headers.get(BIZ_HEADER) || adminBizCode(),
+  };
   if (access) {
     headers.Authorization = `Bearer ${access}`;
   }
@@ -94,22 +99,30 @@ async function proxy(req: NextRequest, params: { path: string[] }) {
     headers['Content-Type'] = 'application/json';
   }
 
-  let upstream = await fetch(`${gatewayUrl()}${path}`, {
-    method: req.method,
-    headers,
-    body: body as BodyInit | undefined,
-  });
+  const send = () =>
+    fetch(`${gatewayUrl()}${path}`, {
+      method: req.method,
+      headers,
+      body: body as BodyInit | undefined,
+    });
+
+  let upstream: Response;
+  try {
+    upstream = await send();
+  } catch {
+    return gatewayUnavailableResponse();
+  }
 
   if (upstream.status === 401 && refresh) {
     const pair = await refreshAccessToken(refresh);
     if (pair) {
       access = pair.token;
       headers.Authorization = `Bearer ${access}`;
-      upstream = await fetch(`${gatewayUrl()}${path}`, {
-        method: req.method,
-        headers,
-        body: body as BodyInit | undefined,
-      });
+      try {
+        upstream = await send();
+      } catch {
+        return gatewayUnavailableResponse();
+      }
       const response = new NextResponse(upstream.body, {
         status: upstream.status,
         headers: {

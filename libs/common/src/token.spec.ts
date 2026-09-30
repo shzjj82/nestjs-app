@@ -53,6 +53,7 @@ function createMemoryRedis() {
 const baseSession = {
   userId: 'u-1',
   appId: 'default',
+  bizCode: 'blog',
   username: 'alice',
   nickname: 'Alice',
   role: 'user' as const,
@@ -70,6 +71,7 @@ describe('TokenStore', () => {
     expect(loaded?.userId).toBe('u-1');
     expect(loaded?.refreshToken).toBe(pair.refreshToken);
     expect(refresh?.accessToken).toBe(pair.session.token);
+    expect(refresh?.bizCode).toBe('blog');
     expect(pair.expiresIn).toBeGreaterThan(0);
     expect(pair.refreshExpiresIn).toBeGreaterThan(pair.expiresIn);
   });

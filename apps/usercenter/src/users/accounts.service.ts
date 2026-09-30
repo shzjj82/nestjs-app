@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { PLATFORM_BIZ_CODE } from '@app/common';
 import type { UserAccountInfo } from '@app/common';
 import { hash } from 'bcrypt';
 import { In, IsNull, Repository } from 'typeorm';
@@ -124,9 +125,17 @@ export class AccountsService {
     return this.accounts.save(account);
   }
 
+  /** 按 code 分配平台范围的角色（平台级 + 平台业务），业务角色请用 id 分配 */
   async assignRoleCodes(accountId: string, codes: string[]) {
     const roles = codes.length
-      ? await this.roles.find({ where: { code: In(codes) } })
+      ? await this.roles
+          .createQueryBuilder('r')
+          .leftJoin('r.business', 'b')
+          .where('r.code IN (:...codes)', { codes })
+          .andWhere('(r.business_id IS NULL OR b.code = :platform)', {
+            platform: PLATFORM_BIZ_CODE,
+          })
+          .getMany()
       : [];
     await this.replaceRoles(accountId, roles);
   }

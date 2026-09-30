@@ -2,6 +2,7 @@ import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
 import { matchRoute, ok, unwrapData } from '@app/common';
 import type { NextFunction, Request, Response } from 'express';
 import { AuthService } from '../auth/auth.service';
+import { BizGuard } from '../auth/biz.guard';
 import { ClientHub } from '../mqtt/client.hub';
 import { buildProxyPayload, LOCAL_PATHS, requestPathname } from './proxy.routes';
 
@@ -11,6 +12,7 @@ export class ProxyMiddleware implements NestMiddleware {
 
   constructor(
     private readonly auth: AuthService,
+    private readonly biz: BizGuard,
     private readonly clients: ClientHub,
   ) {}
 
@@ -45,7 +47,8 @@ export class ProxyMiddleware implements NestMiddleware {
           (req as Request & { user?: unknown }).user = user;
         }
       }
-      this.logger.log(`${req.method} ${pathname} -> ${route.pattern}`);
+      const bizCode = await this.biz.check(route, req, user);
+      this.logger.log(`${req.method} ${pathname} -> ${route.pattern} [${bizCode ?? '-'}]`);
       const payload = buildProxyPayload(
         req,
         route.params,
@@ -55,6 +58,7 @@ export class ProxyMiddleware implements NestMiddleware {
               userId: user.id,
               accountId: user.accountId,
               appId: user.appId,
+              bizCode: user.bizCode ?? '',
               wechatAppId: user.wechatAppId,
               username: user.username ?? null,
               nickname: user.name,
@@ -64,6 +68,7 @@ export class ProxyMiddleware implements NestMiddleware {
             }
           : null,
         this.auth.bearerToken(req) ?? user?.token,
+        bizCode,
       );
       payload._docsPrivileged = this.auth.hasValidDocsKey(req);
       const result = await this.clients.send(

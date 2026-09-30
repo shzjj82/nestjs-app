@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import {
   ACCESS_COOKIE,
+  BIZ_HEADER,
   REFRESH_COOKIE,
+  adminBizCode,
+  gatewayUnavailableResponse,
   gatewayUrl,
-  type ApiResponse,
+  readApiResponse,
 } from '@/lib/api';
 import { cookieOptions, isAdmin } from '@/lib/auth';
 
@@ -22,16 +25,20 @@ interface LoginResult {
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const res = await fetch(`${gatewayUrl()}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      username: body.username,
-      password: body.password,
-      appCode: body.appCode ?? 'web',
-    }),
-  });
-  const json = (await res.json()) as ApiResponse<LoginResult>;
+  let res: Response;
+  try {
+    res = await fetch(`${gatewayUrl()}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', [BIZ_HEADER]: adminBizCode() },
+      body: JSON.stringify({
+        username: body.username,
+        password: body.password,
+      }),
+    });
+  } catch {
+    return gatewayUnavailableResponse();
+  }
+  const json = await readApiResponse<LoginResult>(res);
   if (!res.ok || !json.success || !json.data) {
     return NextResponse.json(
       { success: false, code: json.code || res.status, message: json.message || '登录失败', data: null },

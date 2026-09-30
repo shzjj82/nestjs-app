@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Get,
   Post,
+  Req,
   Res,
   UploadedFile,
   UseGuards,
@@ -12,7 +13,8 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { MQTT_PATTERNS, PERMISSIONS, USER_CLIENT, unwrapData } from '@app/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
+import { BizGuard } from '../auth/biz.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthService } from '../auth/auth.service';
@@ -24,11 +26,17 @@ export class PermissionsFileController {
   constructor(
     private readonly clients: ClientHub,
     private readonly auth: AuthService,
+    private readonly biz: BizGuard,
   ) {}
 
   @Get('export')
   @UseGuards(JwtAuthGuard)
-  async export(@CurrentUser() user: GatewayUser, @Res() res: Response) {
+  async export(
+    @Req() req: Request,
+    @CurrentUser() user: GatewayUser,
+    @Res() res: Response,
+  ) {
+    await this.biz.checkRequest(req, user);
     if (!this.auth.hasAnyPermission(user, [PERMISSIONS.PERMISSION_EXPORT])) {
       throw new ForbiddenException('缺少权限: permission.export');
     }
@@ -50,9 +58,11 @@ export class PermissionsFileController {
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async import(
+    @Req() req: Request,
     @UploadedFile() file: Express.Multer.File | undefined,
     @CurrentUser() user: GatewayUser,
   ) {
+    await this.biz.checkRequest(req, user);
     if (!this.auth.hasAnyPermission(user, [PERMISSIONS.PERMISSION_IMPORT])) {
       throw new ForbiddenException('缺少权限: permission.import');
     }

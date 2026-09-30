@@ -11,6 +11,9 @@ export function createRedis(): Redis {
   });
 }
 
+/** 业务注册表 hash：code -> BusinessRegistryEntry JSON；usercenter 写，gateway 读 */
+export const BIZ_REGISTRY_KEY = 'biz:registry';
+
 export function tokenKey(token: string): string {
   return `auth:token:${token}`;
 }

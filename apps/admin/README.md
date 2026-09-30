@@ -1,6 +1,6 @@
 # 管理控制台（Next.js + Tailwind + shadcn/ui 风格组件）
 
-超级管理员账号由 **usercenter** 首次启动种子写入（`SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD`，默认 `admin` / `admin123`）。本应用只负责登录与管理 UI，不再次注册管理员。
+超级管理员账号由 **usercenter** 首次启动种子写入（`SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD`）。本应用只负责登录与管理 UI，不再次注册管理员。
 
 ## 开发
 
@@ -20,9 +20,17 @@ npm run start:admin
 cd apps/admin && npm run dev
 ```
 
-打开 http://localhost:3100 ，用 `admin` / `admin123` 登录。
+打开 http://localhost:3100 ，用超级管理员账号登录。
 
-环境变量见 `.env.example`：`GATEWAY_URL` 指向网关。
+环境变量：复制 `.env.example` 为 `.env.local`，`GATEWAY_URL` 指向网关（本地 `http://127.0.0.1:3000`，或线上 `https://api.championsea.online`）。`ADMIN_BIZ_CODE` 是后台登录所在的业务，默认 `platform`。
+
+## 业务
+
+后台登录在 `platform` 业务下，所有请求经 `/api/proxy` 转发时自动带 `X-Biz-Code`（默认 `ADMIN_BIZ_CODE`）。需要操作某个业务的数据时，在页面里用 `adminFetch(path, { bizCode })` 覆盖，例如「文档空间」切换业务就是这样发请求的。平台管理员可以跨业务。
+
+- **业务管理**：新建业务、开通模块（文档 / 上传 / 订单）、设置默认角色、启停；每行可打开「能力包」「接入端」「成员」。
+- **角色权限组**：顶部选业务。业务角色只能勾选该业务能力包内的功能点；标「平台级」的角色（如 `admin`）在所有业务生效。
+- 修改能力包、角色权限或成员角色后，相关用户的 token 会被吊销，需重新登录。
 
 ## UI 组件（shadcn / tablecn）
 

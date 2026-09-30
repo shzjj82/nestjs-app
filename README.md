@@ -1,6 +1,6 @@
 # NestJS MQTT 微服务 Monorepo
 
-对外只暴露 **gateway:3000**。`usercenter`、`order`、`docs`、`upload` 通过 MQTT 通信，多个同名实例用 `$share` 共享订阅做负载均衡。
+对外只暴露 **gateway:3000**。`usercenter`、`order`、`docs`、`upload`、`wechat`、`agents` 通过 MQTT 通信，多个同名实例用 `$share` 共享订阅做负载均衡。
 
 数据层使用 **PostgreSQL**（主库）和 **Redis**（缓存 / 会话），MQTT 用 Mosquitto。三种依赖都支持 **脚本安装** 和 **docker-compose**。
 
@@ -20,7 +20,7 @@
 npm run infra:up
 ```
 
-再启动 gateway、usercenter、order、docs、upload、wechat：
+再启动 gateway、usercenter、order、docs、upload、wechat、agents：
 
 ```bash
 npm run start:dev
@@ -52,7 +52,7 @@ sudo ./scripts/install-db.sh
 # 2. 安装并启动 MQTT
 sudo ./scripts/install-mosquitto.sh
 
-# 3. 启动全部服务：gateway + 3 个 usercenter + order + docs + upload
+# 3. 启动全部服务：gateway + 3 个 usercenter + order + docs + upload + wechat + agents
 npm run pm2:start
 
 # 云上只跑网关，微服务在本地：
@@ -71,7 +71,7 @@ sudo REDIS_BIND=0.0.0.0 ./scripts/install-redis.sh
 
 ## Docker Compose（推荐）
 
-一次拉起 PostgreSQL、Redis、Mosquitto，以及 gateway、usercenter、order、docs、upload 各 1 个实例。请求地址始终是 `http://localhost:3000`。用户中心要多实例时再加 `--scale usercenter=3`：
+一次拉起 PostgreSQL、Redis、Mosquitto，以及 gateway、usercenter、order、docs、upload、wechat、agents 各 1 个实例。请求地址始终是 `http://localhost:3000`。用户中心要多实例时再加 `--scale usercenter=3`：
 
 ```bash
 npm run docker:up
@@ -91,66 +91,96 @@ docker compose up -d postgres redis mosquitto
 
 ## 用户中心
 
-一个人一行 `uc_users`。账密、多套微信小程序、多套支付宝小程序都是登录身份，挂在这个人上。**权限只有一套**，角色不按小程序拆。手机号全局唯一，用来合并账号。登录后下发 **access token**（默认 2 小时）和 **refresh token**（默认 30 天），存在 **Redis**；过期用 `POST /auth/refresh` 换新的一对。
+一个人一行 `uc_users`。账密、多套微信小程序、多套支付宝小程序都是登录身份，挂在这个人上。手机号全局唯一，用来合并账号。登录后下发 **access token**（默认 2 小时）和 **refresh token**（默认 30 天），存在 **Redis**；过期用 `POST /auth/refresh` 换新的一对。
 
 启动后会种子：
 
-- 接入端 `web`（账密）、`wechat`、`alipay`
-- 全局角色 `admin` / `user`
-- 管理员 `admin` / `admin123`
+- 系统业务 `platform`（管理后台所在业务，开通全部模块）
+- 接入端 `web`（账密）、`wechat`、`alipay`，归属 `platform`
+- 平台级角色 `admin`（所有业务生效），`platform` 业务角色 `user`
+- 管理员 `admin` / `admin123`（可用 `SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD` 覆盖）
 
-若从旧表升级，角色/功能点曾按 appId 拆过，启动可能因唯一约束失败，需要清掉 `uc_roles` / `uc_permissions` 旧数据或重建库。
+除 `platform` 外，业务 code 只能在管理后台「业务管理」手动新建，系统不会自动生成。
+
+### 业务隔离
+
+数据按**业务 code** 隔离（博客、wiki 等各是一个业务），在管理后台「业务管理」维护：
+
+- **请求头 `X-Biz-Code` 必填**。只认请求头，body / query 里的 `appCode` 会被网关丢弃。缺少返回 400，未登记或已停用返回 403，业务未开通该接口也返回 403（`platform` 始终全部开通）。
+- **按接口开通**：在「业务管理 → 开通模块」里按微服务分组逐个开通接口，业务上存的是 `METHOD /path` 列表（`apis`）。接口名称和描述来自各微服务 handler 上的 `@ApiDoc({ name, description })`，模块名来自 `ApiDocsModule.forService({ service, label, pattern })`；网关通过 `GET /biz-modules` 汇总，服务离线时只显示 `METHOD /path`。
+- **登录即入会**：用户第一次登录某业务时自动成为成员，并获得该业务的默认角色；管理员可在成员里停用或改角色。
+- **token 绑定业务**：拿 A 业务的 token 访问 B 业务返回 403；只有平台管理员可以跨业务。
+- **权限 = 业务角色 ∩ 业务能力包**。能力包是该业务允许使用的功能点上限；平台级角色（`admin`）不受能力包限制。
+- 修改能力包、角色权限、成员角色后，相关用户 token 立即吊销，需要重新登录。
+- 旧 refresh token 不含业务信息，升级后需要重新登录。
+
+用户中心、角色、功能点、业务、接入端、微信小程序等管理接口只能在 `platform` 业务下调用。
 
 ### 注册 / 登录 / 查询
 
 ```bash
-# 注册（phone 可选；已被占用则 409，请登录后绑定以合并）
+# 注册到 blog 业务（phone 可选；已被占用则 409，请登录后绑定以合并）
 curl -X POST http://localhost:3000/auth/register \
+  -H 'X-Biz-Code: blog' \
   -H 'Content-Type: application/json' \
   -d '{"username":"carol","password":"pass123","nickname":"Carol","phone":"13800138000"}'
 
-# 账密登录（username 也可以填手机号）
+# 账密登录（username 也可以填手机号）；管理员登录 platform
 curl -X POST http://localhost:3000/auth/login \
+  -H 'X-Biz-Code: platform' \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"admin123"}'
 
-# 刷新 Token（旧 refresh 立即作废，返回新的一对）
+# 刷新 Token（旧 refresh 立即作废，返回新的一对；业务头须与签发时一致）
 curl -X POST http://localhost:3000/auth/refresh \
+  -H 'X-Biz-Code: blog' \
   -H 'Content-Type: application/json' \
   -d '{"refreshToken":"<refreshToken>"}'
 
 # 当前用户
 curl http://localhost:3000/auth/me \
+  -H 'X-Biz-Code: blog' \
   -H "Authorization: Bearer <token>"
 
-# 查询用户（需要 user.query）
+# 查询用户（需要 user.query，platform 业务）
 curl 'http://localhost:3000/users?keyword=carol' \
+  -H 'X-Biz-Code: platform' \
   -H "Authorization: Bearer <token>"
+
+# 新建业务（需要 business.manage），会自动生成默认角色 user
+curl -X POST http://localhost:3000/businesses \
+  -H 'X-Biz-Code: platform' \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"code":"blog","name":"博客","apis":["GET /docs/documents","POST /upload"]}'
 ```
 
 ### 接入端（多套微信 / 支付宝小程序）
 
-`uc_clients` 用你们的 **appCode** 区分接入端。微信小程序在用户中心只存 **wechatAppId**（指向哪一套），**appSecret 在微信服务登记**，列表不回传密钥。
+`uc_clients` 是业务下的登录入口，每个接入端归属一个业务。微信小程序在用户中心只存 **wechatAppId**（指向哪一套），**appSecret 在微信服务登记**，列表不回传密钥。业务下同类型只有一个接入端时可省略 `clientCode`，有多个时登录要传 `clientCode` 选择。
 
 ```bash
 # 微信登录（openid 由 wechat 服务按 appId 兑换）
 curl -X POST http://localhost:3000/auth/wechat \
+  -H 'X-Biz-Code: mall' \
   -H 'Content-Type: application/json' \
-  -d '{"appCode":"wechat","code":"wx-login-code","nickname":"小程序用户","phone":"13800138000"}'
+  -d '{"clientCode":"mall-wechat","code":"wx-login-code","nickname":"小程序用户","phone":"13800138000"}'
 
 # 支付宝登录
 curl -X POST http://localhost:3000/auth/alipay \
+  -H 'X-Biz-Code: mall' \
   -H 'Content-Type: application/json' \
-  -d '{"appCode":"alipay","code":"alipay-auth-code","nickname":"支付宝用户"}'
+  -d '{"code":"alipay-auth-code","nickname":"支付宝用户"}'
 
-# 再登记一套用户中心接入端，wechatAppId 必须已在微信服务存在
+# 给业务登记接入端，wechatAppId 必须已在微信服务存在
 curl -X POST http://localhost:3000/clients \
+  -H 'X-Biz-Code: platform' \
   -H "Authorization: Bearer <token>" \
   -H 'Content-Type: application/json' \
-  -d '{"appCode":"mall","name":"商城小程序","type":"wechat_mp","wechatAppId":"wxaaaaaaaa"}'
+  -d '{"businessId":"<业务 id>","appCode":"mall-wechat","name":"商城小程序","type":"wechat_mp","wechatAppId":"wxaaaaaaaa"}'
 ```
 
-登录可带 `phone`，与账密账号合并。微信登录签发的 token 会话里会带 **wechatAppId**（真正的微信小程序 appId），刷新后仍保留，用来区分属于哪一套小程序；`appId` 仍是用户中心接入端 appCode。
+登录可带 `phone`，与账密账号合并。微信登录签发的 token 会话里会带 **wechatAppId**（真正的微信小程序 appId），刷新后仍保留，用来区分属于哪一套小程序。
 
 ### 微信服务（多套 appId / secret）
 
@@ -192,6 +222,28 @@ curl -X POST http://localhost:3000/wechat/phone \
   -d '{"mpCode":"mall","phoneCode":"the-phone-code"}'
 ```
 
+### 智能体（OpenAI 兼容 chat）
+
+独立进程 `agents`。密钥只放在该服务：`AI_API_BASE` / `AI_API_KEY` / `AI_MODEL` / `AI_TIMEOUT_MS`。其它业务（含博客）走网关，带 `X-Biz-Code` 和登录 JWT。
+
+```bash
+# 同步：等完整 reply（网关对该 RPC 默认 90s）
+curl -X POST http://localhost:3000/agents/chat \
+  -H 'X-Biz-Code: blog' \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"写一句开场白"}]}'
+
+# 流式：sync=false，SSE 逐段返回 delta
+curl -N -X POST http://localhost:3000/agents/chat \
+  -H 'X-Biz-Code: blog' \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"sync":false,"messages":[{"role":"user","content":"写一句开场白"}]}'
+```
+
+未配 `AI_API_KEY` 时 `GET /agents/chat/status` 为 `{ enabled: false, model }`，chat 返回 503 `AI_NOT_CONFIGURED`。
+
 ### 绑定手机号（合并账号）
 
 不发短信。手机号必须是 11 位大陆号（支持 `+86` / `86` 前缀）。同一手机号只能属于一个用户。
@@ -204,11 +256,11 @@ curl -X POST http://localhost:3000/auth/bind-phone \
   -d '{"phone":"13800138000"}'
 ```
 
-合并规则：优先保留有密码+用户名的账号，分数相同则保留更早创建的。第三方身份和全局角色都会迁到保留侧。
+合并规则：优先保留有密码+用户名的账号，分数相同则保留更早创建的。第三方身份和角色都会迁到保留侧。
 
 ### 权限与角色组
 
-全站只有一套功能点和角色。管理员拥有全部功能点。
+功能点全站一套；角色归属业务（编码在业务内唯一），另有平台级角色 `admin` 拥有全部功能点、在所有业务生效。业务角色实际生效的功能点 = 角色勾选 ∩ 业务能力包。
 
 ```bash
 # 功能点列表
@@ -237,7 +289,7 @@ Excel「功能点」表头：`模块 / 功能编码 / 功能名称 / 描述 / �
 
 ## 接口
 
-网关默认按 `libs/common/src/gateway-routes.ts` 自动转发。表上可配 `auth`、`permissions`；`override: true` 的接口走手写 Controller。
+网关默认按 `libs/common/src/gateway-routes.ts` 自动转发。表上可配 `auth`、`permissions`、`scope`（`platform` / `business`）；新增 `business` 接口时在对应微服务 handler 上加 `@ApiDoc`；`override: true` 的接口走手写 Controller。除 `/health`、各服务探活和 `/auth/logout` 外，所有接口都要带 `X-Biz-Code`。下面的管理接口（用户、账户、业务、接入端、角色、功能点、微信小程序）只能在 `platform` 业务下调用。
 
 - `POST /auth/register` / `POST /auth/login` / `POST /auth/wechat` / `POST /auth/alipay` / `POST /auth/refresh` — 公开
 - `GET /auth/me` — 需要登录
@@ -245,19 +297,22 @@ Excel「功能点」表头：`模块 / 功能编码 / 功能名称 / 描述 / �
 - `GET /users` / `GET /users/:id` — `user.query`
 - `POST /users` / `PATCH /users/:id` — 对应用户权限
 - `PATCH /accounts/:id`（启停 / 重置密码）/ `PUT /accounts/:id/roles`（角色挂在账户上）— 对应用户权限
-- `GET|POST|PATCH /clients` — `client.manage`，Web / 微信 / 支付宝接入端
-- `GET|POST|PATCH|DELETE /roles` 、 `PUT /roles/:id/permissions` — `role.manage`
+- `GET|POST /businesses`、`GET|PATCH /businesses/:id`、`PUT /businesses/:id/permissions`（能力包）、`GET /businesses/:id/members`、`PATCH /businesses/:id/members/:memberId` — `business.manage`
+- `GET|POST|PATCH /clients` — `client.manage`，Web / 微信 / 支付宝接入端，`GET` 可带 `?businessId=`
+- `GET|POST|PATCH|DELETE /roles` 、 `PUT /roles/:id/permissions` — `role.manage`，`GET` 可带 `?businessId=`，新建必须带 `businessId`
 - `GET|POST|PATCH|DELETE /permissions` — `permission.manage`
 - `GET /permissions/export` / `POST /permissions/import` — Excel，手写覆盖
 - `GET|POST|PATCH /wechat/miniprograms` — `wechat.manage`，多套 appId / secret
 - `POST /wechat/qrcode` — `wechat.qrcode`，返回 PNG
 - `POST /wechat/phone` — 登录后按已登记小程序换手机号
-- `GET /health` — 聚合 gateway / usercenter / order / docs / upload / wechat 状态与版本
+- `GET /health` — 聚合 gateway / usercenter / order / docs / upload / wechat / agents 状态与版本
 - `GET /orders` / `GET /orders/:id` — 无需登录
+- `GET /agents/health` / `GET /agents/chat/status` — 探活与是否已配置模型（不回密钥）
+- `POST /agents/chat` — `sync` 默认 true 返回 `{ reply }`；`sync: false` 时 SSE 流式（`data: {"delta":"..."}`）
 
 ## 管理后台
 
-独立 Next.js 应用 [`apps/admin`](apps/admin)（Tailwind + shadcn 风格），端口 **3100**，经 gateway 管理用户/角色/功能点/租户/微信小程序/文档/上传与运维状态。
+独立 Next.js 应用 [`apps/admin`](apps/admin)（Tailwind + shadcn 风格），端口 **3100**，经 gateway 管理用户/角色/功能点/业务/微信小程序/文档/上传与运维状态。
 
 ```bash
 npm run start:admin

@@ -7,7 +7,7 @@ import { actionsColumn } from '@/lib/admin-table-columns';
 import type { AdminColumnDef } from '@/lib/admin-table-types';
 import { Lock, Plus, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
-import { adminFetch } from '@/lib/api';
+import { adminFetch, readApiResponse } from '@/lib/api';
 import { DataTableRowActions } from '@/components/data-table-row-actions';
 import { PageHeader } from '@/components/page-header';
 import { StatusBadge } from '@/components/status-badge';
@@ -135,8 +135,7 @@ export default function WechatPage() {
         }),
       });
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || '生成失败');
+        throw new Error((await readApiResponse(res)).message);
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

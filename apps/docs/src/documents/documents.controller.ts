@@ -1,6 +1,6 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-import { DocsHandleLogInterceptor, MQTT_PATTERNS } from '@app/common';
+import { ApiDoc, DocsHandleLogInterceptor, MQTT_PATTERNS } from '@app/common';
 import {
   asRecord,
   docsPattern,
@@ -30,8 +30,9 @@ export class DocumentsController {
   constructor(private readonly posts: DocumentsService) {}
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_FIND_ALL))
+  @ApiDoc({ name: '文档列表', description: 'scope 支持 public / feed / mine / all' })
   async findAll(payload: Record<string, unknown> = {}) {
-    const appCode = resolveAppCode(optionalString(payload.appCode));
+    const appCode = resolveAppCode(payload);
     const privileged = payload._docsPrivileged === true;
     const sessionAuthorId = sessionUserId(payload);
     const scope = resolveDocsListScope(payload);
@@ -74,11 +75,9 @@ export class DocumentsController {
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_FIND_ID))
+  @ApiDoc({ name: '按 ID 查看文档', description: '工作区按 id 读取，含祖先链' })
   async findId(payload: Record<string, unknown>) {
-    const post = await this.posts.findById(requiredString(payload.id, 'id'));
-    if (!post) {
-      rpcFail(404, 'NOT_FOUND');
-    }
+    const post = await this.requireInBiz(payload);
     const actorId = sessionUserId(payload);
     // 私有文：非作者不可读；公开文工作区按 id：非作者也不可读
     if (post.visibility === 'private') {
@@ -95,6 +94,7 @@ export class DocumentsController {
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_FIND_SLUG))
+  @ApiDoc({ name: '文档详情', description: '按 slug 读取已发布文档' })
   async findSlug(payload: Record<string, unknown>) {
     const privileged = payload._docsPrivileged === true;
     const sessionAuthorId = sessionUserId(payload);
@@ -105,7 +105,7 @@ export class DocumentsController {
         ? 'feed'
         : 'public';
     const includePrivate = mode !== 'public';
-    const appCode = resolveAppCode(optionalString(payload.appCode));
+    const appCode = resolveAppCode(payload);
     const post = await this.posts.findBySlug(
       appCode,
       requiredString(payload.slug, 'slug'),
@@ -144,12 +144,15 @@ export class DocumentsController {
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_CREATE))
+  @ApiDoc({ name: '创建文档' })
   async create(payload: Record<string, unknown>) {
     return { post: await this.posts.create(this.parseWrite(payload)) };
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_UPDATE))
+  @ApiDoc({ name: '更新文档' })
   async update(payload: Record<string, unknown>) {
+    await this.requireInBiz(payload);
     const post = await this.posts.update(
       requiredString(payload.id, 'id'),
       this.parseWrite(payload),
@@ -161,7 +164,9 @@ export class DocumentsController {
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_DELETE))
+  @ApiDoc({ name: '删除文档' })
   async remove(payload: Record<string, unknown>) {
+    await this.requireInBiz(payload);
     if (!(await this.posts.remove(requiredString(payload.id, 'id'), sessionUserId(payload)))) {
       rpcFail(404, 'NOT_FOUND');
     }
@@ -169,7 +174,9 @@ export class DocumentsController {
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_CHILDREN))
-  createChild(payload: Record<string, unknown>) {
+  @ApiDoc({ name: '创建子文档' })
+  async createChild(payload: Record<string, unknown>) {
+    await this.requireInBiz(payload);
     return this.posts.createLinkedChild(
       requiredString(payload.id, 'id'),
       sessionUserId(payload),
@@ -177,7 +184,9 @@ export class DocumentsController {
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_REPARENT))
-  reparent(payload: Record<string, unknown>) {
+  @ApiDoc({ name: '移动文档', description: '调整父文档与排序' })
+  async reparent(payload: Record<string, unknown>) {
+    await this.requireInBiz(payload);
     const raw = payload.parentId;
     const parentId = raw === undefined || raw === null ? null : String(raw);
     return this.posts.reparent(
@@ -185,6 +194,15 @@ export class DocumentsController {
       parentId,
       sessionUserId(payload),
     );
+  }
+
+  /** 按 id 操作的文档必须属于当前业务，否则按不存在处理 */
+  private async requireInBiz(payload: Record<string, unknown>) {
+    const post = await this.posts.findById(requiredString(payload.id, 'id'));
+    if (!post || post.appCode !== resolveAppCode(payload)) {
+      rpcFail(404, 'NOT_FOUND');
+    }
+    return post;
   }
 
   private async listPage(
@@ -248,7 +266,7 @@ export class DocumentsController {
     const kind =
       typeof payload.kind === 'string' && isDocKind(payload.kind) ? payload.kind : undefined;
     return {
-      appCode: resolveAppCode(optionalString(payload.appCode)),
+      appCode: resolveAppCode(payload),
       id: optionalString(payload.id),
       title,
       slug: optionalString(payload.slug),

@@ -21,10 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SelectField } from '@/components/select-field';
 import { Textarea } from '@/components/ui/textarea';
-interface Client {
-  appCode: string;
-  name: string;
-}
+import { hasApi, type Business } from '@/lib/businesses';
 
 interface DocItem {
   id: string;
@@ -45,8 +42,8 @@ const EMPTY_DOC = { title: '', slug: '', content: '', visibility: 'public' };
 const EMPTY_CAT = { name: '', slug: '' };
 
 export default function DocsPage() {
-  const [tenants, setTenants] = useState<Client[]>([]);
-  const [appCode, setAppCode] = useState('web');
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [bizCode, setBizCode] = useState('');
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [docOpen, setDocOpen] = useState(false);
@@ -57,21 +54,23 @@ export default function DocsPage() {
   const [docPageSize, setDocPageSize] = useState(20);
   const [docTotal, setDocTotal] = useState(0);
 
-  async function loadTenants() {
-    const clients = await adminFetch<Client[]>('/clients');
-    setTenants(clients);
-    if (clients.length && !clients.find((c) => c.appCode === appCode)) {
-      setAppCode(clients[0].appCode);
+  async function loadBusinesses() {
+    const list = (await adminFetch<Business[]>('/businesses')).filter(
+      (b) => b.status === 1 && hasApi(b, 'GET /docs/documents'),
+    );
+    setBusinesses(list);
+    if (list.length && !list.find((b) => b.code === bizCode)) {
+      setBizCode(list[0].code);
     }
   }
 
   async function loadDocs(
-    code = appCode,
+    code = bizCode,
     page = docPage,
     pageSize = docPageSize,
   ) {
+    if (!code) return;
     const qs = new URLSearchParams({
-      appCode: code,
       scope: 'all',
       page: String(page),
       pageSize: String(pageSize),
@@ -79,7 +78,7 @@ export default function DocsPage() {
     const result = await adminFetch<
       | { posts?: DocItem[]; items?: DocItem[]; total?: number; page?: number; pageSize?: number }
       | DocItem[]
-    >(`/docs/documents?${qs}`);
+    >(`/docs/documents?${qs}`, { bizCode: code });
     if (Array.isArray(result)) {
       setDocs(result);
       setDocTotal(result.length);
@@ -92,25 +91,26 @@ export default function DocsPage() {
       if (result.page) setDocPage(result.page);
       if (result.pageSize) setDocPageSize(result.pageSize);
     }
-    const cats = await adminFetch<{ categories?: Category[] } | Category[]>(
-      `/docs/categories?appCode=${encodeURIComponent(code)}`,
-    );
+    const cats = await adminFetch<{ categories?: Category[] } | Category[]>('/docs/categories', {
+      bizCode: code,
+    });
     setCategories(Array.isArray(cats) ? cats : cats.categories ?? []);
   }
 
   useEffect(() => {
-    loadTenants().catch((err) => toast.error(err.message));
+    loadBusinesses().catch((err) => toast.error(err.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    loadDocs(appCode, docPage, docPageSize).catch((err) =>
+    loadDocs(bizCode, docPage, docPageSize).catch((err) =>
       toast.error(err instanceof Error ? err.message : '加载失败'),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appCode, docPage, docPageSize]);
+  }, [bizCode, docPage, docPageSize]);
 
-  async function onAppChange(code: string) {
-    setAppCode(code);
+  async function onBizChange(code: string) {
+    setBizCode(code);
     setDocPage(1);
   }
 
@@ -119,11 +119,16 @@ export default function DocsPage() {
     try {
       await adminFetch('/docs/documents', {
         method: 'POST',
+        bizCode,
         body: JSON.stringify({
-          appCode,
           title: form.title,
           slug: form.slug || undefined,
-          content: form.content,
+          body: {
+            blocks: form.content
+              .split('\n')
+              .filter((line) => line.trim())
+              .map((text) => ({ type: 'paragraph', data: { text } })),
+          },
           visibility: form.visibility,
           kind: 'article',
         }),
@@ -142,8 +147,8 @@ export default function DocsPage() {
     try {
       await adminFetch('/docs/categories', {
         method: 'POST',
+        bizCode,
         body: JSON.stringify({
-          appCode,
           name: catForm.name,
           slug: catForm.slug || undefined,
           kind: 'article',
@@ -158,9 +163,9 @@ export default function DocsPage() {
     }
   }
 
-  const tenantOptions = tenants.map((t) => ({
-    value: t.appCode,
-    label: `${t.name} (${t.appCode})`,
+  const bizOptions = businesses.map((b) => ({
+    value: b.code,
+    label: `${b.name} (${b.code})`,
   }));
 
   const docColumns = useMemo<AdminColumnDef<DocItem>[]>(
@@ -211,24 +216,24 @@ export default function DocsPage() {
     <>
       <PageHeader
         title="文档空间"
-        description="按租户 appCode 隔离文档与分类"
+        description="按业务 code 隔离文档与分类（仅列出已开通文档模块的业务）"
         actions={
           <>
-            {tenantOptions.length > 0 ? (
+            {bizOptions.length > 0 ? (
               <div className="w-48">
                 <SelectField
-                  label="当前租户"
-                  value={appCode}
-                  onChange={onAppChange}
-                  options={tenantOptions}
+                  label="当前业务"
+                  value={bizCode}
+                  onChange={onBizChange}
+                  options={bizOptions}
                 />
               </div>
             ) : null}
-            <Button variant="outline" onClick={() => setCatOpen(true)}>
+            <Button variant="outline" onClick={() => setCatOpen(true)} disabled={!bizCode}>
               <FolderPlus />
               新建分类
             </Button>
-            <Button onClick={() => setDocOpen(true)}>
+            <Button onClick={() => setDocOpen(true)} disabled={!bizCode}>
               <Plus />
               新建文档
             </Button>
@@ -267,7 +272,7 @@ export default function DocsPage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>新建文档</DialogTitle>
-            <DialogDescription>将创建在租户 {appCode} 下</DialogDescription>
+            <DialogDescription>将创建在业务 {bizCode} 下</DialogDescription>
           </DialogHeader>
           <form id="doc-create" className="space-y-4" onSubmit={createDoc}>
             <div className="space-y-2">
@@ -309,7 +314,7 @@ export default function DocsPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>新建分类</DialogTitle>
-            <DialogDescription>将创建在租户 {appCode} 下</DialogDescription>
+            <DialogDescription>将创建在业务 {bizCode} 下</DialogDescription>
           </DialogHeader>
           <form id="cat-create" className="space-y-4" onSubmit={createCategory}>
             <div className="space-y-2">

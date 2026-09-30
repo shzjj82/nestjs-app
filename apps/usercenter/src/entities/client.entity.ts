@@ -1,11 +1,27 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { BusinessEntity } from './business.entity';
 
 export type ClientType = 'web' | 'wechat_mp' | 'alipay_mp' | 'app';
 
+/** 接入端：某个业务下的 Web / 小程序 / App 入口 */
 @Entity('uc_clients')
 export class ClientEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ name: 'business_id', type: 'uuid', nullable: true })
+  businessId: string | null;
+
+  @ManyToOne(() => BusinessEntity, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'business_id' })
+  business: BusinessEntity | null;
 
   @Index({ unique: true })
   @Column({ name: 'app_code', type: 'varchar', length: 64 })

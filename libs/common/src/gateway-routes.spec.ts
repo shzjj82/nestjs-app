@@ -98,6 +98,15 @@ describe('matchRoute', () => {
     ]);
   });
 
+  it('protects agents chat with jwt and marks the chat post as override', () => {
+    expect(matchRoute('GET', '/agents/health')?.auth).toBeUndefined();
+    expect(matchRoute('GET', '/agents/chat/status')?.auth).toEqual(['jwt']);
+    expect(matchRoute('POST', '/agents/chat')?.override).toBe(true);
+    expect(matchRoute('POST', '/agents/chat')?.pattern).toBe(MQTT_PATTERNS.AGENTS_CHAT);
+    expect(matchRoute('POST', '/agents/chat/async')).toBeNull();
+    expect(matchRoute('GET', '/agents/jobs/job-1')).toBeNull();
+  });
+
   it('protects wechat miniprogram admin and qrcode override', () => {
     expect(matchRoute('GET', '/wechat/miniprograms')?.permissions).toEqual([
       'wechat.manage',

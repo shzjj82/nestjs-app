@@ -6,7 +6,7 @@ import type { FilterField } from '@/components/filter-bar';
 import type { AdminColumnDef } from '@/lib/admin-table-types';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { adminFetch } from '@/lib/api';
+import { adminFetch, readApiResponse } from '@/lib/api';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -72,7 +72,7 @@ export default function PermissionsPage() {
   async function exportExcel() {
     try {
       const res = await fetch('/api/proxy/permissions/export');
-      if (!res.ok) throw new Error('导出失败');
+      if (!res.ok) throw new Error((await readApiResponse(res)).message);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -90,14 +90,7 @@ export default function PermissionsPage() {
     const body = new FormData();
     body.append('file', file);
     try {
-      const res = await fetch('/api/proxy/permissions/import', {
-        method: 'POST',
-        body,
-      });
-      const json = await res.json();
-      if (!res.ok || json.success === false) {
-        throw new Error(json.message || '导入失败');
-      }
+      await adminFetch('/permissions/import', { method: 'POST', body });
       toast.success('导入成功');
       await load();
     } catch (err) {

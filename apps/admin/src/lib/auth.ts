@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { ACCESS_COOKIE, gatewayUrl, parseApiResponse } from './api';
+import { ACCESS_COOKIE, BIZ_HEADER, adminBizCode, gatewayUrl, parseApiResponse } from './api';
 
 export interface AdminUser {
   id: string;
@@ -10,6 +10,7 @@ export interface AdminUser {
   roles?: string[];
   permissions?: string[];
   wechatAppId?: string;
+  bizCode?: string;
 }
 
 export function isAdmin(user: { roles?: string[] } | null | undefined): boolean {
@@ -33,6 +34,9 @@ export async function gatewayFetch<T>(
   }
   if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
+  }
+  if (!headers.has(BIZ_HEADER)) {
+    headers.set(BIZ_HEADER, adminBizCode());
   }
   const res = await fetch(`${gatewayUrl()}${path.startsWith('/') ? path : `/${path}`}`, {
     ...init,

@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import {
+  AGENTS_CLIENT,
   DOCS_CLIENT,
   MQTT_PATTERNS,
   ORDER_CLIENT,
@@ -35,15 +36,16 @@ export class HealthController {
       version: appVersion(),
     };
 
-    const [usercenter, order, docs, upload, wechat] = await Promise.all([
+    const [usercenter, order, docs, upload, wechat, agents] = await Promise.all([
       this.probe(USER_CLIENT, MQTT_PATTERNS.USER_HEALTH, 'usercenter'),
       this.probe(ORDER_CLIENT, MQTT_PATTERNS.ORDER_HEALTH, 'order'),
       this.probe(DOCS_CLIENT, MQTT_PATTERNS.DOC_HEALTH, 'docs'),
       this.probe(UPLOAD_CLIENT, MQTT_PATTERNS.UPLOAD_HEALTH, 'upload'),
       this.probe(WECHAT_CLIENT, MQTT_PATTERNS.WECHAT_HEALTH, 'wechat'),
+      this.probe(AGENTS_CLIENT, MQTT_PATTERNS.AGENTS_HEALTH, 'agents'),
     ]);
 
-    const services = { gateway, usercenter, order, docs, upload, wechat };
+    const services = { gateway, usercenter, order, docs, upload, wechat, agents };
     const allUp = Object.values(services).every(
       (item) => item.status === 'up' || item.status === 'ok',
     );

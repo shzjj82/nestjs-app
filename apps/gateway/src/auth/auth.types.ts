@@ -4,6 +4,7 @@ export interface GatewayUser {
   name: string;
   role: 'user' | 'admin';
   appId: string;
+  bizCode?: string;
   wechatAppId?: string;
   username?: string | null;
   roles: string[];

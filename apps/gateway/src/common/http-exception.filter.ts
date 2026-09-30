@@ -18,6 +18,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (!res || typeof res.status !== 'function') {
       throw exception;
     }
+    if (res.headersSent) {
+      return;
+    }
 
     const { code, message } = this.normalize(exception);
     res.status(code).json(fail(code, message));

@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { MQTT_PATTERNS, PERMISSIONS, WECHAT_CLIENT, unwrapData } from '@app/common';
 import type { Request, Response } from 'express';
+import { BizGuard } from '../auth/biz.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthService } from '../auth/auth.service';
@@ -20,6 +21,7 @@ export class WechatQrcodeController {
   constructor(
     private readonly clients: ClientHub,
     private readonly auth: AuthService,
+    private readonly biz: BizGuard,
   ) {}
 
   @Post('qrcode')
@@ -29,6 +31,7 @@ export class WechatQrcodeController {
     @CurrentUser() user: GatewayUser,
     @Res() res: Response,
   ) {
+    await this.biz.checkRequest(req, user);
     if (!this.auth.hasAnyPermission(user, [PERMISSIONS.WECHAT_QRCODE])) {
       throw new ForbiddenException('缺少权限: wechat.qrcode');
     }

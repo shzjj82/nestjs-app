@@ -1,3 +1,4 @@
+export * from './api-docs';
 export * from './env';
 export * from './gateway-routes';
 export * from './handle-log.interceptor';

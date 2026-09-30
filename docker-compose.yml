@@ -72,6 +72,8 @@ services:
       <<: *app-env
       PORT: 3000
       MQTT_TIMEOUT_MS: 5000
+      AGENTS_MQTT_TIMEOUT_MS: ${AGENTS_MQTT_TIMEOUT_MS:-90000}
+      AGENTS_HTTP_URL: http://agents:3006
     depends_on: *app-depends
 
   usercenter:
@@ -140,6 +142,23 @@ services:
       WECHAT_APP_ID: ${WECHAT_APP_ID:-}
       WECHAT_SECRET: ${WECHAT_SECRET:-}
       WECHAT_MP_CODE: ${WECHAT_MP_CODE:-wechat}
+    depends_on: *app-depends
+
+  agents:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        APP_NAME: agents
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      INSTANCE_ID: agents-1
+      AGENTS_HTTP_PORT: 3006
+      AI_API_BASE: ${AI_API_BASE:-https://api.openai.com/v1}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-90000}
     depends_on: *app-depends
 
 volumes:

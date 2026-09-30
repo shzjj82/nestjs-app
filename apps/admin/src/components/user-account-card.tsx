@@ -14,6 +14,7 @@ export interface RoleOption {
   id: string;
   code: string;
   name: string;
+  businessLabel?: string;
 }
 
 export function UserAccountCard({
@@ -92,6 +93,9 @@ export function UserAccountCard({
                 <Label htmlFor={id} className="font-normal">
                   {role.name}
                   <span className="font-mono text-xs text-muted-foreground">{role.code}</span>
+                  {role.businessLabel ? (
+                    <Badge variant="outline">{role.businessLabel}</Badge>
+                  ) : null}
                 </Label>
               </div>
             );

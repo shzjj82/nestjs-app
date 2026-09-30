@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { RedisInfraModule } from '@app/common';
+import { ApiDocsModule, MQTT_GROUPS, MQTT_PATTERNS, RedisInfraModule, sharePattern } from '@app/common';
 import { WechatApiModule } from './api/wechat-api.module';
 import { DatabaseModule } from './database/database.module';
 import { SeedService } from './database/seed.service';
@@ -15,6 +15,11 @@ import { WechatController } from './wechat.controller';
     TypeOrmModule.forFeature([MiniProgramEntity]),
     MiniProgramsModule,
     WechatApiModule,
+    ApiDocsModule.forService({
+      service: 'wechat',
+      label: '微信模块',
+      pattern: sharePattern(MQTT_GROUPS.WECHAT, MQTT_PATTERNS.WECHAT_API_DOCS),
+    }),
   ],
   controllers: [WechatController],
   providers: [SeedService],

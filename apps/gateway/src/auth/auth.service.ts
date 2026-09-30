@@ -64,6 +64,7 @@ export class AuthService {
       name: session.nickname,
       role: session.role,
       appId: session.appId,
+      bizCode: session.bizCode,
       wechatAppId: session.wechatAppId,
       username: session.username,
       roles: session.roles,

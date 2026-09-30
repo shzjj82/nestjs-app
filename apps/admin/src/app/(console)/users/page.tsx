@@ -23,6 +23,7 @@ import { actionsColumn } from '@/lib/admin-table-columns';
 import type { AdminColumnDef } from '@/lib/admin-table-types';
 import { ACCOUNT_TYPE_META, type CenterUser, formatDateTime } from '@/lib/accounts';
 import { adminFetch } from '@/lib/api';
+import { type Business, type BusinessRole, PLATFORM_ROLE_SCOPE } from '@/lib/businesses';
 
 interface PageResult {
   items: CenterUser[];
@@ -65,8 +66,20 @@ export default function UsersPage() {
   }, [load]);
 
   useEffect(() => {
-    adminFetch<RoleOption[]>('/roles')
-      .then(setRoles)
+    Promise.all([adminFetch<BusinessRole[]>('/roles'), adminFetch<Business[]>('/businesses')])
+      .then(([roleList, businesses]) => {
+        const names = new Map(businesses.map((b) => [b.id, b.name]));
+        setRoles(
+          roleList.map((role) => ({
+            id: role.id,
+            code: role.code,
+            name: role.name,
+            businessLabel: role.businessId
+              ? (names.get(role.businessId) ?? role.businessId)
+              : PLATFORM_ROLE_SCOPE,
+          })),
+        );
+      })
       .catch(() => undefined);
   }, []);
 

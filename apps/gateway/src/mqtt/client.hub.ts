@@ -1,6 +1,13 @@
 import { BadGatewayException, Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { DOCS_CLIENT, ORDER_CLIENT, UPLOAD_CLIENT, USER_CLIENT, WECHAT_CLIENT } from '@app/common';
+import {
+  AGENTS_CLIENT,
+  DOCS_CLIENT,
+  ORDER_CLIENT,
+  UPLOAD_CLIENT,
+  USER_CLIENT,
+  WECHAT_CLIENT,
+} from '@app/common';
 import { MqttProxy } from './mqtt.proxy';
 
 @Injectable()
@@ -13,6 +20,7 @@ export class ClientHub {
     @Inject(DOCS_CLIENT) docsClient: ClientProxy,
     @Inject(UPLOAD_CLIENT) uploadClient: ClientProxy,
     @Inject(WECHAT_CLIENT) wechatClient: ClientProxy,
+    @Inject(AGENTS_CLIENT) agentsClient: ClientProxy,
     private readonly mqtt: MqttProxy,
   ) {
     this.clients = {
@@ -21,6 +29,7 @@ export class ClientHub {
       [DOCS_CLIENT]: docsClient,
       [UPLOAD_CLIENT]: uploadClient,
       [WECHAT_CLIENT]: wechatClient,
+      [AGENTS_CLIENT]: agentsClient,
     };
   }
 
@@ -32,7 +41,7 @@ export class ClientHub {
     return client;
   }
 
-  send<T>(name: string, pattern: string, data: unknown = {}) {
-    return this.mqtt.send<T>(this.get(name), pattern, data);
+  send<T>(name: string, pattern: string, data: unknown = {}, timeoutMs?: number) {
+    return this.mqtt.send<T>(this.get(name), pattern, data, timeoutMs);
   }
 }

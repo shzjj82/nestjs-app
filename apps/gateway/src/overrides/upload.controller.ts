@@ -15,6 +15,7 @@ import {
 } from '@app/common';
 import type { Request } from 'express';
 import { AuthService } from '../auth/auth.service';
+import { BizGuard } from '../auth/biz.guard';
 import { ClientHub } from '../mqtt/client.hub';
 
 @Controller('upload')
@@ -22,6 +23,7 @@ export class UploadOverrideController {
   constructor(
     private readonly clients: ClientHub,
     private readonly auth: AuthService,
+    private readonly biz: BizGuard,
   ) {}
 
   @Post()
@@ -35,11 +37,11 @@ export class UploadOverrideController {
     @Req() req: Request,
     @UploadedFile() file: Express.Multer.File | undefined,
   ) {
-    await this.auth.enforce(['jwt', 'upload-key'], req);
+    const bizCode = await this.authorize(req);
     return this.clients.send(
       UPLOAD_CLIENT,
       MQTT_PATTERNS.UPLOAD_PUT,
-      this.filePayload(req, file),
+      this.filePayload(req, file, bizCode),
     );
   }
 
@@ -54,15 +56,27 @@ export class UploadOverrideController {
     @Req() req: Request,
     @UploadedFile() file: Express.Multer.File | undefined,
   ) {
-    await this.auth.enforce(['jwt', 'upload-key'], req);
+    const bizCode = await this.authorize(req);
     return this.clients.send(
       UPLOAD_CLIENT,
       MQTT_PATTERNS.UPLOAD_ENQUEUE,
-      this.filePayload(req, file),
+      this.filePayload(req, file, bizCode),
     );
   }
 
-  private filePayload(req: Request, file: Express.Multer.File | undefined) {
+  private async authorize(req: Request): Promise<string | null> {
+    let user = await this.auth.enforce(['jwt', 'upload-key'], req);
+    if (!user && this.auth.bearerToken(req)) {
+      user = await this.auth.fromRequest(req);
+    }
+    return this.biz.checkRequest(req, user);
+  }
+
+  private filePayload(
+    req: Request,
+    file: Express.Multer.File | undefined,
+    bizCode: string | null,
+  ) {
     if (!file?.buffer?.length) {
       throw new BadRequestException('请上传文件，字段名 file');
     }
@@ -72,6 +86,7 @@ export class UploadOverrideController {
       contentType: String(body.contentType ?? file.mimetype ?? 'application/octet-stream'),
       prefix: typeof body.prefix === 'string' ? body.prefix : '',
       base64: file.buffer.toString('base64'),
+      _bizCode: bizCode,
     };
   }
 }

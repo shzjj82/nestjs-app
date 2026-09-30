@@ -17,9 +17,9 @@ const MQTT_TIMEOUT_MS = Number(process.env.MQTT_TIMEOUT_MS ?? 30000);
 
 @Injectable()
 export class MqttProxy {
-  send<T>(client: ClientProxy, pattern: string, data: unknown = {}) {
+  send<T>(client: ClientProxy, pattern: string, data: unknown = {}, timeoutMs = MQTT_TIMEOUT_MS) {
     return lastValueFrom(
-      client.send<T>(pattern, data).pipe(timeout(MQTT_TIMEOUT_MS)),
+      client.send<T>(pattern, data).pipe(timeout(timeoutMs)),
     ).catch((err: unknown) => {
       throw this.toHttpError(pattern, err);
     });
@@ -43,8 +43,12 @@ export class MqttProxy {
         return new NotFoundException(message);
       case 409:
         return new ConflictException(message);
+      case 502:
+        return new BadGatewayException(message);
       case 503:
         return new ServiceUnavailableException(message);
+      case 504:
+        return new GatewayTimeoutException(message);
       default:
         return new BadGatewayException(message);
     }

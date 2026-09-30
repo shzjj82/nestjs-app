@@ -3,9 +3,10 @@ import { compare } from 'bcrypt';
 import { TokenStore } from '@app/common';
 import type { AuthResult, AuthSession, User } from '@app/common';
 import { ClientsService } from '../apps/clients.service';
-import type { AccountEntity, AccountType, ClientEntity } from '../entities';
+import { BusinessesService } from '../businesses/businesses.service';
+import type { AccountEntity, AccountType, BusinessEntity, ClientEntity } from '../entities';
 import { RbacService } from '../rbac/rbac.service';
-import { clientCodeOf, optionalString, requiredString, rpcFail } from '../rpc';
+import { optionalString, requiredString, rpcFail } from '../rpc';
 import { normalizePhone } from '../users/account-merge';
 import { AccountsService } from '../users/accounts.service';
 import { UsersService } from '../users/users.service';
@@ -18,6 +19,7 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly accounts: AccountsService,
     private readonly clients: ClientsService,
+    private readonly businesses: BusinessesService,
     private readonly rbac: RbacService,
     private readonly tokens: TokenStore,
     private readonly wechatClient: WechatClient,
@@ -25,6 +27,7 @@ export class AuthService {
   ) {}
 
   async register(payload: Record<string, unknown>): Promise<AuthResult> {
+    const business = await this.requestBusiness(payload);
     const username = requiredString(payload.username, 'username');
     const password = requiredString(payload.password, 'password');
     if (username.length < 2 || username.length > 32) {
@@ -45,28 +48,34 @@ export class AuthService {
       email: optionalString(payload.email),
     });
     const account = await this.accounts.createPassword(user.id, username, password);
-    await this.accounts.assignRoleCodes(account.id, ['user']);
-    return this.issue(account, this.loginAppCode(payload));
+    return this.issue(account, business, this.loginClientCode(payload, business));
   }
 
   async login(payload: Record<string, unknown>): Promise<AuthResult> {
+    const business = await this.requestBusiness(payload);
     const login = requiredString(payload.username, 'username');
     const password = requiredString(payload.password, 'password');
     const account = await this.users.findPasswordAccount(login);
     if (!account?.passwordHash || !(await compare(password, account.passwordHash))) {
       rpcFail(401, '用户名或密码错误');
     }
-    return this.issue(account, this.loginAppCode(payload));
+    return this.issue(account, business, this.loginClientCode(payload, business));
   }
 
   async loginByWechat(payload: Record<string, unknown>): Promise<AuthResult> {
-    const client = await this.requireClient(payload, 'wechat_mp');
+    const business = await this.requestBusiness(payload);
+    const client = await this.clients.requireForBusiness(
+      business.id,
+      'wechat_mp',
+      optionalString(payload.clientCode),
+    );
     const code = requiredString(payload.code, 'code');
     if (!client.wechatAppId) {
       rpcFail(400, `接入端 ${client.appCode} 未配置 wechatAppId（对应微信服务登记的 appId 或 code）`);
     }
     const session = await this.wechatClient.code2session(client.wechatAppId, code);
     return this.loginByExternal({
+      business,
       client,
       type: 'wechat_mp',
       identifier: session.openid,
@@ -79,7 +88,12 @@ export class AuthService {
   }
 
   async loginByAlipay(payload: Record<string, unknown>): Promise<AuthResult> {
-    const client = await this.requireClient(payload, 'alipay_mp');
+    const business = await this.requestBusiness(payload);
+    const client = await this.clients.requireForBusiness(
+      business.id,
+      'alipay_mp',
+      optionalString(payload.clientCode),
+    );
     const code = requiredString(payload.code, 'code');
     if (!client.alipayAppId || !client.alipayPrivateKey) {
       rpcFail(400, `接入端 ${client.appCode} 未配置支付宝 appId / 私钥`);
@@ -90,6 +104,7 @@ export class AuthService {
       code,
     );
     return this.loginByExternal({
+      business,
       client,
       type: 'alipay_mp',
       identifier: session.userId,
@@ -135,6 +150,7 @@ export class AuthService {
     }
     return this.issue(
       await this.sessionAccount(session.userId, session.accountId),
+      await this.businesses.requireActiveByCode(session.bizCode),
       session.appId,
       session.wechatAppId,
     );
@@ -143,12 +159,17 @@ export class AuthService {
   async refresh(payload: Record<string, unknown>): Promise<AuthResult> {
     const refreshToken = requiredString(payload.refreshToken, 'refreshToken');
     const record = await this.tokens.getRefresh(refreshToken);
-    if (!record) {
+    if (!record?.bizCode) {
       rpcFail(401, 'refresh token 无效或已过期');
+    }
+    const requested = optionalString(payload._bizCode);
+    if (requested && requested !== record.bizCode) {
+      rpcFail(403, 'refresh token 不属于当前业务');
     }
     await this.tokens.revokeByRefresh(refreshToken);
     return this.issue(
       await this.sessionAccount(record.userId, record.accountId),
+      await this.businesses.requireActiveByCode(record.bizCode),
       record.appId,
       record.wechatAppId,
     );
@@ -167,18 +188,21 @@ export class AuthService {
 
   async me(payload: Record<string, unknown>): Promise<User> {
     const session = requireSession(payload);
+    const business = await this.businesses.requireActiveByCode(session.bizCode);
     const account = await this.sessionAccount(session.userId, session.accountId);
     const publicUser = await this.users.findOne(account.userId);
-    const rbac = await this.rbac.loadAccountRbac(account.id);
+    const rbac = await this.rbac.loadAccountRbac(account.id, business.id);
     return {
       ...publicUser,
       ...rbac,
       accountId: account.id,
       wechatAppId: session.wechatAppId,
+      bizCode: business.code,
     };
   }
 
   private async loginByExternal(input: {
+    business: BusinessEntity;
     client: ClientEntity;
     type: AccountType;
     identifier: string;
@@ -213,7 +237,6 @@ export class AuthService {
         identifier: input.identifier,
         unionid: input.unionid,
       });
-      await this.accounts.assignRoleCodes(account.id, ['user']);
     }
 
     if (input.phone) {
@@ -231,7 +254,7 @@ export class AuthService {
         avatar: input.avatar,
       });
     }
-    return this.issue(account, input.client.appCode, input.wechatAppId);
+    return this.issue(account, input.business, input.client.appCode, input.wechatAppId);
   }
 
   /** 旧会话没有 accountId 时，回落到该用户最早的账户 */
@@ -246,24 +269,18 @@ export class AuthService {
     return first;
   }
 
-  private async requireClient(
-    payload: Record<string, unknown>,
-    type: ClientEntity['type'],
-  ) {
-    const appCode = clientCodeOf(payload, true);
-    const client = await this.clients.requireByAppCode(appCode);
-    if (client.type !== type) {
-      rpcFail(400, `接入端 ${client.appCode} 不是 ${type}`);
-    }
-    return client;
+  /** 业务 code 只来自网关注入的 _bizCode（请求头 X-Biz-Code） */
+  private requestBusiness(payload: Record<string, unknown>) {
+    return this.businesses.requireActiveByCode(optionalString(payload._bizCode));
   }
 
-  private loginAppCode(payload: Record<string, unknown>) {
-    return clientCodeOf(payload) ?? 'web';
+  private loginClientCode(payload: Record<string, unknown>, business: BusinessEntity) {
+    return optionalString(payload.clientCode) ?? business.code;
   }
 
   private async issue(
     account: AccountEntity,
+    business: BusinessEntity,
     appId: string,
     wechatAppId?: string,
   ): Promise<AuthResult> {
@@ -274,13 +291,15 @@ export class AuthService {
     if (user.status !== 1) {
       rpcFail(403, '用户已停用');
     }
+    await this.businesses.ensureMember(business, user.id, account.id);
     await this.accounts.touchLogin(account);
-    const rbac = await this.rbac.loadAccountRbac(account.id);
+    const rbac = await this.rbac.loadAccountRbac(account.id, business.id);
     const publicUser = await this.users.toPublic(user);
     const pair = await this.tokens.issue({
       userId: user.id,
       accountId: account.id,
       appId,
+      bizCode: business.code,
       wechatAppId: wechatAppId || undefined,
       username: account.type === 'password' ? account.identifier : publicUser.username,
       nickname: user.nickname,
@@ -297,6 +316,7 @@ export class AuthService {
         ...publicUser,
         ...rbac,
         accountId: account.id,
+        bizCode: business.code,
         wechatAppId: wechatAppId || undefined,
       },
       wechatAppId: wechatAppId || undefined,

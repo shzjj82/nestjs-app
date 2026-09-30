@@ -53,3 +53,4 @@ export const UsercenterHandleLogInterceptor = createHandleLogInterceptor(
   'Usercenter',
   'usercenter',
 );
+export const AgentsHandleLogInterceptor = createHandleLogInterceptor('Agents', 'agents');

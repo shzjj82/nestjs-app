@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { asRecord, requiredString } from '../common/rpc';
+import { bizPrefix, requireBizCode } from '../common/biz-scope';
+import { asRecord, requiredString, rpcFail } from '../common/rpc';
 import { readIncomingFile } from '../common/file-payload';
 import { JobsStore } from './jobs.store';
 
@@ -11,8 +12,13 @@ export class JobsService {
     return this.store.enqueue(readIncomingFile(payload));
   }
 
-  findOne(payload: unknown) {
+  async findOne(payload: unknown) {
     const data = asRecord(payload);
-    return this.store.requireJob(requiredString(data.id, 'id'));
+    const job = await this.store.requireJob(requiredString(data.id, 'id'));
+    const own = bizPrefix(requireBizCode(data), '');
+    if (job.prefix !== own && !job.prefix.startsWith(`${own}/`)) {
+      rpcFail(404, '上传任务不存在或已过期');
+    }
+    return job;
   }
 }

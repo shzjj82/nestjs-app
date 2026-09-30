@@ -47,13 +47,9 @@ export default function UploadPage() {
     body.append('file', file);
     body.append('prefix', prefix);
     try {
-      const res = await fetch('/api/proxy/upload', { method: 'POST', body });
-      const json = await res.json();
-      if (!res.ok || json.success === false) {
-        throw new Error(json.message || '上传失败');
-      }
-      setLast(json.data);
-      if (json.data?.key) setObjectKey(json.data.key);
+      const data = await adminFetch<UploadResult>('/upload', { method: 'POST', body });
+      setLast(data);
+      if (data?.key) setObjectKey(data.key);
       toast.success('上传成功');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '上传失败');
@@ -70,12 +66,11 @@ export default function UploadPage() {
     body.append('file', file);
     body.append('prefix', prefix);
     try {
-      const res = await fetch('/api/proxy/upload/async', { method: 'POST', body });
-      const json = await res.json();
-      if (!res.ok || json.success === false) {
-        throw new Error(json.message || '入队失败');
-      }
-      const id = json.data?.jobId || json.data?.id;
+      const data = await adminFetch<UploadResult & { id?: string }>('/upload/async', {
+        method: 'POST',
+        body,
+      });
+      const id = data?.jobId || data?.id;
       setJobId(id || '');
       toast.success(`已入队 ${id || ''}`);
     } catch (err) {
