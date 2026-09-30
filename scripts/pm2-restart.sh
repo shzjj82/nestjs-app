@@ -26,7 +26,9 @@ if pm2 describe gateway >/dev/null 2>&1; then
     gateway) pm2 restart gateway ;;
     apps)
       pm2 restart /usercenter-/ || true
-      pm2 restart order || true
+      pm2 restart order upload wechat || true
+      pm2 restart /docs-/ || true
+      pm2 restart /agents-/ || true
       ;;
     *) pm2 restart all ;;
   esac

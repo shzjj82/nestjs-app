@@ -3,7 +3,7 @@ set -euo pipefail
 
 # 默认先用 Docker 拉起 postgres / redis / mosquitto，再用 PM2 跑业务进程。
 # 用法：
-#   ./scripts/pm2-start.sh              # 启动全部（gateway + usercenter x3 + order + docs + upload + wechat + agents）
+#   ./scripts/pm2-start.sh              # 启动全部（gateway + usercenter + order + docs x3 + upload + wechat + agents x3）
 #   ./scripts/pm2-start.sh gateway      # 只启动网关
 #   ./scripts/pm2-start.sh apps         # 只启动 usercenter + order + docs + upload + wechat + agents
 #   SKIP_INFRA=1 ./scripts/pm2-start.sh # 跳过 Docker，使用本机已有数据库
@@ -12,7 +12,9 @@ set -euo pipefail
 #   DATABASE_URL=postgres://nestjs:nestjs@127.0.0.1:5432/nestjs
 #   REDIS_URL=redis://127.0.0.1:6379
 #   PORT=3000
-#   USERCENTER_REPLICAS=3
+#   USERCENTER_REPLICAS=1
+#   DOCS_REPLICAS=3
+#   AGENTS_REPLICAS=3
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -22,8 +24,10 @@ MQTT_URL="${MQTT_URL:-mqtt://127.0.0.1:1883}"
 DATABASE_URL="${DATABASE_URL:-postgres://nestjs:nestjs@127.0.0.1:5432/nestjs}"
 REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 PORT="${PORT:-3000}"
-USERCENTER_REPLICAS="${USERCENTER_REPLICAS:-3}"
-export MQTT_URL DATABASE_URL REDIS_URL PORT USERCENTER_REPLICAS
+USERCENTER_REPLICAS="${USERCENTER_REPLICAS:-1}"
+DOCS_REPLICAS="${DOCS_REPLICAS:-3}"
+AGENTS_REPLICAS="${AGENTS_REPLICAS:-3}"
+export MQTT_URL DATABASE_URL REDIS_URL PORT USERCENTER_REPLICAS DOCS_REPLICAS AGENTS_REPLICAS
 
 if [[ "${SKIP_INFRA:-0}" != "1" ]]; then
   if ! command -v docker >/dev/null 2>&1; then
@@ -81,9 +85,19 @@ case "${SCOPE}" in
     ;;
   apps)
     only="$(node -e "
-      const n = Number(process.env.USERCENTER_REPLICAS || 3);
-      const list = Array.from({ length: n }, (_, i) => 'usercenter-' + (i + 1));
-      list.push('order', 'docs', 'upload', 'wechat', 'agents');
+      function names(service, envName, fallback) {
+        const n = Number(process.env[envName] || fallback);
+        const count = Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+        return Array.from({ length: count }, (_, i) => service + '-' + (i + 1));
+      }
+      const list = [
+        ...names('usercenter', 'USERCENTER_REPLICAS', 1),
+        'order',
+        ...names('docs', 'DOCS_REPLICAS', 3),
+        'upload',
+        'wechat',
+        ...names('agents', 'AGENTS_REPLICAS', 3),
+      ];
       process.stdout.write(list.join(','));
     ")"
     pm2 start ecosystem.config.cjs --only "${only}"

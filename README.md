@@ -52,7 +52,7 @@ sudo ./scripts/install-db.sh
 # 2. 安装并启动 MQTT
 sudo ./scripts/install-mosquitto.sh
 
-# 3. 启动全部服务：gateway + 3 个 usercenter + order + docs + upload + wechat + agents
+# 3. 启动全部服务：gateway + usercenter + order + 3 个 docs + upload + wechat + 3 个 agents
 npm run pm2:start
 
 # 云上只跑网关，微服务在本地：
