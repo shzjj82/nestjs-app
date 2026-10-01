@@ -24,15 +24,21 @@ export class TeamsController {
   }
 
   @MessagePattern(ucPattern(MQTT_PATTERNS.TEAM_CREATE))
-  @ApiDoc({ name: '创建团队', description: '创建者成为拥有者，团队按 appCode 与业务隔离' })
+  @ApiDoc({ name: '创建团队', description: '创建者成为拥有者，并生成用于加入的团队码' })
   create(payload: Record<string, unknown>) {
     return this.teams.create(this.scope(payload), payload);
   }
 
   @MessagePattern(ucPattern(MQTT_PATTERNS.TEAM_JOIN))
-  @ApiDoc({ name: '加入团队', description: '当前账户以使用者身份加入' })
+  @ApiDoc({ name: '加入团队', description: '用团队码加入，当前账户成为使用者' })
   join(payload: Record<string, unknown>) {
-    return this.teams.join(this.scope(payload), requiredString(payload.id, 'id'));
+    return this.teams.join(this.scope(payload), requiredString(payload.code, 'code'));
+  }
+
+  @MessagePattern(ucPattern(MQTT_PATTERNS.TEAM_REFRESH_CODE))
+  @ApiDoc({ name: '刷新团队码', description: '拥有者重新生成加入码，旧码立即失效' })
+  refreshCode(payload: Record<string, unknown>) {
+    return this.teams.refreshCode(this.scope(payload), requiredString(payload.id, 'id'));
   }
 
   @MessagePattern(ucPattern(MQTT_PATTERNS.TEAM_LEAVE))

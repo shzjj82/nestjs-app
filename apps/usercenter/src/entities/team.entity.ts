@@ -3,6 +3,7 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 /** 团队：按接入端 appCode 与业务 code 隔离，成员挂在账户上 */
 @Entity('uc_teams')
 @Index(['appCode', 'bizCode'])
+@Index(['appCode', 'bizCode', 'code'], { unique: true })
 export class TeamEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -14,6 +15,10 @@ export class TeamEntity {
   /** 业务 code，与文档 appCode / X-Biz-Code 一致 */
   @Column({ name: 'biz_code', type: 'varchar', length: 64 })
   bizCode: string;
+
+  /** 加入团队用的码，创建和刷新时生成，不由调用方指定 */
+  @Column({ type: 'varchar', length: 16 })
+  code: string;
 
   @Column({ type: 'varchar', length: 64 })
   name: string;

@@ -146,6 +146,8 @@ export interface TeamInfo {
   id: string;
   appCode: string;
   bizCode: string;
+  /** 加入团队用，创建时生成，拥有者可刷新 */
+  code: string;
   name: string;
   description: string | null;
   role: TeamRole;
@@ -160,6 +162,7 @@ export interface TeamMemberInfo {
   identifier: string;
   role: TeamRole;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface ClientInfo {

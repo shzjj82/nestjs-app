@@ -43,6 +43,7 @@ export const MQTT_PATTERNS = {
   TEAM_FIND_ONE: 'team.findOne',
   TEAM_CREATE: 'team.create',
   TEAM_JOIN: 'team.join',
+  TEAM_REFRESH_CODE: 'team.code.refresh',
   TEAM_LEAVE: 'team.leave',
   TEAM_MEMBER_UPDATE: 'team.member.update',
   TEAM_MEMBERSHIPS: 'team.memberships',

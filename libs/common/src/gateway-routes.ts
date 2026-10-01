@@ -90,7 +90,8 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'GET', path: '/teams', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_FIND_ALL, auth: ['jwt'] }),
   business({ method: 'POST', path: '/teams', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_CREATE, auth: ['jwt'] }),
   business({ method: 'GET', path: '/teams/:id', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_FIND_ONE, auth: ['jwt'] }),
-  business({ method: 'POST', path: '/teams/:id/join', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_JOIN, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/teams/join', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_JOIN, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/teams/:id/code', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_REFRESH_CODE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/teams/:id/leave', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_LEAVE, auth: ['jwt'] }),
   business({ method: 'PATCH', path: '/teams/:id/members/:accountId', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_MEMBER_UPDATE, auth: ['jwt'] }),
 

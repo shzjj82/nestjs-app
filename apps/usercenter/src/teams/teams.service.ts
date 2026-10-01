@@ -7,6 +7,7 @@ import { BusinessesService } from '../businesses/businesses.service';
 import { ClientsService } from '../apps/clients.service';
 import { AccountEntity, TeamEntity, TeamMemberEntity } from '../entities';
 import { optionalString, requiredString, rpcFail } from '../rpc';
+import { generateTeamCode } from './team-code';
 import { canManageTeam, parseTeamRole } from './team-role';
 
 export interface TeamScope {
@@ -61,6 +62,7 @@ export class TeamsService {
       this.teams.create({
         appCode: scope.appCode,
         bizCode: scope.bizCode,
+        code: await this.allocateCode(scope.appCode, scope.bizCode),
         name,
         description: optionalString(payload.description) ?? null,
         status: 1,
@@ -74,30 +76,48 @@ export class TeamsService {
         accountId: scope.accountId,
         role: 'owner',
         createdAt: now,
+        updatedAt: now,
       }),
     );
     return this.toInfo(team, 'owner');
   }
 
-  async join(scope: TeamScope, teamId: string): Promise<TeamInfo> {
+  async join(scope: TeamScope, code: string): Promise<TeamInfo> {
     await this.assertScope(scope);
     await this.requireAccountInApp(scope.accountId, scope.appCode);
-    const team = await this.requireTeam(teamId, scope.appCode, scope.bizCode);
+    const team = await this.requireTeamByCode(code, scope.appCode, scope.bizCode);
     const existing = await this.members.findOne({
       where: { teamId: team.id, accountId: scope.accountId },
     });
     if (existing) {
       return this.toInfo(team, existing.role);
     }
+    const now = new Date();
     const row = await this.members.save(
       this.members.create({
         teamId: team.id,
         accountId: scope.accountId,
         role: 'user',
-        createdAt: new Date(),
+        createdAt: now,
+        updatedAt: now,
       }),
     );
+    await this.touch(team, now);
     return this.toInfo(team, row.role);
+  }
+
+  async refreshCode(scope: TeamScope, teamId: string): Promise<TeamInfo> {
+    await this.assertScope(scope);
+    const team = await this.requireTeam(teamId, scope.appCode, scope.bizCode);
+    const actor = await this.requireMember(team.id, scope.accountId);
+    if (!canManageTeam(actor.role)) {
+      rpcFail(403, '只有拥有者可以刷新团队码');
+    }
+    const now = new Date();
+    team.code = await this.allocateCode(scope.appCode, scope.bizCode);
+    team.updatedAt = now;
+    await this.teams.save(team);
+    return this.toInfo(team, actor.role);
   }
 
   async leave(scope: TeamScope, teamId: string) {
@@ -108,6 +128,7 @@ export class TeamsService {
       await this.assertOtherOwner(team.id, scope.accountId);
     }
     await this.members.delete({ id: me.id });
+    await this.touch(team, new Date());
     return { left: true as const, teamId: team.id };
   }
 
@@ -135,8 +156,11 @@ export class TeamsService {
     if (target.role === 'owner' && role !== 'owner') {
       await this.assertOtherOwner(team.id, target.accountId);
     }
+    const now = new Date();
     target.role = role;
+    target.updatedAt = now;
     await this.members.save(target);
+    await this.touch(team, now);
     return this.toMember(target);
   }
 
@@ -189,10 +213,37 @@ export class TeamsService {
     return account;
   }
 
+  private async allocateCode(appCode: string, bizCode: string) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const code = generateTeamCode();
+      const exists = await this.teams.findOne({ where: { appCode, bizCode, code } });
+      if (!exists) {
+        return code;
+      }
+    }
+    rpcFail(500, '团队码生成失败');
+  }
+
+  private async touch(team: TeamEntity, at: Date) {
+    team.updatedAt = at;
+    await this.teams.save(team);
+  }
+
   private async requireTeam(id: string, appCode: string, bizCode: string) {
     const team = await this.teams.findOne({ where: { id } });
     if (!team || team.status !== 1 || team.appCode !== appCode || team.bizCode !== bizCode) {
       rpcFail(404, '团队不存在');
+    }
+    return team;
+  }
+
+  private async requireTeamByCode(code: string, appCode: string, bizCode: string) {
+    const normalized = code.trim().toUpperCase();
+    const team = await this.teams.findOne({
+      where: { code: normalized, appCode, bizCode },
+    });
+    if (!team || team.status !== 1) {
+      rpcFail(404, '团队码无效');
     }
     return team;
   }
@@ -220,6 +271,7 @@ export class TeamsService {
       id: team.id,
       appCode: team.appCode,
       bizCode: team.bizCode,
+      code: team.code,
       name: team.name,
       description: team.description,
       role,
@@ -236,6 +288,7 @@ export class TeamsService {
       identifier: row.account?.identifier ?? '',
       role: row.role,
       createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     };
   }
 }

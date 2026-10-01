@@ -86,7 +86,8 @@ describe('matchRoute', () => {
 
   it('registers team routes for the signed-in account', () => {
     expect(matchRoute('POST', '/teams')?.pattern).toBe(MQTT_PATTERNS.TEAM_CREATE);
-    expect(matchRoute('POST', '/teams/team-1/join')?.pattern).toBe(MQTT_PATTERNS.TEAM_JOIN);
+    expect(matchRoute('POST', '/teams/join')?.pattern).toBe(MQTT_PATTERNS.TEAM_JOIN);
+    expect(matchRoute('POST', '/teams/team-1/code')?.pattern).toBe(MQTT_PATTERNS.TEAM_REFRESH_CODE);
     expect(matchRoute('PATCH', '/teams/team-1/members/acc-1')?.params).toEqual({
       id: 'team-1',
       accountId: 'acc-1',
