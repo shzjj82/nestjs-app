@@ -1,16 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { DataTable } from '@/components/data-table';
-import type { FilterField } from '@/components/filter-bar';
-import { actionsColumn } from '@/lib/admin-table-columns';
-import type { AdminColumnDef } from '@/lib/admin-table-types';
-import { Lock, Plus, QrCode } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { adminFetch, readApiResponse } from '@/lib/api';
+
+import { DataTable } from '@/components/data-table';
 import { DataTableRowActions } from '@/components/data-table-row-actions';
+import type { FilterField } from '@/components/filter-bar';
 import { PageHeader } from '@/components/page-header';
-import { StatusBadge } from '@/components/status-badge';
+import { SelectField } from '@/components/select-field';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,147 +20,246 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-interface MiniProgram {
+import { actionsColumn } from '@/lib/admin-table-columns';
+import type { AdminColumnDef } from '@/lib/admin-table-types';
+import { adminFetch } from '@/lib/api';
+import type { Business } from '@/lib/businesses';
+import type { BusinessAppClient, RegisteredWechatApp } from '@/lib/wechat-apps';
+
+interface WechatRow {
   id: string;
-  code: string;
-  name: string;
+  businessName: string;
+  appCode: string;
   appId: string;
-  hasSecret: boolean;
-  status: number;
 }
 
-const FILTERS: FilterField<MiniProgram>[] = [
+const FILTERS: FilterField<WechatRow>[] = [
   {
-    id: 'name',
+    id: 'appCode',
     type: 'text',
-    label: '名称',
-    placeholder: '搜索名称 / code / appId...',
-    accessor: (row) => `${row.name} ${row.code} ${row.appId}`,
-  },
-  {
-    id: 'secret',
-    type: 'select',
-    label: '密钥',
-    accessor: (row) => (row.hasSecret ? '1' : '0'),
-    options: [
-      { label: '已配置', value: '1' },
-      { label: '缺失', value: '0' },
-    ],
-  },
-  {
-    id: 'status',
-    type: 'multiSelect',
-    label: '状态',
-    options: [
-      { label: '启用', value: '1' },
-      { label: '停用', value: '0' },
-    ],
+    label: 'appCode',
+    placeholder: '搜索业务名称 / appCode / appId...',
+    accessor: (row) => `${row.businessName} ${row.appCode} ${row.appId}`,
   },
 ];
 
-const EMPTY_MP = { code: '', name: '', appId: '', secret: '' };
+const UNSELECTED = '__pick__';
+const EMPTY_FORM = { businessId: UNSELECTED, appId: '', secret: '' };
+
+interface WechatForm {
+  businessId: string;
+  appId: string;
+  secret: string;
+}
 
 export default function WechatPage() {
-  const [items, setItems] = useState<MiniProgram[]>([]);
+  const [apps, setApps] = useState<RegisteredWechatApp[]>([]);
+  const [businesses, setBusinesses] = useState<Business[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
-  const [qrcodeOpen, setQrcodeOpen] = useState(false);
-  const [secretOpen, setSecretOpen] = useState(false);
-  const [secretTarget, setSecretTarget] = useState<MiniProgram | null>(null);
-  const [form, setForm] = useState(EMPTY_MP);
-  const [newSecret, setNewSecret] = useState('');
-  const [qrcode, setQrcode] = useState({ code: '', scene: 'admin=1', page: '' });
+  const [form, setForm] = useState<WechatForm>(EMPTY_FORM);
+  const [editing, setEditing] = useState<WechatRow | null>(null);
+  const [editForm, setEditForm] = useState<WechatForm>(EMPTY_FORM);
+  const [deleting, setDeleting] = useState<WechatRow | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  async function load() {
-    setItems(await adminFetch<MiniProgram[]>('/wechat/miniprograms'));
-  }
+  const load = useCallback(async () => {
+    const [nextApps, nextBusinesses] = await Promise.all([
+      adminFetch<RegisteredWechatApp[]>('/wechat/miniprograms'),
+      adminFetch<Business[]>('/businesses'),
+    ]);
+    setApps(nextApps);
+    setBusinesses(nextBusinesses);
+  }, []);
 
   useEffect(() => {
-    load().catch((err) => toast.error(err.message));
-  }, []);
+    load().catch((err) => toast.error(err instanceof Error ? err.message : '加载失败'));
+  }, [load]);
+
+  const rows = useMemo<WechatRow[]>(
+    () =>
+      apps.map((app) => {
+        const business = businesses.find((item) => item.code === app.code);
+        return {
+          id: app.id,
+          businessName: business?.name ?? app.name,
+          appCode: app.code,
+          appId: app.appId,
+        };
+      }),
+    [apps, businesses],
+  );
+
+  const availableBusinesses = useMemo(() => {
+    const used = new Set(apps.map((app) => app.code));
+    return businesses.filter((business) => !used.has(business.code));
+  }, [apps, businesses]);
+
+  const editBusinesses = useMemo(() => {
+    if (!editing) return [];
+    const used = new Set(apps.map((app) => app.code));
+    return businesses.filter(
+      (business) => business.code === editing.appCode || !used.has(business.code),
+    );
+  }, [apps, businesses, editing]);
+
+  function openCreate() {
+    setForm(EMPTY_FORM);
+    setCreateOpen(true);
+  }
+
+  function openEdit(row: WechatRow) {
+    const business = businesses.find((item) => item.code === row.appCode);
+    setEditForm({
+      businessId: business?.id ?? UNSELECTED,
+      appId: row.appId,
+      secret: '',
+    });
+    setEditing(row);
+  }
+
+  async function ensureClient(business: Business, appId: string) {
+    const clients = await adminFetch<BusinessAppClient[]>('/clients');
+    const existing = clients.find((client) => client.appCode === business.code);
+    if (existing) {
+      await adminFetch(`/clients/${existing.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          businessId: business.id,
+          type: 'wechat_mp',
+          wechatAppId: appId,
+          status: 1,
+        }),
+      });
+      return;
+    }
+    await adminFetch('/clients', {
+      method: 'POST',
+      body: JSON.stringify({
+        businessId: business.id,
+        appCode: business.code,
+        name: business.name,
+        type: 'wechat_mp',
+        wechatAppId: appId,
+      }),
+    });
+  }
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    try {
-      await adminFetch('/wechat/miniprograms', {
-        method: 'POST',
-        body: JSON.stringify(form),
-      });
-      toast.success('小程序已登记');
-      setForm(EMPTY_MP);
-      setCreateOpen(false);
-      await load();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '创建失败');
+    const business =
+      form.businessId === UNSELECTED
+        ? undefined
+        : businesses.find((item) => item.id === form.businessId);
+    const appId = form.appId.trim();
+    const secret = form.secret.trim();
+    if (!business) {
+      toast.error('请选择业务');
+      return;
     }
-  }
-
-  const openSecret = useCallback((mp: MiniProgram) => {
-    setSecretTarget(mp);
-    setNewSecret('');
-    setSecretOpen(true);
-  }, []);
-
-  async function rotateSecret() {
-    if (!secretTarget) return;
-    const secret = newSecret.trim();
-    if (!secret) {
-      toast.error('请输入新 secret');
+    if (!appId || !secret) {
+      toast.error('请填写 appId 和 appSecret');
       return;
     }
     try {
-      await adminFetch(`/wechat/miniprograms/${secretTarget.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ secret }),
-      });
-      toast.success('secret 已更新');
-      setSecretOpen(false);
-      await load();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : '更新失败');
-    }
-  }
-
-  async function downloadQrcode(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      const res = await fetch('/api/proxy/wechat/qrcode', {
+      await adminFetch('/wechat/miniprograms', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          code: qrcode.code,
-          scene: qrcode.scene,
-          page: qrcode.page || undefined,
+          code: business.code,
+          name: business.name,
+          appId,
+          secret,
         }),
       });
-      if (!res.ok) {
-        throw new Error((await readApiResponse(res)).message);
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `qrcode-${qrcode.code || 'mp'}.png`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('小程序码已下载');
-      setQrcodeOpen(false);
+      await ensureClient(business, appId);
+      toast.success('已添加');
+      setForm(EMPTY_FORM);
+      setCreateOpen(false);
+      await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : '生成失败');
+      toast.error(err instanceof Error ? err.message : '添加失败');
     }
   }
 
-  const columns = useMemo<AdminColumnDef<MiniProgram>[]>(
+  async function unlinkClient(appCode: string) {
+    const clients = await adminFetch<BusinessAppClient[]>('/clients');
+    const existing = clients.find((client) => client.appCode === appCode);
+    if (!existing) return;
+    await adminFetch(`/clients/${existing.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ wechatAppId: null, status: 0 }),
+    });
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    const business =
+      editForm.businessId === UNSELECTED
+        ? undefined
+        : businesses.find((item) => item.id === editForm.businessId);
+    const appId = editForm.appId.trim();
+    const secret = editForm.secret.trim();
+    if (!business) {
+      toast.error('请选择业务');
+      return;
+    }
+    if (!appId) {
+      toast.error('请填写 appId');
+      return;
+    }
+    setBusy(true);
+    try {
+      await adminFetch(`/wechat/miniprograms/${editing.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          code: business.code,
+          name: business.name,
+          appId,
+          ...(secret ? { secret } : {}),
+        }),
+      });
+      if (editing.appCode !== business.code) {
+        await unlinkClient(editing.appCode);
+      }
+      await ensureClient(business, appId);
+      toast.success('已保存');
+      setEditing(null);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '保存失败');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    setBusy(true);
+    try {
+      await adminFetch(`/wechat/miniprograms/${deleting.id}`, { method: 'DELETE' });
+      await unlinkClient(deleting.appCode);
+      toast.success('已删除');
+      setDeleting(null);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '删除失败');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const columns = useMemo<AdminColumnDef<WechatRow>[]>(
     () => [
       {
-        accessorKey: 'code',
-        header: 'code',
-        meta: { label: 'code' },
-        cell: ({ row }) => <span className="font-mono text-xs">{row.original.code}</span>,
+        accessorKey: 'businessName',
+        header: '业务名称',
+        meta: { label: '业务名称' },
       },
       {
-        accessorKey: 'name',
-        header: '名称',
-        meta: { label: '名称' },
+        accessorKey: 'appCode',
+        header: 'appCode',
+        meta: { label: 'appCode' },
+        cell: ({ row }) => <span className="font-mono text-xs">{row.original.appCode}</span>,
       },
       {
         accessorKey: 'appId',
@@ -170,101 +267,89 @@ export default function WechatPage() {
         meta: { label: 'appId' },
         cell: ({ row }) => <span className="font-mono text-xs">{row.original.appId}</span>,
       },
-      {
-        id: 'secret',
-        accessorFn: (row) => (row.hasSecret ? '1' : '0'),
-        header: '密钥',
-        meta: { label: '密钥' },
-        cell: ({ row }) => (
-          <StatusBadge active={row.original.hasSecret} activeLabel="已配置" inactiveLabel="缺失" />
-        ),
-      },
-      {
-        id: 'status',
-        accessorFn: (row) => String(row.status),
-        header: '状态',
-        meta: { label: '状态' },
-        cell: ({ row }) => (
-          <StatusBadge active={row.original.status === 1} activeLabel="启用" />
-        ),
-      },
       actionsColumn({
         id: 'actions',
         header: () => <span className="sr-only">操作</span>,
         meta: { label: '操作' },
         cell: ({ row }) => (
           <DataTableRowActions
-            actions={[{ label: '轮换密钥', icon: Lock, onSelect: () => openSecret(row.original) }]}
+            actions={[
+              { label: '编辑', icon: Pencil, onSelect: () => openEdit(row.original) },
+              {
+                label: '删除',
+                icon: Trash2,
+                variant: 'destructive',
+                separatorBefore: true,
+                onSelect: () => setDeleting(row.original),
+              },
+            ]}
           />
         ),
       }),
     ],
-    [openSecret],
+    [businesses],
   );
 
   return (
     <>
       <PageHeader
         title="微信小程序"
-        description="多套 appId / secret 登记；列表不回传密钥"
+        description="一个业务 code 只登记一条。需要时再添加 appId 和 appSecret，列表不显示密钥"
         actions={
-          <>
-            <Button variant="outline" onClick={() => setQrcodeOpen(true)}>
-              <QrCode />
-              生成小程序码
-            </Button>
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus />
-              登记小程序
-            </Button>
-          </>
+          <Button onClick={openCreate}>
+            <Plus />
+            添加
+          </Button>
         }
       />
 
-        <DataTable
-          columns={columns}
-          data={items}
-          filters={FILTERS}
-          emptyMessage="暂无登记，点击右上角登记小程序"
-        />
+      <DataTable
+        columns={columns}
+        data={rows}
+        filters={FILTERS}
+        emptyMessage="暂无记录。需要哪个业务再用它的 code 添加"
+      />
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>登记小程序</DialogTitle>
-            <DialogDescription>密钥仅存储于微信微服务，列表不会回显</DialogDescription>
+            <DialogTitle>添加微信小程序</DialogTitle>
+            <DialogDescription>appCode 使用业务管理里的 code，每个 code 只能添加一次</DialogDescription>
           </DialogHeader>
           <form id="wechat-create" className="space-y-4" onSubmit={create}>
+            <SelectField
+              label="业务"
+              value={form.businessId}
+              onChange={(businessId) => setForm({ ...form, businessId })}
+              options={
+                availableBusinesses.length
+                  ? [
+                      { value: UNSELECTED, label: '选择业务' },
+                      ...availableBusinesses.map((business) => ({
+                        value: business.id,
+                        label: `${business.name}（${business.code}）`,
+                      })),
+                    ]
+                  : [{ value: UNSELECTED, label: '没有可添加的业务' }]
+              }
+            />
             <div className="space-y-2">
-              <Label>业务 code</Label>
+              <Label htmlFor="wechat-app-id">appId</Label>
               <Input
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>名称</Label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>微信 appId</Label>
-              <Input
+                id="wechat-app-id"
                 value={form.appId}
                 onChange={(e) => setForm({ ...form, appId: e.target.value })}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label>appSecret</Label>
+              <Label htmlFor="wechat-app-secret">appSecret</Label>
               <Input
+                id="wechat-app-secret"
                 type="password"
                 value={form.secret}
                 onChange={(e) => setForm({ ...form, secret: e.target.value })}
+                autoComplete="new-password"
                 required
               />
             </div>
@@ -273,83 +358,82 @@ export default function WechatPage() {
             <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
               取消
             </Button>
-            <Button type="submit" form="wechat-create">
-              登记
+            <Button type="submit" form="wechat-create" disabled={!availableBusinesses.length}>
+              添加
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={secretOpen} onOpenChange={setSecretOpen}>
+      <Dialog open={!!editing} onOpenChange={(open) => !open && !busy && setEditing(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>轮换 secret</DialogTitle>
-            <DialogDescription>
-              {secretTarget ? (
-                <>
-                  {secretTarget.name}{' '}
-                  <span className="font-mono text-xs">({secretTarget.code})</span>
-                </>
-              ) : null}
-            </DialogDescription>
+            <DialogTitle>编辑微信小程序</DialogTitle>
+            <DialogDescription>appSecret 留空则保持原密钥，列表不会显示密钥</DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label>新 appSecret</Label>
-            <Input
-              type="password"
-              value={newSecret}
-              onChange={(e) => setNewSecret(e.target.value)}
-              placeholder="输入新的微信小程序密钥"
+          <form id="wechat-edit" className="space-y-4" onSubmit={saveEdit}>
+            <SelectField
+              label="业务"
+              value={editForm.businessId}
+              onChange={(businessId) => setEditForm({ ...editForm, businessId })}
+              options={[
+                ...(editForm.businessId === UNSELECTED
+                  ? [{ value: UNSELECTED, label: '选择业务' }]
+                  : []),
+                ...editBusinesses.map((business) => ({
+                  value: business.id,
+                  label: `${business.name}（${business.code}）`,
+                })),
+              ]}
             />
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setSecretOpen(false)}>
-              取消
-            </Button>
-            <Button onClick={rotateSecret}>更新</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={qrcodeOpen} onOpenChange={setQrcodeOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>生成小程序码</DialogTitle>
-            <DialogDescription>生成后自动下载 PNG 文件</DialogDescription>
-          </DialogHeader>
-          <form id="qrcode-form" className="space-y-4" onSubmit={downloadQrcode}>
             <div className="space-y-2">
-              <Label>小程序 code</Label>
+              <Label htmlFor="wechat-edit-app-id">appId</Label>
               <Input
-                value={qrcode.code}
-                onChange={(e) => setQrcode({ ...qrcode, code: e.target.value })}
-                placeholder={items[0]?.code || 'mall'}
+                id="wechat-edit-app-id"
+                value={editForm.appId}
+                onChange={(e) => setEditForm({ ...editForm, appId: e.target.value })}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label>scene</Label>
+              <Label htmlFor="wechat-edit-app-secret">appSecret</Label>
               <Input
-                value={qrcode.scene}
-                onChange={(e) => setQrcode({ ...qrcode, scene: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>page（可选）</Label>
-              <Input
-                value={qrcode.page}
-                onChange={(e) => setQrcode({ ...qrcode, page: e.target.value })}
-                placeholder="pages/index/index"
+                id="wechat-edit-app-secret"
+                type="password"
+                value={editForm.secret}
+                onChange={(e) => setEditForm({ ...editForm, secret: e.target.value })}
+                placeholder="留空则不修改"
+                autoComplete="new-password"
               />
             </div>
           </form>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setQrcodeOpen(false)}>
+            <Button type="button" variant="outline" disabled={busy} onClick={() => setEditing(null)}>
               取消
             </Button>
-            <Button type="submit" form="qrcode-form">
-              下载 PNG
+            <Button type="submit" form="wechat-edit" disabled={busy || !editBusinesses.length}>
+              保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleting} onOpenChange={(open) => !open && !busy && setDeleting(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除这条记录？</DialogTitle>
+            <DialogDescription>
+              {deleting
+                ? `将删除 ${deleting.businessName}（${deleting.appCode}）的微信配置`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={busy} onClick={() => setDeleting(null)}>
+              取消
+            </Button>
+            <Button variant="destructive" disabled={busy} onClick={confirmDelete}>
+              删除
             </Button>
           </DialogFooter>
         </DialogContent>

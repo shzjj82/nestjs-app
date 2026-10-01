@@ -99,6 +99,17 @@ export class MiniProgramsService {
     return this.toInfo(await this.programs.save(row));
   }
 
+  async remove(payload: Record<string, unknown>): Promise<{ id: string }> {
+    const row = await this.programs.findOne({
+      where: { id: requiredString(payload.id, 'id') },
+    });
+    if (!row) {
+      rpcFail(404, `小程序 ${String(payload.id)} 不存在`);
+    }
+    await this.programs.delete({ id: row.id });
+    return { id: row.id };
+  }
+
   toInfo(row: MiniProgramEntity): WechatMiniProgram {
     return {
       id: row.id,

@@ -116,6 +116,7 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   platform({ method: 'GET', path: '/wechat/miniprograms', client: WECHAT_CLIENT, pattern: MQTT_PATTERNS.WECHAT_MP_FIND_ALL, permissions: [PERMISSIONS.WECHAT_MANAGE] }),
   platform({ method: 'POST', path: '/wechat/miniprograms', client: WECHAT_CLIENT, pattern: MQTT_PATTERNS.WECHAT_MP_CREATE, permissions: [PERMISSIONS.WECHAT_MANAGE] }),
   platform({ method: 'PATCH', path: '/wechat/miniprograms/:id', client: WECHAT_CLIENT, pattern: MQTT_PATTERNS.WECHAT_MP_UPDATE, permissions: [PERMISSIONS.WECHAT_MANAGE] }),
+  platform({ method: 'DELETE', path: '/wechat/miniprograms/:id', client: WECHAT_CLIENT, pattern: MQTT_PATTERNS.WECHAT_MP_DELETE, permissions: [PERMISSIONS.WECHAT_MANAGE] }),
   platform({ method: 'POST', path: '/wechat/qrcode', client: WECHAT_CLIENT, pattern: MQTT_PATTERNS.WECHAT_QRCODE, permissions: [PERMISSIONS.WECHAT_QRCODE], override: true }),
   business({ method: 'POST', path: '/wechat/phone', client: WECHAT_CLIENT, pattern: MQTT_PATTERNS.WECHAT_PHONE, auth: ['jwt'] }),
 

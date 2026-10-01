@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Attention, CheckOne } from '@icon-park/react';
+import { CircleAlert, CircleCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -299,9 +299,9 @@ export function BusinessModulesSheet({
               }
             >
               {confirming === 'close' ? (
-                <Attention theme="outline" size={24} fill="currentColor" />
+                <CircleAlert className="size-6" />
               ) : (
-                <CheckOne theme="outline" size={24} fill="currentColor" />
+                <CircleCheck className="size-6" />
               )}
             </div>
             <DialogTitle>{confirming === 'open' ? '确认开通这些接口？' : '确认取消开通？'}</DialogTitle>

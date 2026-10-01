@@ -125,6 +125,9 @@ describe('matchRoute', () => {
     expect(matchRoute('GET', '/wechat/miniprograms')?.permissions).toEqual([
       'wechat.manage',
     ]);
+    expect(matchRoute('DELETE', '/wechat/miniprograms/mp-1')?.pattern).toBe(
+      'wechat.mp.delete',
+    );
     expect(matchRoute('POST', '/wechat/qrcode')?.override).toBe(true);
     expect(matchRoute('POST', '/wechat/qrcode')?.permissions).toEqual([
       'wechat.qrcode',

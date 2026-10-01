@@ -23,4 +23,9 @@ export class MiniProgramsController {
   update(payload: Record<string, unknown>) {
     return this.programs.update(payload);
   }
+
+  @MessagePattern(wechatPattern(MQTT_PATTERNS.WECHAT_MP_DELETE))
+  remove(payload: Record<string, unknown>) {
+    return this.programs.remove(payload);
+  }
 }

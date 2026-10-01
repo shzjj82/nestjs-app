@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ApplicationOne } from '@icon-park/react';
-import { Plus } from 'lucide-react';
+import { LayoutGrid, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { DataTable } from '@/components/data-table';
@@ -235,7 +234,7 @@ export default function BusinessesPage() {
               variant="outline"
               onClick={() => setModulesTarget(business)}
             >
-              <ApplicationOne theme="outline" size={16} fill="currentColor" />
+              <LayoutGrid />
               开通
             </Button>
           );

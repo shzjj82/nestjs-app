@@ -91,6 +91,7 @@ export const MQTT_PATTERNS = {
   WECHAT_MP_FIND_ALL: 'wechat.mp.findAll',
   WECHAT_MP_CREATE: 'wechat.mp.create',
   WECHAT_MP_UPDATE: 'wechat.mp.update',
+  WECHAT_MP_DELETE: 'wechat.mp.delete',
   WECHAT_CODE2SESSION: 'wechat.code2session',
   WECHAT_QRCODE: 'wechat.qrcode',
   WECHAT_PHONE: 'wechat.phone',

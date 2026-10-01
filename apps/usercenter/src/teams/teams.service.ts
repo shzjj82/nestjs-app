@@ -165,6 +165,10 @@ export class TeamsService {
 
   private async assertScope(scope: TeamScope) {
     const business = await this.businesses.requireActiveByCode(scope.bizCode);
+    // 业务 code 本身就是 appCode，不必再登记一条接入端
+    if (scope.appCode === business.code) {
+      return;
+    }
     const client = await this.clients.requireByAppCode(scope.appCode);
     if (client.businessId && client.businessId !== business.id) {
       rpcFail(403, `接入端 ${scope.appCode} 不属于业务 ${scope.bizCode}`);

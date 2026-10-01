@@ -42,7 +42,7 @@ export const CONSOLE_NAV_GROUPS: ConsoleNavGroup[] = [
         href: '/businesses',
         label: '业务管理',
         icon: Building2,
-        keywords: ['business', 'bizCode', 'tenant', '租户', 'appCode', 'client', '接入端', '能力包'],
+        keywords: ['business', 'bizCode', 'tenant', '租户', '能力包'],
       },
     ],
   },
