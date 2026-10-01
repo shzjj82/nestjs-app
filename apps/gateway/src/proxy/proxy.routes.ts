@@ -12,6 +12,8 @@ export const PROXY_HTTP_PATHS: RouteInfo[] = [
   { path: 'accounts/{*path}', method: RequestMethod.ALL },
   { path: 'businesses', method: RequestMethod.ALL },
   { path: 'businesses/{*path}', method: RequestMethod.ALL },
+  { path: 'teams', method: RequestMethod.ALL },
+  { path: 'teams/{*path}', method: RequestMethod.ALL },
   { path: 'clients', method: RequestMethod.ALL },
   { path: 'clients/{*path}', method: RequestMethod.ALL },
   { path: 'docs', method: RequestMethod.ALL },

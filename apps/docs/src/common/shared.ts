@@ -55,6 +55,7 @@ export type DocPost = {
   tags: string[];
   bodyFormat: string;
   authorId: string | null;
+  teamId: string | null;
   body: EditorJsDocument;
   visibility: 'private' | 'public';
   publishedAt: string | null;

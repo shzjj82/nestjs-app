@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { docsDatabaseUrl } from '@app/common';
 import { DOCS_ENTITIES } from '../entities';
+import { DocsTeamId1760000001000 } from './migrations/1760000001000-docs-team-id';
 import { InitDocsSchema1760000000000 } from './migrations/1760000000000-init-docs-schema';
 
 const sync = process.env.TYPEORM_SYNC === 'true';
@@ -14,7 +15,7 @@ const sync = process.env.TYPEORM_SYNC === 'true';
       entities: DOCS_ENTITIES,
       synchronize: sync,
       migrationsRun: !sync,
-      migrations: [InitDocsSchema1760000000000],
+      migrations: [InitDocsSchema1760000000000, DocsTeamId1760000001000],
       logging: process.env.TYPEORM_LOGGING === 'true',
     }),
     TypeOrmModule.forFeature(DOCS_ENTITIES),

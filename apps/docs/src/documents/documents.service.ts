@@ -36,6 +36,7 @@ type WriteInput = {
   body: EditorJsDocument;
   visibility?: DocVisibility;
   authorId?: string | null;
+  teamId?: string | null;
 };
 
 type VisibilityFilter = 'public-only' | 'feed' | 'any';
@@ -55,6 +56,7 @@ const LIST_COLUMNS = [
   'post.props',
   'post.bodyFormat',
   'post.authorId',
+  'post.teamId',
   'post.visibility',
   'post.publishedAt',
   'post.createdAt',
@@ -103,6 +105,7 @@ export class DocumentsService {
       tags: fromProps.length > 0 ? fromProps : row.category ? [row.category] : [],
       bodyFormat: row.bodyFormat || 'editorjs',
       authorId: row.authorId ?? null,
+      teamId: row.teamId ?? null,
       visibility: row.visibility === 'public' ? 'public' : 'private',
       publishedAt: row.publishedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
@@ -133,8 +136,9 @@ export class DocumentsService {
     page?: number;
     pageSize?: number;
     visibilityFilter: VisibilityFilter;
-    /** feed：公开文 + 当前用户自己的私有文 */
+    /** feed：公开文 + 当前用户自己的私有文 + 所在团队的私有文 */
     viewerId?: string;
+    readableTeamIds?: string[];
     treeOrder?: boolean;
     /** 按作者过滤文章 */
     authorId?: string;
@@ -145,13 +149,20 @@ export class DocumentsService {
     qb.andWhere('post.appCode = :appCode', { appCode: opts.appCode });
     if (opts.authorScopedWorkspace && opts.authorId) {
       // authorId 为空的是接多用户前写的旧文，工作区暂时可见，编辑时会认领
-      qb.andWhere(`(post.authorId = :authorId OR post.authorId IS NULL)`, {
-        authorId: opts.authorId,
-      });
+      if (opts.readableTeamIds?.length) {
+        qb.andWhere(
+          `(post.author_id = :authorId OR post.author_id IS NULL OR post.team_id IN (:...readableTeamIds))`,
+          { authorId: opts.authorId, readableTeamIds: opts.readableTeamIds },
+        );
+      } else {
+        qb.andWhere(`(post.author_id = :authorId OR post.author_id IS NULL)`, {
+          authorId: opts.authorId,
+        });
+      }
     } else if (opts.authorId) {
       qb.andWhere('post.authorId = :authorId', { authorId: opts.authorId });
     }
-    this.applyVisibility(qb, opts.visibilityFilter, opts.viewerId);
+    this.applyVisibility(qb, opts.visibilityFilter, opts.viewerId, opts.readableTeamIds);
     if (opts.docKind) {
       qb.andWhere('post.kind = :docKind', { docKind: opts.docKind });
     }
@@ -215,6 +226,7 @@ export class DocumentsService {
   async listWorkspaceTree(
     appCode: string,
     authorId?: string,
+    readableTeamIds?: string[],
   ): Promise<DocPostListItem[]> {
     const { posts } = await this.list({
       appCode,
@@ -222,6 +234,7 @@ export class DocumentsService {
       treeOrder: true,
       authorId,
       authorScopedWorkspace: Boolean(authorId),
+      readableTeamIds,
     });
     return posts;
   }
@@ -234,16 +247,22 @@ export class DocumentsService {
     qb: SelectQueryBuilder<DocumentEntity>,
     filter: VisibilityFilter,
     viewerId?: string,
+    readableTeamIds?: string[],
   ) {
     if (filter === 'any') {
       return;
     }
+    const teamIds = readableTeamIds?.length ? readableTeamIds : [];
     const ownedFeed = filter === 'feed' && !!viewerId;
     if (ownedFeed) {
+      const teamSql = teamIds.length ? ` OR post.team_id IN (:...readableTeamIds)` : '';
       qb.andWhere(
-        `(post.visibility = 'public' OR (post.visibility = 'private' AND post.author_id = :viewerId))`,
-        { viewerId },
+        `(post.visibility = 'public' OR (post.visibility = 'private' AND (post.author_id = :viewerId${teamSql})))`,
+        teamIds.length ? { viewerId, readableTeamIds: teamIds } : { viewerId },
       );
+      const hiddenTeamSql = teamIds.length
+        ? `AND (team_id IS NULL OR team_id NOT IN (:...readableTeamIds))`
+        : '';
       qb.andWhere(
         `post.id NOT IN (
           WITH RECURSIVE under_hidden AS (
@@ -251,6 +270,7 @@ export class DocumentsService {
             WHERE visibility = 'private'
               AND author_id IS DISTINCT FROM :viewerId
               AND app_code = :appCode
+              ${hiddenTeamSql}
             UNION ALL
             SELECT child.id, parent.depth + 1 FROM doc_documents child
             INNER JOIN under_hidden parent ON child.parent_id = parent.id
@@ -258,7 +278,7 @@ export class DocumentsService {
           )
           SELECT id FROM under_hidden
         )`,
-        { viewerId },
+        teamIds.length ? { viewerId, readableTeamIds: teamIds } : { viewerId },
       );
       return;
     }
@@ -282,19 +302,27 @@ export class DocumentsService {
    * 文章仅作者（或尚无 authorId 的旧数据）可改。
    * 无 actorId 时放行：仅服务密钥迁移/运维路径应走到这里；用户 JWT 路径必有 actorId。
    */
-  assertArticleOwner(post: DocPost, actorId: string | undefined): void {
+  assertArticleOwner(
+    post: DocPost,
+    actorId: string | undefined,
+    writableTeamIds?: readonly string[],
+  ): void {
     if (!actorId) {
       return;
     }
-    if (post.authorId && post.authorId !== actorId) {
-      rpcFail(403, 'FORBIDDEN');
+    if (!post.authorId || post.authorId === actorId) {
+      return;
     }
+    if (post.teamId && writableTeamIds?.includes(post.teamId)) {
+      return;
+    }
+    rpcFail(403, 'FORBIDDEN');
   }
 
   async findBySlug(
     appCode: string,
     slug: string,
-    opts: { mode: 'public' | 'feed' | 'any'; viewerId?: string },
+    opts: { mode: 'public' | 'feed' | 'any'; viewerId?: string; readableTeamIds?: string[] },
   ): Promise<DocPost | null> {
     const row = await this.posts.findOne({ where: { appCode, slug } });
     if (!row) {
@@ -311,11 +339,12 @@ export class DocumentsService {
       return post;
     }
     // feed：私有仅本人可见；祖先私有且非本人则不可见
-    const isOwner = Boolean(opts.viewerId && post.authorId === opts.viewerId);
-    if (post.visibility === 'private' && !isOwner) {
+    const inTeam = Boolean(post.teamId && opts.readableTeamIds?.includes(post.teamId));
+    const visible = Boolean(opts.viewerId && post.authorId === opts.viewerId) || inTeam;
+    if (post.visibility === 'private' && !visible) {
       return null;
     }
-    if (await this.hasPrivateAncestor(post.id, opts.viewerId)) {
+    if (await this.hasPrivateAncestor(post.id, opts.viewerId, opts.readableTeamIds)) {
       return null;
     }
     return post;
@@ -405,6 +434,7 @@ export class DocumentsService {
         bodyFormat: 'editorjs',
         body: input.body as unknown as Record<string, unknown>,
         authorId: input.authorId ?? null,
+        teamId: input.teamId ?? null,
         visibility,
         publishedAt: visibility === 'public' ? now : null,
         createdAt: now,
@@ -418,12 +448,16 @@ export class DocumentsService {
     return created;
   }
 
-  async update(id: string, input: WriteInput): Promise<DocPost | null> {
+  async update(
+    id: string,
+    input: WriteInput,
+    writableTeamIds?: readonly string[],
+  ): Promise<DocPost | null> {
     const existing = await this.findById(id);
     if (!existing) {
       return null;
     }
-    this.assertArticleOwner(existing, input.authorId ?? undefined);
+    this.assertArticleOwner(existing, input.authorId ?? undefined, writableTeamIds);
     // 旧文无作者时，首次由当前用户认领
     if (!existing.authorId && input.authorId) {
       existing.authorId = input.authorId;
@@ -488,7 +522,8 @@ export class DocumentsService {
         coverUrl: input.coverUrl,
         props: props as never,
         body: input.body as never,
-        authorId: input.authorId ?? existing.authorId,
+        authorId: existing.authorId ?? input.authorId ?? null,
+        ...(input.teamId !== undefined ? { teamId: input.teamId } : {}),
         visibility,
         publishedAt,
         updatedAt: now,
@@ -497,13 +532,17 @@ export class DocumentsService {
     return this.findById(id);
   }
 
-  async createLinkedChild(parentId: string, authorId?: string) {
+  async createLinkedChild(
+    parentId: string,
+    authorId?: string,
+    writableTeamIds?: readonly string[],
+  ) {
     return this.dataSource.transaction(async () => {
       const parent = await this.findById(parentId);
       if (!parent) {
         rpcFail(400, 'INVALID_PARENT');
       }
-      this.assertArticleOwner(parent, authorId);
+      this.assertArticleOwner(parent, authorId, writableTeamIds);
       const child = await this.create({
         appCode: parent.appCode,
         title: '无标题',
@@ -515,6 +554,7 @@ export class DocumentsService {
         body: starterArticleDocument(),
         visibility: 'public',
         authorId: authorId ?? parent.authorId ?? null,
+        teamId: parent.teamId,
       });
       const nextParent = await this.appendPageLink(parentId, child);
       if (!nextParent) {
@@ -524,17 +564,22 @@ export class DocumentsService {
     });
   }
 
-  async reparent(childId: string, newParentId: string | null, actorId?: string) {
+  async reparent(
+    childId: string,
+    newParentId: string | null,
+    actorId?: string,
+    writableTeamIds?: readonly string[],
+  ) {
     return this.dataSource.transaction(async () => {
       const child = await this.findById(childId);
       if (!child) {
         rpcFail(404, 'NOT_FOUND');
       }
-      this.assertArticleOwner(child, actorId);
+      this.assertArticleOwner(child, actorId, writableTeamIds);
       if (newParentId) {
         const parent = await this.findById(newParentId);
         if (parent) {
-          this.assertArticleOwner(parent, actorId);
+          this.assertArticleOwner(parent, actorId, writableTeamIds);
         }
       }
       const resolvedParentId = await this.resolveParent(child.appCode, newParentId);
@@ -588,13 +633,17 @@ export class DocumentsService {
     });
   }
 
-  async remove(id: string, actorId?: string): Promise<boolean> {
+  async remove(
+    id: string,
+    actorId?: string,
+    writableTeamIds?: readonly string[],
+  ): Promise<boolean> {
     return this.dataSource.transaction(async () => {
       const existing = await this.findById(id);
       if (!existing) {
         return false;
       }
-      this.assertArticleOwner(existing, actorId);
+      this.assertArticleOwner(existing, actorId, writableTeamIds);
       const ids = await this.collectSubtree(id);
       if (existing.parentId) {
         await this.stripPageLink(existing.parentId, id);
@@ -745,20 +794,20 @@ export class DocumentsService {
   }
 
   private async ancestorChain(postId: string): Promise<
-    Array<{ id: string; visibility: string; authorId: string | null }>
+    Array<{ id: string; visibility: string; authorId: string | null; teamId: string | null }>
   > {
     return this.posts.query(
       `WITH RECURSIVE chain AS (
-         SELECT id, parent_id, visibility, author_id, 1 AS depth
+         SELECT id, parent_id, visibility, author_id, team_id, 1 AS depth
          FROM doc_documents
          WHERE id = (SELECT parent_id FROM doc_documents WHERE id = $1)
          UNION ALL
-         SELECT parent.id, parent.parent_id, parent.visibility, parent.author_id, chain.depth + 1
+         SELECT parent.id, parent.parent_id, parent.visibility, parent.author_id, parent.team_id, chain.depth + 1
          FROM doc_documents parent
          INNER JOIN chain ON parent.id = chain.parent_id
          WHERE chain.depth < 64
        )
-       SELECT id, visibility, author_id AS "authorId"
+       SELECT id, visibility, author_id AS "authorId", team_id AS "teamId"
        FROM chain
        WHERE id IS NOT NULL
        ORDER BY depth ASC`,
@@ -771,11 +820,18 @@ export class DocumentsService {
    * 无 viewerId：任意 private 祖先即不可见。
    * 有 viewerId：仅「private 且非本人」的祖先才阻断。
    */
-  private async hasPrivateAncestor(postId: string, viewerId?: string) {
+  private async hasPrivateAncestor(
+    postId: string,
+    viewerId?: string,
+    readableTeamIds?: readonly string[],
+  ) {
     const chain = await this.ancestorChain(postId);
+    const teams = new Set(readableTeamIds ?? []);
     return chain.some(
       (node) =>
-        node.visibility === 'private' && (!viewerId || node.authorId !== viewerId),
+        node.visibility === 'private' &&
+        (!viewerId || node.authorId !== viewerId) &&
+        !(node.teamId && teams.has(node.teamId)),
     );
   }
 }

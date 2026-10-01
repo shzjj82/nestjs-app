@@ -7,6 +7,7 @@ import { DatabaseModule } from './database/database.module';
 import { RbacModule } from './rbac/rbac.module';
 import { UsercenterController } from './usercenter.controller';
 import { UsercenterService } from './usercenter.service';
+import { TeamsModule } from './teams/teams.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -18,6 +19,7 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     AuthModule,
     RbacModule,
+    TeamsModule,
     ApiDocsModule.forService({
       service: 'usercenter',
       label: '用户模块',

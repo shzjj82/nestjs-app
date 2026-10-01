@@ -73,6 +73,11 @@ export class DocumentEntity {
   @Column({ name: 'author_id', type: 'uuid', nullable: true })
   authorId!: string | null;
 
+  /** 所属团队；空表示不按团队共享 */
+  @Index()
+  @Column({ name: 'team_id', type: 'uuid', nullable: true })
+  teamId!: string | null;
+
   /** private | public */
   @Index()
   @Column({ type: 'varchar', length: 16, default: 'private' })

@@ -87,6 +87,13 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   platform({ method: 'PATCH', path: '/permissions/:id', client: USER_CLIENT, pattern: MQTT_PATTERNS.PERMISSION_UPDATE, permissions: [PERMISSIONS.PERMISSION_MANAGE] }),
   platform({ method: 'DELETE', path: '/permissions/:id', client: USER_CLIENT, pattern: MQTT_PATTERNS.PERMISSION_DELETE, permissions: [PERMISSIONS.PERMISSION_MANAGE] }),
 
+  business({ method: 'GET', path: '/teams', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_FIND_ALL, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/teams', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_CREATE, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/teams/:id', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_FIND_ONE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/teams/:id/join', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_JOIN, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/teams/:id/leave', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_LEAVE, auth: ['jwt'] }),
+  business({ method: 'PATCH', path: '/teams/:id/members/:accountId', client: USER_CLIENT, pattern: MQTT_PATTERNS.TEAM_MEMBER_UPDATE, auth: ['jwt'] }),
+
   business({ method: 'GET', path: '/orders', client: ORDER_CLIENT, pattern: MQTT_PATTERNS.ORDER_FIND_ALL }),
   business({ method: 'GET', path: '/orders/:id', client: ORDER_CLIENT, pattern: MQTT_PATTERNS.ORDER_FIND_ONE }),
   business({ method: 'POST', path: '/orders', client: ORDER_CLIENT, pattern: MQTT_PATTERNS.ORDER_CREATE, override: true }),

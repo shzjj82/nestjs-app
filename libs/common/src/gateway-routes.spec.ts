@@ -82,6 +82,15 @@ describe('matchRoute', () => {
     expect(matchRoute('PUT', '/docs/categories/abc')?.auth).toEqual(['jwt', 'docs-key']);
   });
 
+  it('registers team routes for the signed-in account', () => {
+    expect(matchRoute('POST', '/teams')?.pattern).toBe(MQTT_PATTERNS.TEAM_CREATE);
+    expect(matchRoute('POST', '/teams/team-1/join')?.pattern).toBe(MQTT_PATTERNS.TEAM_JOIN);
+    expect(matchRoute('PATCH', '/teams/team-1/members/acc-1')?.params).toEqual({
+      id: 'team-1',
+      accountId: 'acc-1',
+    });
+  });
+
   it('protects upload writes with upload-key and marks file posts as override', () => {
     expect(matchRoute('POST', '/upload')?.override).toBe(true);
     expect(matchRoute('POST', '/upload')?.auth).toEqual(['jwt', 'upload-key']);

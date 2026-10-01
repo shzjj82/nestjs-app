@@ -141,6 +141,27 @@ export interface BindPhoneDto {
   phone: string;
 }
 
+export type TeamRole = 'owner' | 'developer' | 'user';
+
+export interface TeamInfo {
+  id: string;
+  appCode: string;
+  bizCode: string;
+  name: string;
+  description: string | null;
+  role: TeamRole;
+  createdAt: string;
+}
+
+export interface TeamMemberInfo {
+  id: string;
+  accountId: string;
+  accountType: string;
+  identifier: string;
+  role: TeamRole;
+  createdAt: string;
+}
+
 export interface ClientInfo {
   id: string;
   appCode: string;

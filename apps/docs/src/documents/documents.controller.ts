@@ -17,6 +17,7 @@ import {
   type DocKind,
 } from '../common/shared';
 import { DocumentsService } from './documents.service';
+import { TeamAccess } from './team-access';
 import {
   isTreeView,
   parseVisibility,
@@ -27,7 +28,10 @@ import {
 @Controller()
 @UseInterceptors(DocsHandleLogInterceptor)
 export class DocumentsController {
-  constructor(private readonly posts: DocumentsService) {}
+  constructor(
+    private readonly posts: DocumentsService,
+    private readonly teamAccess: TeamAccess,
+  ) {}
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_FIND_ALL))
   @ApiDoc({ name: '文档列表', description: 'scope 支持 public / feed / mine / all' })
@@ -43,7 +47,12 @@ export class DocumentsController {
       if (!sessionAuthorId) {
         rpcFail(401, 'UNAUTHORIZED');
       }
-      const posts = await this.posts.listWorkspaceTree(appCode, sessionAuthorId);
+      const grants = await this.grants(payload);
+      const posts = await this.posts.listWorkspaceTree(
+        appCode,
+        sessionAuthorId,
+        grants.readable,
+      );
       return { posts, total: posts.length };
     }
 
@@ -60,9 +69,11 @@ export class DocumentsController {
     }
 
     if (scope === 'feed') {
+      const grants = await this.grants(payload);
       return this.listPage(payload, appCode, {
         visibilityFilter: 'feed',
         viewerId: sessionAuthorId,
+        readableTeamIds: grants.readable,
         authorId: optionalString(payload.authorId),
       });
     }
@@ -79,9 +90,11 @@ export class DocumentsController {
   async findId(payload: Record<string, unknown>) {
     const post = await this.requireInBiz(payload);
     const actorId = sessionUserId(payload);
-    // 私有文：非作者不可读；公开文工作区按 id：非作者也不可读
+    const grants = await this.grants(payload);
+    const inTeam = Boolean(post.teamId && grants.readable.includes(post.teamId));
+    // 私有文：作者或团队成员可读；公开文工作区按 id：非作者也不可读
     if (post.visibility === 'private') {
-      if (!actorId || (post.authorId && post.authorId !== actorId)) {
+      if (!actorId || (post.authorId && post.authorId !== actorId && !inTeam)) {
         rpcFail(403, 'FORBIDDEN');
       }
     } else if (actorId && post.authorId && post.authorId !== actorId) {
@@ -98,6 +111,9 @@ export class DocumentsController {
   async findSlug(payload: Record<string, unknown>) {
     const privileged = payload._docsPrivileged === true;
     const sessionAuthorId = sessionUserId(payload);
+    const grants = sessionAuthorId
+      ? await this.grants(payload)
+      : { readable: [] as string[], writable: [] as string[] };
     const forceAny = privileged && payload.mode === 'any';
     const mode: 'public' | 'feed' | 'any' = forceAny
       ? 'any'
@@ -109,7 +125,7 @@ export class DocumentsController {
     const post = await this.posts.findBySlug(
       appCode,
       requiredString(payload.slug, 'slug'),
-      { mode, viewerId: sessionAuthorId },
+      { mode, viewerId: sessionAuthorId, readableTeamIds: grants.readable },
     );
     if (!post) {
       rpcFail(404, 'NOT_FOUND');
@@ -123,6 +139,7 @@ export class DocumentsController {
       parentId: post.parentId ?? null,
       visibilityFilter,
       viewerId: sessionAuthorId,
+      readableTeamIds: grants.readable,
       treeOrder: true,
     });
     const { posts: children } = await this.posts.list({
@@ -131,6 +148,7 @@ export class DocumentsController {
       parentId: post.id,
       visibilityFilter,
       viewerId: sessionAuthorId,
+      readableTeamIds: grants.readable,
       treeOrder: true,
     });
     return {
@@ -146,16 +164,23 @@ export class DocumentsController {
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_CREATE))
   @ApiDoc({ name: '创建文档' })
   async create(payload: Record<string, unknown>) {
-    return { post: await this.posts.create(this.parseWrite(payload)) };
+    const input = this.parseWrite(payload);
+    const grants = await this.grants(payload);
+    this.assertAssignableTeam(payload, input.teamId, grants.writable);
+    return { post: await this.posts.create(input) };
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_UPDATE))
   @ApiDoc({ name: '更新文档' })
   async update(payload: Record<string, unknown>) {
     await this.requireInBiz(payload);
+    const input = this.parseWrite(payload);
+    const grants = await this.grants(payload);
+    this.assertAssignableTeam(payload, input.teamId, grants.writable);
     const post = await this.posts.update(
       requiredString(payload.id, 'id'),
-      this.parseWrite(payload),
+      input,
+      grants.writable,
     );
     if (!post) {
       rpcFail(404, 'NOT_FOUND');
@@ -167,7 +192,14 @@ export class DocumentsController {
   @ApiDoc({ name: '删除文档' })
   async remove(payload: Record<string, unknown>) {
     await this.requireInBiz(payload);
-    if (!(await this.posts.remove(requiredString(payload.id, 'id'), sessionUserId(payload)))) {
+    const grants = await this.grants(payload);
+    if (
+      !(await this.posts.remove(
+        requiredString(payload.id, 'id'),
+        sessionUserId(payload),
+        grants.writable,
+      ))
+    ) {
       rpcFail(404, 'NOT_FOUND');
     }
     return null;
@@ -177,9 +209,11 @@ export class DocumentsController {
   @ApiDoc({ name: '创建子文档' })
   async createChild(payload: Record<string, unknown>) {
     await this.requireInBiz(payload);
+    const grants = await this.grants(payload);
     return this.posts.createLinkedChild(
       requiredString(payload.id, 'id'),
       sessionUserId(payload),
+      grants.writable,
     );
   }
 
@@ -187,12 +221,14 @@ export class DocumentsController {
   @ApiDoc({ name: '移动文档', description: '调整父文档与排序' })
   async reparent(payload: Record<string, unknown>) {
     await this.requireInBiz(payload);
+    const grants = await this.grants(payload);
     const raw = payload.parentId;
     const parentId = raw === undefined || raw === null ? null : String(raw);
     return this.posts.reparent(
       requiredString(payload.id, 'id'),
       parentId,
       sessionUserId(payload),
+      grants.writable,
     );
   }
 
@@ -211,6 +247,7 @@ export class DocumentsController {
     opts: {
       visibilityFilter: 'public-only' | 'feed' | 'any';
       viewerId?: string;
+      readableTeamIds?: string[];
       authorId?: string;
     },
   ) {
@@ -230,6 +267,7 @@ export class DocumentsController {
       pageSize: Number(payload.pageSize) || undefined,
       visibilityFilter: opts.visibilityFilter,
       viewerId: opts.viewerId,
+      readableTeamIds: opts.readableTeamIds,
       treeOrder: Boolean(docKind || parentId !== undefined),
       authorId: opts.authorId,
     });
@@ -257,6 +295,7 @@ export class DocumentsController {
     body: EditorJsDocument;
     visibility: DocVisibility;
     authorId?: string | null;
+    teamId?: string | null;
   } {
     const title = requiredString(payload.title, 'title');
     const body = payload.body;
@@ -286,11 +325,67 @@ export class DocumentsController {
       body,
       visibility: parseVisibility(payload.visibility, 'private'),
       authorId: sessionUserId(payload),
+      teamId: parseTeamId(payload.teamId),
     };
+  }
+
+  private async grants(payload: Record<string, unknown>) {
+    const accountId = sessionAccountId(payload);
+    const appCode = sessionAppCode(payload);
+    if (!accountId || !appCode) {
+      return { readable: [] as string[], writable: [] as string[] };
+    }
+    const items = await this.teamAccess.grants({
+      accountId,
+      appCode,
+      bizCode: resolveAppCode(payload),
+    });
+    return {
+      readable: items.map((item) => item.teamId),
+      writable: items
+        .filter((item) => item.role === 'owner' || item.role === 'developer')
+        .map((item) => item.teamId),
+    };
+  }
+
+  /** 登录用户把文档挂到团队时，必须是该团队的拥有者或开发者。服务密钥不带账户时放行。 */
+  private assertAssignableTeam(
+    payload: Record<string, unknown>,
+    teamId: string | null | undefined,
+    writable: string[],
+  ) {
+    if (!teamId || !sessionAccountId(payload)) {
+      return;
+    }
+    if (!writable.includes(teamId)) {
+      rpcFail(403, 'FORBIDDEN');
+    }
   }
 }
 
 function sessionUserId(payload: Record<string, unknown>): string | undefined {
   const session = asRecord(payload._session);
   return optionalString(session.userId) ?? optionalString(payload.authorId);
+}
+
+function sessionAccountId(payload: Record<string, unknown>): string | undefined {
+  return optionalString(asRecord(payload._session).accountId);
+}
+
+function sessionAppCode(payload: Record<string, unknown>): string | undefined {
+  return optionalString(asRecord(payload._session).appId);
+}
+
+function parseTeamId(raw: unknown): string | null | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (raw === null || raw === '') {
+    return null;
+  }
+  const value = String(raw).trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+    rpcFail(400, 'teamId 无效');
+  }
+  return value;
 }
