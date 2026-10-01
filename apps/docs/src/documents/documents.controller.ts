@@ -338,7 +338,7 @@ export class DocumentsController {
     const items = await this.teamAccess.grants({
       accountId,
       appCode,
-      bizCode: resolveAppCode(payload),
+      bizCode: optionalString(payload._bizCode) ?? appCode,
     });
     return {
       readable: items.map((item) => item.teamId),
@@ -374,7 +374,7 @@ function sessionAccountId(payload: Record<string, unknown>): string | undefined 
 }
 
 function sessionAppCode(payload: Record<string, unknown>): string | undefined {
-  return optionalString(asRecord(payload._session).appId);
+  return optionalString(payload._appCode) ?? optionalString(asRecord(payload._session).appId);
 }
 
 function parseTeamId(raw: unknown): string | null | undefined {

@@ -63,7 +63,7 @@ export class TeamsController {
   private scope(payload: Record<string, unknown>): TeamScope {
     const session = asRecord(payload._session);
     const accountId = optionalString(session.accountId);
-    const appCode = optionalString(session.appId);
+    const appCode = optionalString(payload._appCode) ?? optionalString(session.appId);
     const bizCode = optionalString(payload._bizCode);
     if (!accountId) {
       rpcFail(401, '需要登录账户');

@@ -224,6 +224,7 @@ export class TeamsService {
       description: team.description,
       role,
       createdAt: team.createdAt.toISOString(),
+      updatedAt: team.updatedAt.toISOString(),
     };
   }
 

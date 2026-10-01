@@ -1,11 +1,11 @@
 import { RpcException } from '@nestjs/microservices';
-import { parseChatInput } from './chat-input';
+import { parseChatInput } from '../../src/chat/chat-input';
 import {
   buildHistoryMessages,
   contextAppendix,
   describeAttachments,
   normalizeMessages,
-} from './chat-messages';
+} from '../../src/chat/chat-messages';
 
 describe('normalizeMessages', () => {
   it('keeps the last 24 non-empty user/assistant turns', () => {

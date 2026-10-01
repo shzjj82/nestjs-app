@@ -150,6 +150,7 @@ export interface TeamInfo {
   description: string | null;
   role: TeamRole;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface TeamMemberInfo {

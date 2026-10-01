@@ -1,5 +1,5 @@
 import { RpcException } from '@nestjs/microservices';
-import { ChatService } from './chat.service';
+import { ChatService } from '../../src/chat/chat.service';
 
 describe('ChatService', () => {
   const originalKey = process.env.AI_API_KEY;

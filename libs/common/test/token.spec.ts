@@ -1,4 +1,4 @@
-import { TokenStore } from './token';
+import { TokenStore } from '../src/token';
 
 function createMemoryRedis() {
   const values = new Map<string, string>();

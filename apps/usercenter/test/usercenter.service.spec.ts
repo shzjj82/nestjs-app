@@ -1,4 +1,4 @@
-import { UsercenterService } from './usercenter.service';
+import { UsercenterService } from '../src/usercenter.service';
 
 describe('UsercenterService', () => {
   it('returns health', () => {

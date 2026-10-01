@@ -38,7 +38,8 @@ export function requestPathname(req: { path?: string; url: string }): string {
 }
 
 /**
- * 业务 code 只认网关校验后的 _bizCode；前端传入的 appCode / _bizCode 一律丢弃。
+ * 业务 code 只认网关校验后的 _bizCode。
+ * appCode 只认请求头 X-App-Code 注入的 _appCode；查询参数和 body 里的 appCode 一律丢弃。
  */
 export function buildProxyPayload(
   req: { query?: unknown; body?: unknown },
@@ -46,6 +47,7 @@ export function buildProxyPayload(
   session?: AuthSession | null,
   token?: string | null,
   bizCode?: string | null,
+  appCode?: string | null,
 ) {
   const query = (req.query ?? {}) as Record<string, unknown>;
   const body =
@@ -57,6 +59,7 @@ export function buildProxyPayload(
     _session: _ignoredSession,
     _token: _ignoredToken,
     _bizCode: _ignoredBizCode,
+    _appCode: _ignoredAppCodeField,
     _docsPrivileged: _ignoredPrivileged,
     appCode: _ignoredAppCode,
     ...rest
@@ -67,6 +70,16 @@ export function buildProxyPayload(
     _session: session ?? null,
     _token: token ?? null,
     _bizCode: bizCode ?? null,
+    _appCode: appCode ?? null,
     _docsPrivileged: false,
   };
+}
+
+export const APP_CODE_HEADER = 'x-app-code';
+
+/** 应用 code 只从请求头 X-App-Code 读取 */
+export function requestAppCode(req: { headers?: Record<string, unknown> }): string | null {
+  const raw = req.headers?.[APP_CODE_HEADER];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }

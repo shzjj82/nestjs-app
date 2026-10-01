@@ -1,5 +1,5 @@
-import { auditBillBalance, reconcileOcrBillDraft } from './audit'
-import { finalizeOcrBillDraft } from './schema'
+import { auditBillBalance, reconcileOcrBillDraft } from '../src/audit'
+import { finalizeOcrBillDraft } from '../src/schema'
 
 describe('auditBillBalance', () => {
   it('keeps itemDiscount and dedupes orderDiscount when strikethrough is double-counted', () => {

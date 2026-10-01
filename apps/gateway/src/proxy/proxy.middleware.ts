@@ -4,7 +4,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { AuthService } from '../auth/auth.service';
 import { BizGuard } from '../auth/biz.guard';
 import { ClientHub } from '../mqtt/client.hub';
-import { buildProxyPayload, LOCAL_PATHS, requestPathname } from './proxy.routes';
+import { buildProxyPayload, LOCAL_PATHS, requestAppCode, requestPathname } from './proxy.routes';
 
 @Injectable()
 export class ProxyMiddleware implements NestMiddleware {
@@ -48,6 +48,7 @@ export class ProxyMiddleware implements NestMiddleware {
         }
       }
       const bizCode = await this.biz.check(route, req, user);
+      const appCode = requestAppCode(req) ?? user?.appId ?? null;
       this.logger.log(`${req.method} ${pathname} -> ${route.pattern} [${bizCode ?? '-'}]`);
       const payload = buildProxyPayload(
         req,
@@ -69,6 +70,7 @@ export class ProxyMiddleware implements NestMiddleware {
           : null,
         this.auth.bearerToken(req) ?? user?.token,
         bizCode,
+        appCode,
       );
       payload._docsPrivileged = this.auth.hasValidDocsKey(req);
       const result = await this.clients.send(

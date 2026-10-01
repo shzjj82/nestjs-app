@@ -1,4 +1,4 @@
-import { mergeBusinessRbac } from './rbac-merge';
+import { mergeBusinessRbac } from '../../src/rbac/rbac-merge';
 
 describe('mergeBusinessRbac', () => {
   it('keeps platform role permissions regardless of capability', () => {

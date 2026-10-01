@@ -1,5 +1,5 @@
-import { bizPrefix, keyInBiz, requireBizCode } from './biz-scope';
-import { objectKey } from './object-key';
+import { bizPrefix, keyInBiz, requireBizCode } from '../../src/common/biz-scope';
+import { objectKey } from '../../src/common/object-key';
 
 describe('biz-scope', () => {
   it('prefixes object keys with the business code', () => {

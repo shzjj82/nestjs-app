@@ -1,5 +1,5 @@
-import type { BillDraft } from './schema'
-import { allocateByWeight, splitBill } from './split'
+import type { BillDraft } from '../src/schema'
+import { allocateByWeight, splitBill } from '../src/split'
 
 function sumBy<T>(items: T[], pick: (item: T) => number): number {
   let total = 0

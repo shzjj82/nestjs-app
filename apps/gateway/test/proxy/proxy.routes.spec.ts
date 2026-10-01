@@ -1,16 +1,18 @@
-import { buildProxyPayload } from './proxy.routes';
+import { buildProxyPayload } from '../../src/proxy/proxy.routes';
 
 describe('buildProxyPayload', () => {
   it('drops client supplied appCode and _bizCode in favour of the verified code', () => {
     const payload = buildProxyPayload(
-      { query: { appCode: 'wiki', _bizCode: 'wiki' }, body: { title: 't' } },
+      { query: { appCode: 'wiki', _bizCode: 'wiki', _appCode: 'forged' }, body: { title: 't' } },
       { id: '1' },
       null,
       null,
       'blog',
+      'editor',
     );
     expect(payload).not.toHaveProperty('appCode');
     expect(payload._bizCode).toBe('blog');
+    expect(payload._appCode).toBe('editor');
     expect(payload).toMatchObject({ title: 't', id: '1' });
   });
 

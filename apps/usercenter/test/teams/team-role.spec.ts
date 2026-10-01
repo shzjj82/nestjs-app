@@ -1,4 +1,4 @@
-import { canManageTeam, canWriteTeamDocs } from './team-role';
+import { canManageTeam, canWriteTeamDocs } from '../../src/teams/team-role';
 
 describe('team role', () => {
   it('lets owner and developer write docs', () => {

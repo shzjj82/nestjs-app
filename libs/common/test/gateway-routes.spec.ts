@@ -1,5 +1,5 @@
-import { matchRoute } from './gateway-routes';
-import { MQTT_PATTERNS } from './patterns';
+import { matchRoute } from '../src/gateway-routes';
+import { MQTT_PATTERNS } from '../src/patterns';
 
 describe('matchRoute', () => {
   it('matches public login route', () => {

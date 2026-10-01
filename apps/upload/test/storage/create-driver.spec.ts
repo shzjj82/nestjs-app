@@ -1,7 +1,7 @@
-import { createStorageDriver } from './create-driver';
-import { CosDriver } from './drivers/cos.driver';
-import { MinioDriver } from './drivers/minio.driver';
-import { OssDriver } from './drivers/oss.driver';
+import { createStorageDriver } from '../../src/storage/create-driver';
+import { CosDriver } from '../../src/storage/drivers/cos.driver';
+import { MinioDriver } from '../../src/storage/drivers/minio.driver';
+import { OssDriver } from '../../src/storage/drivers/oss.driver';
 
 const base = {
   endpoint: 'http://127.0.0.1:9000',

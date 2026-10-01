@@ -1,4 +1,4 @@
-import { finalizeOcrBillDraft, validateBillDraft } from './schema'
+import { finalizeOcrBillDraft, validateBillDraft } from '../src/schema'
 
 describe('validateBillDraft', () => {
   it('accepts a balanced bill', () => {

@@ -15,7 +15,7 @@ async function bootstrap() {
   app.enableCors({
     origin: origins?.length ? origins : true,
     credentials: true,
-    allowedHeaders: ['Authorization', 'Content-Type', 'x-docs-key', 'x-upload-key', 'x-biz-code'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'x-docs-key', 'x-upload-key', 'x-biz-code', 'x-app-code'],
   });
   app.enableShutdownHooks();
 

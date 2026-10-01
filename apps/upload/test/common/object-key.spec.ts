@@ -1,4 +1,4 @@
-import { objectKey } from './object-key';
+import { objectKey } from '../../src/common/object-key';
 
 describe('objectKey', () => {
   it('keeps prefix and file extension', () => {
