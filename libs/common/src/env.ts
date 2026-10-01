@@ -41,6 +41,30 @@ export function wechatDatabaseUrl(): string {
   }
 }
 
+/** order 默认独立库 `order`；可用 ORDER_DATABASE_URL 覆盖 */
+export function orderDatabaseUrl(): string {
+  return namedDatabaseUrl('ORDER_DATABASE_URL', 'order');
+}
+
+/** agents 默认独立库 `agents`；可用 AGENTS_DATABASE_URL 覆盖 */
+export function agentsDatabaseUrl(): string {
+  return namedDatabaseUrl('AGENTS_DATABASE_URL', 'agents');
+}
+
+function namedDatabaseUrl(envName: string, database: string): string {
+  if (process.env[envName]) {
+    return process.env[envName] as string;
+  }
+  const shared = databaseUrl();
+  try {
+    const parsed = new URL(shared);
+    parsed.pathname = `/${database}`;
+    return parsed.toString();
+  } catch {
+    return shared.replace(/\/[^/?]+(\?|$)/, `/${database}$1`);
+  }
+}
+
 /** docs 默认独立库 `docs`；可用 DOCS_DATABASE_URL 覆盖 */
 export function docsDatabaseUrl(): string {
   if (process.env.DOCS_DATABASE_URL) {

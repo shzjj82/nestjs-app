@@ -73,6 +73,15 @@
         "tsConfigPath": "apps/agents/tsconfig.app.json"
       }
     },
+    "bill": {
+      "type": "library",
+      "root": "libs/bill",
+      "entryFile": "index",
+      "sourceRoot": "libs/bill/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/bill/tsconfig.lib.json"
+      }
+    },
     "common": {
       "type": "library",
       "root": "libs/common",

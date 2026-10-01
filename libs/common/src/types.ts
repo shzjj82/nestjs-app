@@ -41,7 +41,7 @@ export interface User {
 
 export interface Order {
   id: string;
-  userId: string;
+  accountId: string | null;
   item: string;
   amount: number;
 }
@@ -56,9 +56,8 @@ export interface CreateUserDto {
 }
 
 export interface CreateOrderDto {
-  userId: string;
-  item: string;
-  amount: number;
+  item?: string;
+  amount?: number;
 }
 
 export interface PageQuery {

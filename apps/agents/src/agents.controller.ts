@@ -1,7 +1,7 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { AgentsHandleLogInterceptor, MQTT_PATTERNS, serviceHealth } from '@app/common';
-import { aiConfigured, aiModel } from './chat/chat-env';
+import { aiConfigured, aiModel, aiVisionModel } from './chat/chat-env';
 import { agentsPattern } from './common/rpc';
 
 @Controller()
@@ -13,6 +13,10 @@ export class AgentsController {
       chat: {
         enabled: aiConfigured(),
         model: aiModel(),
+      },
+      vision: {
+        enabled: aiConfigured(),
+        model: aiVisionModel(),
       },
     });
   }

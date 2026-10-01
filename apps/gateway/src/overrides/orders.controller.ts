@@ -30,8 +30,13 @@ export class OrdersOverrideController {
     @CurrentUser() user: GatewayUser,
   ) {
     const bizCode = await this.biz.checkRequest(req, user);
-    if (!body?.userId || !body?.item?.trim() || body.amount == null) {
-      throw new BadRequestException('userId、item、amount 必填');
+    const items = (body as { items?: unknown }).items;
+    const hasItems = Array.isArray(items) && items.length > 0;
+    if (!user.accountId) {
+      throw new BadRequestException('当前会话没有账户');
+    }
+    if (!body?.item?.trim() && !hasItems) {
+      throw new BadRequestException('item 或 items 必填');
     }
 
     return this.clients.send<ServiceEnvelope<Order>>(
@@ -39,8 +44,12 @@ export class OrdersOverrideController {
       MQTT_PATTERNS.ORDER_CREATE,
       {
         ...body,
-        operatorId: user.id,
         _bizCode: bizCode,
+        _session: {
+          accountId: user.accountId,
+          appId: user.appId,
+          bizCode: user.bizCode ?? bizCode ?? '',
+        },
       },
     );
   }

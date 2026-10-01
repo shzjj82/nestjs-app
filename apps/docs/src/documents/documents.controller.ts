@@ -38,7 +38,7 @@ export class DocumentsController {
   async findAll(payload: Record<string, unknown> = {}) {
     const appCode = resolveAppCode(payload);
     const privileged = payload._docsPrivileged === true;
-    const sessionAuthorId = sessionUserId(payload);
+    const sessionAuthorId = authorAccountId(payload);
     const scope = resolveDocsListScope(payload);
     const tree = isTreeView(payload);
 
@@ -89,7 +89,7 @@ export class DocumentsController {
   @ApiDoc({ name: '按 ID 查看文档', description: '工作区按 id 读取，含祖先链' })
   async findId(payload: Record<string, unknown>) {
     const post = await this.requireInBiz(payload);
-    const actorId = sessionUserId(payload);
+    const actorId = authorAccountId(payload);
     const grants = await this.grants(payload);
     const inTeam = Boolean(post.teamId && grants.readable.includes(post.teamId));
     // 私有文：作者或团队成员可读；公开文工作区按 id：非作者也不可读
@@ -110,7 +110,7 @@ export class DocumentsController {
   @ApiDoc({ name: '文档详情', description: '按 slug 读取已发布文档' })
   async findSlug(payload: Record<string, unknown>) {
     const privileged = payload._docsPrivileged === true;
-    const sessionAuthorId = sessionUserId(payload);
+    const sessionAuthorId = authorAccountId(payload);
     const grants = sessionAuthorId
       ? await this.grants(payload)
       : { readable: [] as string[], writable: [] as string[] };
@@ -196,7 +196,7 @@ export class DocumentsController {
     if (
       !(await this.posts.remove(
         requiredString(payload.id, 'id'),
-        sessionUserId(payload),
+        authorAccountId(payload),
         grants.writable,
       ))
     ) {
@@ -212,7 +212,7 @@ export class DocumentsController {
     const grants = await this.grants(payload);
     return this.posts.createLinkedChild(
       requiredString(payload.id, 'id'),
-      sessionUserId(payload),
+      authorAccountId(payload),
       grants.writable,
     );
   }
@@ -227,7 +227,7 @@ export class DocumentsController {
     return this.posts.reparent(
       requiredString(payload.id, 'id'),
       parentId,
-      sessionUserId(payload),
+      authorAccountId(payload),
       grants.writable,
     );
   }
@@ -324,7 +324,7 @@ export class DocumentsController {
       tags: payload.tags === undefined ? undefined : normalizeTags(payload.tags),
       body,
       visibility: parseVisibility(payload.visibility, 'private'),
-      authorId: sessionUserId(payload),
+      authorId: authorAccountId(payload),
       teamId: parseTeamId(payload.teamId),
     };
   }
@@ -363,9 +363,10 @@ export class DocumentsController {
   }
 }
 
-function sessionUserId(payload: Record<string, unknown>): string | undefined {
+/** 文档的作者、可见范围按登录账户。无会话时才接受调用方显式传入的 authorId（迁移或服务密钥）。 */
+function authorAccountId(payload: Record<string, unknown>): string | undefined {
   const session = asRecord(payload._session);
-  return optionalString(session.userId) ?? optionalString(payload.authorId);
+  return optionalString(session.accountId) ?? optionalString(payload.authorId);
 }
 
 function sessionAccountId(payload: Record<string, unknown>): string | undefined {

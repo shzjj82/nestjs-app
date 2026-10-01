@@ -1,24 +1,11 @@
-import { Controller, Inject } from '@nestjs/common';
-import { ClientProxy, MessagePattern, RpcException } from '@nestjs/microservices';
-import { lastValueFrom, TimeoutError } from 'rxjs';
-import { timeout } from 'rxjs/operators';
-import {
-  ApiDoc,
-  MQTT_GROUPS,
-  MQTT_PATTERNS,
-  sharePattern,
-  USER_CLIENT,
-  unwrapData,
-} from '@app/common';
-import type { CreateOrderDto, ServiceEnvelope, User } from '@app/common';
+import { Controller } from '@nestjs/common';
+import { MessagePattern, RpcException } from '@nestjs/microservices';
+import { ApiDoc, MQTT_GROUPS, MQTT_PATTERNS, sharePattern } from '@app/common';
 import { OrderService } from './order.service';
 
 @Controller()
 export class OrderController {
-  constructor(
-    private readonly orderService: OrderService,
-    @Inject(USER_CLIENT) private readonly userClient: ClientProxy,
-  ) {}
+  constructor(private readonly orderService: OrderService) {}
 
   @MessagePattern(sharePattern(MQTT_GROUPS.ORDER, MQTT_PATTERNS.ORDER_HEALTH))
   health() {
@@ -27,14 +14,14 @@ export class OrderController {
 
   @MessagePattern(sharePattern(MQTT_GROUPS.ORDER, MQTT_PATTERNS.ORDER_FIND_ALL))
   @ApiDoc({ name: '订单列表' })
-  findAll() {
-    return this.orderService.findAll();
+  findAll(payload: unknown) {
+    return this.orderService.findAll(payload);
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.ORDER, MQTT_PATTERNS.ORDER_FIND_ONE))
   @ApiDoc({ name: '订单详情' })
-  findOne(payload: { id: string }) {
-    const order = this.orderService.findOne(payload.id);
+  async findOne(payload: { id: string }) {
+    const order = await this.orderService.findOne(payload);
     if (!order) {
       throw new RpcException({ status: 404, message: `订单 ${payload.id} 不存在` });
     }
@@ -42,37 +29,8 @@ export class OrderController {
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.ORDER, MQTT_PATTERNS.ORDER_CREATE))
-  @ApiDoc({ name: '创建订单', description: '下单前校验用户存在' })
-  async create(payload: CreateOrderDto) {
-    await this.assertUserExists(payload.userId);
+  @ApiDoc({ name: '创建订单', description: '订单归属于当前登录账户' })
+  create(payload: unknown) {
     return this.orderService.create(payload);
-  }
-
-  private async assertUserExists(userId: string) {
-    try {
-      const raw = await lastValueFrom(
-        this.userClient
-          .send<ServiceEnvelope<User> | User>(MQTT_PATTERNS.USER_FIND_ONE, {
-            id: userId,
-          })
-          .pipe(timeout(5000)),
-      );
-      const user = unwrapData<User>(raw);
-      if (!user?.id) {
-        throw new RpcException({ status: 404, message: `用户 ${userId} 不存在` });
-      }
-    } catch (err) {
-      if (err instanceof RpcException) {
-        throw err;
-      }
-      if (err instanceof TimeoutError) {
-        throw new RpcException({ status: 504, message: '校验用户超时' });
-      }
-      const payload = err as { status?: number; message?: string };
-      throw new RpcException({
-        status: payload?.status ?? 502,
-        message: payload?.message ?? '无法校验用户',
-      });
-    }
   }
 }

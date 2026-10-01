@@ -148,7 +148,7 @@ export class DocumentsService {
     const qb = this.posts.createQueryBuilder('post');
     qb.andWhere('post.appCode = :appCode', { appCode: opts.appCode });
     if (opts.authorScopedWorkspace && opts.authorId) {
-      // authorId 为空的是接多用户前写的旧文，工作区暂时可见，编辑时会认领
+      // authorId 为空的是接账户归属前写的旧文，工作区暂时可见，编辑时会认领
       if (opts.readableTeamIds?.length) {
         qb.andWhere(
           `(post.author_id = :authorId OR post.author_id IS NULL OR post.team_id IN (:...readableTeamIds))`,

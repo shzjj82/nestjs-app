@@ -98,6 +98,7 @@ export const MQTT_PATTERNS = {
   AGENTS_API_DOCS: 'agents.apiDocs',
   AGENTS_CHAT: 'agents.chat',
   AGENTS_CHAT_STATUS: 'agents.chat.status',
+  AGENTS_VISION_PARSE: 'agents.vision.parse',
 } as const;
 
 export function sharePattern(group: string, pattern: string): string {

@@ -2,9 +2,11 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { instanceId, mqttBrokerOptions } from '@app/common';
+import { ensureAgentsDatabase } from './database/ensure-database';
 import { AgentsModule } from './agents.module';
 
 async function bootstrap() {
+  await ensureAgentsDatabase();
   const app = await NestFactory.create(AgentsModule);
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.MQTT,

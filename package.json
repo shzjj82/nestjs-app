@@ -37,6 +37,7 @@
     "infra:down": "docker compose stop postgres redis mosquitto",
     "infra:logs": "docker compose logs -f postgres redis mosquitto",
     "install:db": "bash scripts/install-db.sh",
+    "import:pay-separately": "ts-node -r tsconfig-paths/register scripts/import-pay-separately.ts",
     "install:postgres": "bash scripts/install-postgres.sh",
     "install:redis": "bash scripts/install-redis.sh",
     "pm2:start": "bash scripts/pm2-start.sh",
@@ -62,7 +63,9 @@
     "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.31"
+    "typeorm": "^0.3.31",
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -75,6 +78,7 @@
     "@types/jest": "^30.0.0",
     "@types/multer": "^2.2.0",
     "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.1",
     "@types/supertest": "^7.0.0",
     "concurrently": "^9.2.4",
     "eslint": "^9.18.0",
@@ -113,7 +117,8 @@
       "<rootDir>/libs/"
     ],
     "moduleNameMapper": {
-      "^@app/common(|/.*)$": "<rootDir>/libs/common/src/$1"
+      "^@app/common(|/.*)$": "<rootDir>/libs/common/src/$1",
+      "^@app/bill(|/.*)$": "<rootDir>/libs/bill/src/$1"
     }
   }
 }

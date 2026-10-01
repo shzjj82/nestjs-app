@@ -2,9 +2,11 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { instanceId, mqttBrokerOptions } from '@app/common';
+import { ensureOrderDatabase } from './database/ensure-database';
 import { OrderModule } from './order.module';
 
 async function bootstrap() {
+  await ensureOrderDatabase();
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     OrderModule,
     {

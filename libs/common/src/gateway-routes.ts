@@ -122,6 +122,7 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   { method: 'GET', path: '/agents/health', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_HEALTH },
   business({ method: 'GET', path: '/agents/chat/status', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CHAT_STATUS, auth: ['jwt'] }),
   business({ method: 'POST', path: '/agents/chat', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CHAT, auth: ['jwt'], override: true }),
+  business({ method: 'POST', path: '/agents/vision', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_VISION_PARSE, auth: ['jwt'], override: true }),
 ];
 
 function docsContentRoutes(prefix: '/docs/documents'): GatewayRoute[] {

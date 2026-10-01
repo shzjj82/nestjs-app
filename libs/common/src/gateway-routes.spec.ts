@@ -55,6 +55,8 @@ describe('matchRoute', () => {
   });
 
   it('marks create order as override', () => {
+    expect(matchRoute('POST', '/orders/shares')).toBeNull();
+    expect(matchRoute('POST', '/orders/ocr')).toBeNull();
     const route = matchRoute('POST', '/orders');
     expect(route?.override).toBe(true);
   });
@@ -112,6 +114,9 @@ describe('matchRoute', () => {
     expect(matchRoute('GET', '/agents/chat/status')?.auth).toEqual(['jwt']);
     expect(matchRoute('POST', '/agents/chat')?.override).toBe(true);
     expect(matchRoute('POST', '/agents/chat')?.pattern).toBe(MQTT_PATTERNS.AGENTS_CHAT);
+    expect(matchRoute('POST', '/agents/vision')?.override).toBe(true);
+    expect(matchRoute('POST', '/agents/vision')?.auth).toEqual(['jwt']);
+    expect(matchRoute('POST', '/agents/vision')?.pattern).toBe(MQTT_PATTERNS.AGENTS_VISION_PARSE);
     expect(matchRoute('POST', '/agents/chat/async')).toBeNull();
     expect(matchRoute('GET', '/agents/jobs/job-1')).toBeNull();
   });
