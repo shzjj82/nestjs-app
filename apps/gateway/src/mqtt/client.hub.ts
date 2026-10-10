@@ -4,6 +4,7 @@ import {
   AGENTS_CLIENT,
   DOCS_CLIENT,
   ORDER_CLIENT,
+  RECYCLE_CLIENT,
   UPLOAD_CLIENT,
   USER_CLIENT,
   WECHAT_CLIENT,
@@ -21,6 +22,7 @@ export class ClientHub {
     @Inject(UPLOAD_CLIENT) uploadClient: ClientProxy,
     @Inject(WECHAT_CLIENT) wechatClient: ClientProxy,
     @Inject(AGENTS_CLIENT) agentsClient: ClientProxy,
+    @Inject(RECYCLE_CLIENT) recycleClient: ClientProxy,
     private readonly mqtt: MqttProxy,
   ) {
     this.clients = {
@@ -30,6 +32,7 @@ export class ClientHub {
       [UPLOAD_CLIENT]: uploadClient,
       [WECHAT_CLIENT]: wechatClient,
       [AGENTS_CLIENT]: agentsClient,
+      [RECYCLE_CLIENT]: recycleClient,
     };
   }
 

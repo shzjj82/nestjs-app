@@ -4,6 +4,7 @@ export const DOCS_CLIENT = 'DOCS_CLIENT';
 export const UPLOAD_CLIENT = 'UPLOAD_CLIENT';
 export const WECHAT_CLIENT = 'WECHAT_CLIENT';
 export const AGENTS_CLIENT = 'AGENTS_CLIENT';
+export const RECYCLE_CLIENT = 'RECYCLE_CLIENT';
 
 export const MQTT_GROUPS = {
   USERCENTER: 'usercenter',
@@ -12,6 +13,7 @@ export const MQTT_GROUPS = {
   UPLOAD: 'upload',
   WECHAT: 'wechat',
   AGENTS: 'agents',
+  RECYCLE: 'recycle',
 } as const;
 
 export const MQTT_PATTERNS = {
@@ -96,11 +98,38 @@ export const MQTT_PATTERNS = {
   WECHAT_CODE2SESSION: 'wechat.code2session',
   WECHAT_QRCODE: 'wechat.qrcode',
   WECHAT_PHONE: 'wechat.phone',
+  /** 订阅消息模板清单（供小程序调 wx.requestSubscribeMessage） */
+  WECHAT_SUBSCRIBE_TEMPLATES: 'wechat.subscribe.templates',
+  /** 发送订阅消息；由业务服务内部调用，不走网关 */
+  WECHAT_SUBSCRIBE_SEND: 'wechat.subscribe.send',
   AGENTS_HEALTH: 'agents.health',
   AGENTS_API_DOCS: 'agents.apiDocs',
   AGENTS_CHAT: 'agents.chat',
   AGENTS_CHAT_STATUS: 'agents.chat.status',
   AGENTS_VISION_PARSE: 'agents.vision.parse',
+  RECYCLE_HEALTH: 'recycle.health',
+  RECYCLE_API_DOCS: 'recycle.apiDocs',
+  RECYCLE_POLICY_TRANSITIONS: 'recycle.policy.transitions',
+  RECYCLE_CATALOG_ALL: 'recycle.catalog.all',
+  RECYCLE_CATALOG_TYPES: 'recycle.catalog.types',
+  RECYCLE_CATALOG_BRANDS: 'recycle.catalog.brands',
+  RECYCLE_CATALOG_MODELS: 'recycle.catalog.models',
+  RECYCLE_QUOTE_CREATE: 'recycle.quote.create',
+  RECYCLE_ORDER_FIND_ALL: 'recycle.order.findAll',
+  RECYCLE_ORDER_FIND_ONE: 'recycle.order.findOne',
+  RECYCLE_ORDER_CREATE: 'recycle.order.create',
+  RECYCLE_ORDER_ACTION: 'recycle.order.action',
+  RECYCLE_ORDER_TIMELINE: 'recycle.order.timeline',
+  RECYCLE_ORDER_AUDIT: 'recycle.order.audit',
+  RECYCLE_APPROVAL_FIND_ALL: 'recycle.approval.findAll',
+  RECYCLE_APPROVAL_FIND_ONE: 'recycle.approval.findOne',
+  RECYCLE_APPROVAL_DECIDE: 'recycle.approval.decide',
+  RECYCLE_APPROVAL_RECORDS: 'recycle.approval.records',
+  RECYCLE_APPROVAL_CANCEL: 'recycle.approval.cancel',
+  /** 内部事件：订单 → 审批（不注册到网关） */
+  RECYCLE_EVT_APPROVAL_REQUESTED: 'recycle.evt.approval.requested',
+  /** 内部事件：审批 → 订单（不注册到网关） */
+  RECYCLE_EVT_APPROVAL_DECIDED: 'recycle.evt.approval.decided',
 } as const;
 
 export function sharePattern(group: string, pattern: string): string {

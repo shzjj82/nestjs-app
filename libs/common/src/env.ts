@@ -80,6 +80,27 @@ export function docsDatabaseUrl(): string {
   }
 }
 
+/** recycle 默认独立库 `recycle`；可用 RECYCLE_DATABASE_URL 覆盖 */
+export function recycleDatabaseUrl(): string {
+  if (process.env.RECYCLE_DATABASE_URL) {
+    return process.env.RECYCLE_DATABASE_URL;
+  }
+  const shared = databaseUrl();
+  try {
+    const parsed = new URL(shared);
+    parsed.pathname = '/recycle';
+    return parsed.toString();
+  } catch {
+    return shared.replace(/\/[^/?]+(\?|$)/, '/recycle$1');
+  }
+}
+
+/** 回收服务内部事件密钥；跨上下文事件必须携带，防止伪造 */
+export function recycleInternalKey(): string {
+  return readEnv('RECYCLE_INTERNAL_KEY', 'dev-recycle-internal-key');
+}
+
+
 export function redisConfig() {
   return {
     host: readEnv('REDIS_HOST', '127.0.0.1'),

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { REDIS } from '@app/common';
+import { optionalString, REDIS } from '@app/common';
 import type Redis from 'ioredis';
 import { rpcFail } from '../common/rpc';
 import type { MiniProgramEntity } from '../entities';
@@ -112,6 +112,100 @@ export class WechatApiService {
       countryCode: info.countryCode,
       purePhone: info.purePhoneNumber,
     };
+  }
+
+  /**
+   * 订阅消息模板清单（按场景分组）。
+   * 小程序拿它去调 `wx.requestSubscribeMessage`；没配置的场景值为空串，
+   * 前端必须跳过空串，否则基础库会在 success 回调内部抛错且业务 try/catch 抓不到。
+   */
+  async subscribeTemplates(
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, string>> {
+    const mp = await this.programs.requireEnabled(payload);
+    const cfg = mp.subscribeTemplates ?? {};
+    // 前端只关心「场景 → 模板 ID」，字段映射是服务端内部的事
+    return Object.fromEntries(
+      Object.entries(cfg).map(([scene, item]) => [scene, item?.templateId ?? '']),
+    );
+  }
+
+  /**
+   * 发送一条订阅消息。
+   *
+   * 业务服务只给「场景名 + 收件人 openid + 填充数据」，
+   * 模板 ID 由本服务按小程序配置补全 —— 业务服务不需要知道模板 ID。
+   */
+  async sendSubscribe(payload: Record<string, unknown>): Promise<{
+    sent: boolean;
+    scene: string;
+    templateId: string;
+  }> {
+    const mp = await this.programs.requireEnabled(payload);
+    const touser = this.required(payload.touser ?? payload.openid, 'touser');
+    const scene = this.required(payload.scene, 'scene');
+    const cfg = mp.subscribeTemplates?.[scene];
+    const templateId = optionalString(payload.templateId) ?? cfg?.templateId;
+    if (!templateId) {
+      rpcFail(
+        400,
+        `小程序 ${mp.code} 未配置场景 ${scene} 的订阅消息模板，无法发送`,
+      );
+    }
+
+    // 业务服务给的是语义值（orderCode / title / amount …），按配置填进模板字段
+    const values = (payload.values ?? {}) as Record<string, unknown>;
+    const data = this.buildTemplateData(cfg?.fields, values);
+
+    const token = await this.accessToken(mp);
+    const url = new URL('https://api.weixin.qq.com/cgi-bin/message/subscribe/send');
+    url.searchParams.set('access_token', token);
+    const body: Record<string, unknown> = {
+      touser,
+      template_id: templateId,
+      data,
+      miniprogram_state: optionalString(payload.miniprogramState) ?? 'formal',
+      lang: optionalString(payload.lang) ?? 'zh_CN',
+    };
+    const page = optionalString(payload.page);
+    if (page) body.page = page;
+
+    const res = await this.postJson<{
+      errcode?: number;
+      errmsg?: string;
+    }>(url, body);
+    if (res.errcode && res.errcode !== 0) {
+      // 43101 = 用户拒绝订阅/未授权，属正常情况，不抛错让业务流程继续
+      if (res.errcode === 43101) {
+        this.logger.warn(`订阅消息未送达（用户未授权）: ${scene} -> ${touser}`);
+        return { sent: false, scene, templateId };
+      }
+      rpcFail(502, `发送订阅消息失败: ${res.errmsg ?? 'unknown'} (${res.errcode})`);
+    }
+    return { sent: true, scene, templateId };
+  }
+
+  /**
+   * 语义值 → 微信模板字段。
+   * 没有配 fields 时用默认填充（thing1 = 标题），保证模板至少能发得出去。
+   */
+  private buildTemplateData(
+    fields: Record<string, string> | undefined,
+    values: Record<string, unknown>,
+  ): Record<string, { value: string }> {
+    const pick = (key: string): string => {
+      const raw = values[key];
+      return raw === undefined || raw === null ? '' : String(raw);
+    };
+    if (fields && Object.keys(fields).length) {
+      return Object.fromEntries(
+        Object.entries(fields).map(([field, semantic]) => [
+          field,
+          { value: pick(semantic) },
+        ]),
+      );
+    }
+    return { thing1: { value: pick('title') || pick('orderCode') } };
   }
 
   async accessToken(mp: MiniProgramEntity): Promise<string> {

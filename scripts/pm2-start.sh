@@ -73,6 +73,7 @@ if [[ "${need_build}" -eq 1 ]]; then
     npx nest build upload
     npx nest build wechat
     npx nest build agents
+    npx nest build recycle
   fi
 fi
 
@@ -96,6 +97,7 @@ case "${SCOPE}" in
         ...names('docs', 'DOCS_REPLICAS', 3),
         'upload',
         'wechat',
+        'recycle',
         ...names('agents', 'AGENTS_REPLICAS', 3),
       ];
       process.stdout.write(list.join(','));

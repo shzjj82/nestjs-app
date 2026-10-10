@@ -301,6 +301,12 @@ export class AuthService {
       appId,
       bizCode: business.code,
       wechatAppId: wechatAppId || undefined,
+      /**
+       * openid 从账户记录取，不是从请求体取。
+       * 微信小程序账户的 identifier 就是 code2session 换来的 openid，
+       * 客户端无论传什么都不影响这里 —— 下游拿到的必然是服务端自己换来的那个。
+       */
+      openid: account.type === 'wechat_mp' ? account.identifier : undefined,
       username: account.type === 'password' ? account.identifier : publicUser.username,
       nickname: user.nickname,
       role: rbac.roles.includes('admin') ? 'admin' : 'user',

@@ -21,6 +21,9 @@ const docsDatabaseUrl =
 const wechatDatabaseUrl =
   process.env.WECHAT_DATABASE_URL ??
   databaseUrl.replace(/\/[^/?]+(\?|$)/, '/wechat$1');
+const recycleDatabaseUrl =
+  process.env.RECYCLE_DATABASE_URL ??
+  databaseUrl.replace(/\/[^/?]+(\?|$)/, '/recycle$1');
 const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
 
 function replicate(service, count, extraEnv) {
@@ -160,6 +163,26 @@ module.exports = {
         WECHAT_APP_ID: process.env.WECHAT_APP_ID ?? '',
         WECHAT_SECRET: process.env.WECHAT_SECRET ?? '',
         WECHAT_MP_CODE: process.env.WECHAT_MP_CODE ?? 'wechat',
+      },
+    },
+    {
+      name: 'recycle',
+      script: 'dist/apps/recycle/main.js',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      max_memory_restart: '300M',
+      env: {
+        NODE_ENV: 'production',
+        MQTT_URL: mqttUrl,
+        DATABASE_URL: databaseUrl,
+        RECYCLE_DATABASE_URL: recycleDatabaseUrl,
+        RECYCLE_INTERNAL_KEY:
+          process.env.RECYCLE_INTERNAL_KEY ?? 'dev-recycle-internal-key',
+        REDIS_URL: redisUrl,
+        INSTANCE_ID: 'recycle-1',
+        APP_VERSION: appVersion,
+        EXPECTED_APP_VERSION: expectedAppVersion,
       },
     },
     ...agentsApps,

@@ -5,6 +5,7 @@ import {
   DOCS_CLIENT,
   mqttClientOptions,
   ORDER_CLIENT,
+  RECYCLE_CLIENT,
   UPLOAD_CLIENT,
   USER_CLIENT,
   WECHAT_CLIENT,
@@ -39,6 +40,10 @@ import { MqttProxy } from './mqtt.proxy';
         name: AGENTS_CLIENT,
         ...mqttClientOptions('gateway-agents'),
       },
+      {
+        name: RECYCLE_CLIENT,
+        ...mqttClientOptions('gateway-recycle'),
+      },
     ]),
   ],
   providers: [MqttProxy, ClientHub],
@@ -52,6 +57,7 @@ export class MqttModule implements OnModuleInit {
     @Inject(UPLOAD_CLIENT) private readonly uploadClient: ClientProxy,
     @Inject(WECHAT_CLIENT) private readonly wechatClient: ClientProxy,
     @Inject(AGENTS_CLIENT) private readonly agentsClient: ClientProxy,
+    @Inject(RECYCLE_CLIENT) private readonly recycleClient: ClientProxy,
   ) {}
 
   async onModuleInit() {
@@ -62,6 +68,7 @@ export class MqttModule implements OnModuleInit {
       this.uploadClient.connect(),
       this.wechatClient.connect(),
       this.agentsClient.connect(),
+      this.recycleClient.connect(),
     ]);
   }
 }

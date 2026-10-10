@@ -1,0 +1,30 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { recycleDatabaseUrl } from '@app/common';
+import { RECYCLE_ENTITIES } from '../entities';
+import { OrderWechatAppId1760400000000 } from './migrations/1760400000000-order-wechat-appid';
+import { CatalogSchema1760300000000 } from './migrations/1760300000000-catalog-schema';
+import { InitRecycleSchema1760200000000 } from './migrations/1760200000000-init-recycle-schema';
+
+const sync = process.env.TYPEORM_SYNC === 'true';
+
+@Module({
+  imports: [
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      url: recycleDatabaseUrl(),
+      entities: RECYCLE_ENTITIES,
+      synchronize: sync,
+      migrationsRun: !sync,
+      migrations: [
+        InitRecycleSchema1760200000000,
+        CatalogSchema1760300000000,
+        OrderWechatAppId1760400000000,
+      ],
+      logging: process.env.TYPEORM_LOGGING === 'true',
+    }),
+    TypeOrmModule.forFeature(RECYCLE_ENTITIES),
+  ],
+  exports: [TypeOrmModule],
+})
+export class DatabaseModule {}

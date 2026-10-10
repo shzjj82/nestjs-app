@@ -30,6 +30,8 @@ export const PROXY_HTTP_PATHS: RouteInfo[] = [
   { path: 'wechat/{*path}', method: RequestMethod.ALL },
   { path: 'agents', method: RequestMethod.ALL },
   { path: 'agents/{*path}', method: RequestMethod.ALL },
+  { path: 'recycle', method: RequestMethod.ALL },
+  { path: 'recycle/{*path}', method: RequestMethod.ALL },
 ];
 
 export function requestPathname(req: { path?: string; url: string }): string {

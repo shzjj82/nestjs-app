@@ -82,6 +82,15 @@
         "tsConfigPath": "libs/bill/tsconfig.lib.json"
       }
     },
+    "recycle": {
+      "type": "application",
+      "root": "apps/recycle",
+      "entryFile": "main",
+      "sourceRoot": "apps/recycle/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/recycle/tsconfig.app.json"
+      }
+    },
     "common": {
       "type": "library",
       "root": "libs/common",

@@ -85,6 +85,12 @@ export interface AuthSession {
   bizCode: string;
   /** 微信小程序 appId；仅微信登录会话存在，用来区分属于哪一套小程序 */
   wechatAppId?: string;
+  /**
+   * 微信 openid；仅微信小程序登录会话存在。
+   * 由 usercenter 签发会话时从账户记录取（客户端传不进来），
+   * 下游服务（如回收）发订阅消息 / 打款都以它为准。
+   */
+  openid?: string;
   username: string | null;
   nickname: string;
   role: 'user' | 'admin';
@@ -265,6 +271,18 @@ export const PERMISSIONS = {
   PERMISSION_EXPORT: 'permission.export',
   WECHAT_MANAGE: 'wechat.manage',
   WECHAT_QRCODE: 'wechat.qrcode',
+  /**
+   * 服务端定价；只申报型号与数量，单价由目录回填。
+   * 需要登录 —— 估价是写型语义（POST）且可刷，登录后才能按用户限流。
+   * 注：目录读取（/recycle/cartridges*）是公开的，不设权限点。
+   */
+  RECYCLE_QUOTE_CREATE: 'recycle.quote.create',
+  RECYCLE_ORDER_VIEW: 'recycle.order.view',
+  RECYCLE_ORDER_CREATE: 'recycle.order.create',
+  /** 订单动作总开关；具体「谁能在什么状态下做什么」由回收服务内的策略引擎判定 */
+  RECYCLE_ORDER_ACTION: 'recycle.order.action',
+  RECYCLE_APPROVAL_VIEW: 'recycle.approval.view',
+  RECYCLE_APPROVAL_DECIDE: 'recycle.approval.decide',
 } as const;
 
 export type AgentChatRole = 'user' | 'assistant';

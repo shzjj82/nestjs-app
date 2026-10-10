@@ -18,6 +18,8 @@ export interface RefreshRecord {
   appId: string;
   bizCode: string;
   wechatAppId?: string;
+  /** 刷新时要带过去，否则换了 access token 就把 openid 弄丢了 */
+  openid?: string;
 }
 
 export interface TokenPair {
@@ -44,6 +46,7 @@ export class TokenStore {
       appId: session.appId,
       bizCode: session.bizCode,
       wechatAppId: session.wechatAppId,
+      openid: session.openid,
     };
     const accessSet = userTokenSetKey(session.userId);
     const refreshSet = userRefreshSetKey(session.userId);

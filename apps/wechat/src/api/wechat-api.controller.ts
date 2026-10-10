@@ -24,4 +24,23 @@ export class WechatApiController {
   phone(payload: Record<string, unknown>) {
     return this.api.phone(payload);
   }
+
+  @MessagePattern(wechatPattern(MQTT_PATTERNS.WECHAT_SUBSCRIBE_TEMPLATES))
+  @ApiDoc({
+    name: '订阅消息模板清单',
+    description: '按场景返回模板 ID；未配置的场景为空串，前端须跳过',
+  })
+  subscribeTemplates(payload: Record<string, unknown>) {
+    return this.api.subscribeTemplates(payload);
+  }
+
+  /**
+   * 发送订阅消息。业务服务（如回收）通过 MQTT 内部调用，不走网关。
+   * 入参只带场景名，模板 ID 由本服务按小程序配置补全。
+   */
+  @MessagePattern(wechatPattern(MQTT_PATTERNS.WECHAT_SUBSCRIBE_SEND))
+  @ApiDoc({ name: '发送订阅消息', description: '内部接口：业务服务通知用户' })
+  sendSubscribe(payload: Record<string, unknown>) {
+    return this.api.sendSubscribe(payload);
+  }
 }
