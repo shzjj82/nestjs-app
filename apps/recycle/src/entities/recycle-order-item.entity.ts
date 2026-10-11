@@ -23,6 +23,15 @@ export class RecycleOrderItemEntity {
   @JoinColumn({ name: 'order_id' })
   order?: RecycleOrderEntity;
 
+  @Column({ name: 'type_id', type: 'uuid', nullable: true })
+  typeId: string | null;
+
+  @Column({ name: 'brand_id', type: 'uuid', nullable: true })
+  brandId: string | null;
+
+  @Column({ name: 'model_id', type: 'uuid', nullable: true })
+  modelId: string | null;
+
   @Column({ name: 'cartridge_type', type: 'varchar', length: 16 })
   cartridgeType: CartridgeType;
 

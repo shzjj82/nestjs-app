@@ -1,36 +1,33 @@
 import { mergeBusinessRbac } from '../../src/rbac/rbac-merge';
 
 describe('mergeBusinessRbac', () => {
-  it('keeps platform role permissions regardless of capability', () => {
+  it('keeps platform role permissions', () => {
     const result = mergeBusinessRbac({
       platformRoles: [{ code: 'admin', permissions: ['user.query', 'role.manage'] }],
       businessRoles: [],
-      capability: new Set(),
     });
     expect(result.roles).toEqual(['admin']);
     expect(result.permissions.sort()).toEqual(['role.manage', 'user.query']);
   });
 
-  it('intersects business role permissions with capability', () => {
+  it('treats business roles as identities without permissions', () => {
     const result = mergeBusinessRbac({
       platformRoles: [],
-      businessRoles: [{ code: 'editor', permissions: ['doc.write', 'user.query'] }],
-      capability: new Set(['doc.write']),
+      businessRoles: [{ code: 'customer', permissions: ['recycle.order.create'] }],
     });
-    expect(result.roles).toEqual(['editor']);
-    expect(result.permissions).toEqual(['doc.write']);
+    expect(result.roles).toEqual(['customer']);
+    expect(result.permissions).toEqual([]);
   });
 
-  it('dedupes roles and permissions across sources', () => {
+  it('dedupes roles across sources', () => {
     const result = mergeBusinessRbac({
       platformRoles: [{ code: 'admin', permissions: ['doc.write'] }],
       businessRoles: [
         { code: 'user', permissions: ['doc.write'] },
         { code: 'user', permissions: ['doc.read'] },
       ],
-      capability: new Set(['doc.write', 'doc.read']),
     });
     expect(result.roles.sort()).toEqual(['admin', 'user']);
-    expect(result.permissions.sort()).toEqual(['doc.read', 'doc.write']);
+    expect(result.permissions).toEqual(['doc.write']);
   });
 });

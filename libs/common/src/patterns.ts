@@ -114,7 +114,6 @@ export const MQTT_PATTERNS = {
   RECYCLE_CATALOG_TYPES: 'recycle.catalog.types',
   RECYCLE_CATALOG_BRANDS: 'recycle.catalog.brands',
   RECYCLE_CATALOG_MODELS: 'recycle.catalog.models',
-  RECYCLE_QUOTE_CREATE: 'recycle.quote.create',
   RECYCLE_ORDER_FIND_ALL: 'recycle.order.findAll',
   RECYCLE_ORDER_FIND_ONE: 'recycle.order.findOne',
   RECYCLE_ORDER_CREATE: 'recycle.order.create',

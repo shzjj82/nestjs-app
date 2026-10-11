@@ -16,8 +16,7 @@ import {
  * 价格口径：**只回收空耗材**（空墨盒 / 空硒鼓），单位「分」，区间 5~30 元/支；
  * 原装带芯片、可再利用性好的型号取高位；空硒鼓整体略高于空墨盒。
  *
- * 灌数方式：按唯一键 upsert，重复启动幂等，已人工改过价的行会被覆盖
- * —— 若需要「人工改价不被重启冲掉」，把对应行从种子里删掉即可。
+ * 灌数方式：类型按 key、品牌按 (typeId, brand)、型号按 (brandId, name) upsert。
  */
 
 type SeedType = {
@@ -120,18 +119,60 @@ export const SEED_MODELS: SeedModel[] = [
 
 /** 按唯一键 upsert，重复执行幂等 */
 export async function seedCatalog(dataSource: DataSource): Promise<void> {
-  await dataSource.getRepository(RecycleCartridgeTypeEntity).upsert(
+  const types = dataSource.getRepository(RecycleCartridgeTypeEntity);
+  const brands = dataSource.getRepository(RecycleBrandEntity);
+  const models = dataSource.getRepository(RecycleModelEntity);
+
+  await types.upsert(
     SEED_TYPES.map((row, index) => ({ ...row, sort: index + 1, enabled: true })),
     ['key'],
   );
+  const typeRows = await types.find();
+  const typeIdByKey = new Map(typeRows.map((row) => [row.key, row.id]));
 
-  await dataSource.getRepository(RecycleBrandEntity).upsert(
-    SEED_BRANDS.map((row, index) => ({ ...row, sort: index + 1, enabled: true })),
-    ['brand', 'type'],
+  await brands.upsert(
+    SEED_BRANDS.map((row, index) => {
+      const typeId = typeIdByKey.get(row.type);
+      if (!typeId) {
+        throw new Error(`目录种子缺少类型 ${row.type}`);
+      }
+      return {
+        typeId,
+        brand: row.brand,
+        logo: row.logo,
+        sort: index + 1,
+        enabled: true,
+      };
+    }),
+    ['typeId', 'brand'],
+  );
+  const brandRows = await brands.find();
+  const brandIdByScope = new Map(
+    brandRows.map((row) => [`${row.typeId}:${row.brand}`, row.id]),
   );
 
-  await dataSource.getRepository(RecycleModelEntity).upsert(
-    SEED_MODELS.map((row, index) => ({ ...row, sort: index + 1, enabled: true })),
-    ['type', 'brand', 'name'],
+  await models.upsert(
+    SEED_MODELS.map((row, index) => {
+      const typeId = typeIdByKey.get(row.type);
+      if (!typeId) {
+        throw new Error(`目录种子缺少类型 ${row.type}`);
+      }
+      const brandId = brandIdByScope.get(`${typeId}:${row.brand}`);
+      if (!brandId) {
+        throw new Error(`目录种子缺少品牌 ${row.type}/${row.brand}`);
+      }
+      return {
+        typeId,
+        brandId,
+        name: row.name,
+        spec: row.spec,
+        fits: row.fits,
+        chip: row.chip,
+        price: row.price,
+        sort: index + 1,
+        enabled: true,
+      };
+    }),
+    ['brandId', 'name'],
   );
 }

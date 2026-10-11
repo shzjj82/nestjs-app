@@ -29,6 +29,9 @@ export interface OrderSnapshot {
 
 /** 订单明细（一次回收可含多个不同品牌 / 类型的耗材） */
 export interface OrderItemInput {
+  typeId: string;
+  brandId: string;
+  modelId: string;
   cartridgeType: CartridgeType;
   brand: string;
   model: string;

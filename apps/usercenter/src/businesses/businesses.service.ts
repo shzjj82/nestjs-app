@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import {
   BIZ_REGISTRY_KEY,
   bizApiKeys,
-  PLATFORM_BIZ_CODE,
   REDIS,
   TokenStore,
 } from '@app/common';
@@ -19,8 +18,6 @@ import {
   AccountRoleEntity,
   BusinessEntity,
   BusinessMemberEntity,
-  BusinessPermissionEntity,
-  PermissionEntity,
   RoleEntity,
 } from '../entities';
 import { normalizeAppCode } from '../apps/wechat-app-code';
@@ -35,10 +32,6 @@ export class BusinessesService implements OnApplicationBootstrap {
     private readonly businesses: Repository<BusinessEntity>,
     @InjectRepository(BusinessMemberEntity)
     private readonly members: Repository<BusinessMemberEntity>,
-    @InjectRepository(BusinessPermissionEntity)
-    private readonly businessPermissions: Repository<BusinessPermissionEntity>,
-    @InjectRepository(PermissionEntity)
-    private readonly permissions: Repository<PermissionEntity>,
     @InjectRepository(RoleEntity)
     private readonly roles: Repository<RoleEntity>,
     @InjectRepository(AccountEntity)
@@ -163,19 +156,7 @@ export class BusinessesService implements OnApplicationBootstrap {
   }
 
   async setPermissions(payload: Record<string, unknown>): Promise<BusinessInfo> {
-    const business = await this.requireById(requiredString(payload.id, 'id'));
-    const ids = Array.isArray(payload.permissionIds) ? payload.permissionIds.map(String) : [];
-    const permissions = ids.length ? await this.permissions.find({ where: { id: In(ids) } }) : [];
-    await this.businessPermissions.delete({ businessId: business.id });
-    if (permissions.length) {
-      await this.businessPermissions.save(
-        permissions.map((permission) =>
-          this.businessPermissions.create({ businessId: business.id, permissionId: permission.id }),
-        ),
-      );
-    }
-    await this.revokeMembers(business.id);
-    return this.toInfo(business);
+    return this.toInfo(await this.requireById(requiredString(payload.id, 'id')));
   }
 
   async listMembers(payload: Record<string, unknown>): Promise<BusinessMemberInfo[]> {
@@ -272,31 +253,6 @@ export class BusinessesService implements OnApplicationBootstrap {
     return member;
   }
 
-  /** 该业务能力包内的功能点 code；平台业务默认拥有全部 */
-  async permissionCodes(businessId: string): Promise<Set<string>> {
-    const links = await this.businessPermissions.find({
-      where: { businessId },
-      relations: ['permission'],
-    });
-    return new Set(links.map((link) => link.permission.code));
-  }
-
-  /** 新建功能点时自动并入平台业务能力包 */
-  async grantToPlatform(permissionId: string) {
-    const platform = await this.businesses.findOne({ where: { code: PLATFORM_BIZ_CODE } });
-    if (!platform) {
-      return;
-    }
-    const exists = await this.businessPermissions.findOne({
-      where: { businessId: platform.id, permissionId },
-    });
-    if (!exists) {
-      await this.businessPermissions.save(
-        this.businessPermissions.create({ businessId: platform.id, permissionId }),
-      );
-    }
-  }
-
   private async replaceBusinessRoles(userId: string, businessId: string, next: RoleEntity[]) {
     const accounts = await this.accounts.find({ where: { userId } });
     if (!accounts.length) {
@@ -334,10 +290,7 @@ export class BusinessesService implements OnApplicationBootstrap {
   }
 
   private async toInfo(row: BusinessEntity): Promise<BusinessInfo> {
-    const [links, memberCount] = await Promise.all([
-      this.businessPermissions.find({ where: { businessId: row.id } }),
-      this.members.count({ where: { businessId: row.id } }),
-    ]);
+    const memberCount = await this.members.count({ where: { businessId: row.id } });
     return {
       id: row.id,
       code: row.code,
@@ -347,7 +300,7 @@ export class BusinessesService implements OnApplicationBootstrap {
       apis: row.apis ?? [],
       defaultRoleId: row.defaultRoleId,
       isSystem: row.isSystem,
-      permissionIds: links.map((link) => link.permissionId),
+      permissionIds: [],
       memberCount,
       createdAt: row.createdAt.toISOString(),
     };

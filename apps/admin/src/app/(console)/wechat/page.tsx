@@ -9,6 +9,7 @@ import { DataTableRowActions } from '@/components/data-table-row-actions';
 import type { FilterField } from '@/components/filter-bar';
 import { PageHeader } from '@/components/page-header';
 import { SelectField } from '@/components/select-field';
+import { SubscribeTemplateEditor } from '@/components/subscribe-template-editor';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -20,17 +21,25 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { actionsColumn } from '@/lib/admin-table-columns';
 import type { AdminColumnDef } from '@/lib/admin-table-types';
 import { adminFetch } from '@/lib/api';
 import type { Business } from '@/lib/businesses';
-import type { BusinessAppClient, RegisteredWechatApp } from '@/lib/wechat-apps';
+import type {
+  BusinessAppClient,
+  RegisteredWechatApp,
+  SubscribeTemplateRow,
+} from '@/lib/wechat-apps';
+import { collectTemplates, toTemplateRows } from '@/lib/wechat-apps';
 
 interface WechatRow {
   id: string;
   businessName: string;
   appCode: string;
   appId: string;
+  sceneCount: number;
+  subscribeTemplates: RegisteredWechatApp['subscribeTemplates'];
 }
 
 const FILTERS: FilterField<WechatRow>[] = [
@@ -59,6 +68,7 @@ export default function WechatPage() {
   const [form, setForm] = useState<WechatForm>(EMPTY_FORM);
   const [editing, setEditing] = useState<WechatRow | null>(null);
   const [editForm, setEditForm] = useState<WechatForm>(EMPTY_FORM);
+  const [editTemplates, setEditTemplates] = useState<SubscribeTemplateRow[]>([]);
   const [deleting, setDeleting] = useState<WechatRow | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -79,11 +89,14 @@ export default function WechatPage() {
     () =>
       apps.map((app) => {
         const business = businesses.find((item) => item.code === app.code);
+        const templates = app.subscribeTemplates ?? {};
         return {
           id: app.id,
           businessName: business?.name ?? app.name,
           appCode: app.code,
           appId: app.appId,
+          sceneCount: Object.keys(templates).length,
+          subscribeTemplates: templates,
         };
       }),
     [apps, businesses],
@@ -114,6 +127,7 @@ export default function WechatPage() {
       appId: row.appId,
       secret: '',
     });
+    setEditTemplates(toTemplateRows(row.subscribeTemplates));
     setEditing(row);
   }
 
@@ -136,7 +150,8 @@ export default function WechatPage() {
       method: 'POST',
       body: JSON.stringify({
         businessId: business.id,
-        appCode: business.code,
+        // 接入端的 code 用 clientCode 传：网关会丢弃请求体里的 appCode（那是调用方身份的字段）
+        clientCode: business.code,
         name: business.name,
         type: 'wechat_mp',
         wechatAppId: appId,
@@ -207,6 +222,11 @@ export default function WechatPage() {
       toast.error('请填写 appId');
       return;
     }
+    const templates = collectTemplates(editTemplates);
+    if (templates.error) {
+      toast.error(templates.error);
+      return;
+    }
     setBusy(true);
     try {
       await adminFetch(`/wechat/miniprograms/${editing.id}`, {
@@ -216,6 +236,7 @@ export default function WechatPage() {
           name: business.name,
           appId,
           ...(secret ? { secret } : {}),
+          subscribeTemplates: templates.value,
         }),
       });
       if (editing.appCode !== business.code) {
@@ -267,6 +288,17 @@ export default function WechatPage() {
         meta: { label: 'appId' },
         cell: ({ row }) => <span className="font-mono text-xs">{row.original.appId}</span>,
       },
+      {
+        accessorKey: 'sceneCount',
+        header: '订阅消息',
+        meta: { label: '订阅消息' },
+        cell: ({ row }) =>
+          row.original.sceneCount > 0 ? (
+            <span className="text-xs">{row.original.sceneCount} 个场景</span>
+          ) : (
+            <span className="text-xs text-muted-foreground">未配置</span>
+          ),
+      },
       actionsColumn({
         id: 'actions',
         header: () => <span className="sr-only">操作</span>,
@@ -314,7 +346,9 @@ export default function WechatPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>添加微信小程序</DialogTitle>
-            <DialogDescription>appCode 使用业务管理里的 code，每个 code 只能添加一次</DialogDescription>
+            <DialogDescription>
+              appCode 使用业务管理里的 code，每个 code 只能添加一次；订阅消息模板可在添加后编辑
+            </DialogDescription>
           </DialogHeader>
           <form id="wechat-create" className="space-y-4" onSubmit={create}>
             <SelectField
@@ -366,7 +400,7 @@ export default function WechatPage() {
       </Dialog>
 
       <Dialog open={!!editing} onOpenChange={(open) => !open && !busy && setEditing(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>编辑微信小程序</DialogTitle>
             <DialogDescription>appSecret 留空则保持原密钥，列表不会显示密钥</DialogDescription>
@@ -406,6 +440,8 @@ export default function WechatPage() {
                 autoComplete="new-password"
               />
             </div>
+            <Separator />
+            <SubscribeTemplateEditor rows={editTemplates} onChange={setEditTemplates} />
           </form>
           <DialogFooter>
             <Button type="button" variant="outline" disabled={busy} onClick={() => setEditing(null)}>

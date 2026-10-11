@@ -116,12 +116,7 @@ export default function RolesPage() {
     }
   }
 
-  // 业务角色只能在能力包范围内勾选；平台级角色不受能力包约束
-  const selectablePermissions = useMemo(() => {
-    if (!selected?.businessId || !business) return permissions;
-    const allowed = new Set(business.permissionIds);
-    return permissions.filter((p) => allowed.has(p.id));
-  }, [selected, business, permissions]);
+  const selectablePermissions = permissions;
 
   const columns = useMemo<AdminColumnDef<BusinessRole>[]>(
     () => [
@@ -150,21 +145,28 @@ export default function RolesPage() {
       {
         id: 'permissions',
         header: '功能点',
-        accessorFn: (row) => row.permissionCodes?.length ?? 0,
-        meta: { label: '功能点数' },
-        cell: ({ row }) => row.original.permissionCodes?.length ?? 0,
+        accessorFn: (row) =>
+          row.businessId ? '身份' : String(row.permissionCodes?.length ?? 0),
+        meta: { label: '功能点' },
+        cell: ({ row }) =>
+          row.original.businessId ? (
+            <span className="text-xs text-muted-foreground">业务身份，无功能点</span>
+          ) : (
+            row.original.permissionCodes?.length ?? 0
+          ),
       },
       actionsColumn({
         id: 'actions',
         header: () => <span className="sr-only">操作</span>,
         meta: { label: '操作' },
-        cell: ({ row }) => (
-          <DataTableRowActions
-            actions={[
-              { label: '配置权限', icon: KeyRound, onSelect: () => openPermDialog(row.original) },
-            ]}
-          />
-        ),
+        cell: ({ row }) =>
+          row.original.businessId ? null : (
+            <DataTableRowActions
+              actions={[
+                { label: '配置权限', icon: KeyRound, onSelect: () => openPermDialog(row.original) },
+              ]}
+            />
+          ),
       }),
     ],
     [openPermDialog, business],
@@ -174,7 +176,7 @@ export default function RolesPage() {
     <>
       <PageHeader
         title="角色权限组"
-        description="角色归属于业务；业务角色的功能点受该业务能力包限制，平台级角色在所有业务生效"
+        description="业务角色只表示身份（客户 / 业务员等）；功能点仅平台级角色用于管理后台"
         actions={
           <>
             {businesses.length > 0 ? (
@@ -253,7 +255,7 @@ export default function RolesPage() {
                 <>
                   {selected.name}{' '}
                   <span className="font-mono text-xs">({selected.code})</span>
-                  {selected.businessId ? ' · 仅列出业务能力包内的功能点' : ' · 平台级角色'}
+                  {' · 平台级角色'}
                 </>
               ) : null}
             </DialogDescription>
@@ -263,7 +265,7 @@ export default function RolesPage() {
             permissions={selectablePermissions}
             value={permIds}
             onChange={setPermIds}
-            emptyMessage="该业务能力包为空，请先在「业务管理」中配置能力包"
+            emptyMessage="暂无功能点"
           />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setPermOpen(false)}>

@@ -9,7 +9,6 @@ import {
   AccountRoleEntity,
   BusinessEntity,
   BusinessMemberEntity,
-  BusinessPermissionEntity,
   ClientEntity,
   PermissionEntity,
   RoleEntity,
@@ -36,12 +35,6 @@ const DEFAULT_PERMISSIONS: Array<{
   { module: '权限', code: PERMISSIONS.PERMISSION_EXPORT, name: '导出权限', description: 'Excel 导出功能点与角色勾选', sort: 100 },
   { module: '微信', code: PERMISSIONS.WECHAT_MANAGE, name: '管理小程序', description: '登记多套微信小程序 appId / secret', sort: 110 },
   { module: '微信', code: PERMISSIONS.WECHAT_QRCODE, name: '生成小程序码', description: '按小程序生成 QR 码', sort: 120 },
-  { module: '回收', code: PERMISSIONS.RECYCLE_QUOTE_CREATE, name: '获取回收报价', description: '按型号与数量由服务端定价（目录读取是公开的，不设权限点）', sort: 125 },
-  { module: '回收', code: PERMISSIONS.RECYCLE_ORDER_VIEW, name: '查看回收订单', description: '订单列表与详情，按身份自动收窄数据范围', sort: 130 },
-  { module: '回收', code: PERMISSIONS.RECYCLE_ORDER_CREATE, name: '创建回收订单', description: '提交空墨盒 / 空硒鼓回收单', sort: 140 },
-  { module: '回收', code: PERMISSIONS.RECYCLE_ORDER_ACTION, name: '执行订单动作', description: '动作 × 角色 × 状态由回收服务策略引擎裁决', sort: 150 },
-  { module: '回收', code: PERMISSIONS.RECYCLE_APPROVAL_VIEW, name: '查看审批待办', description: '审批任务与留痕记录', sort: 160 },
-  { module: '回收', code: PERMISSIONS.RECYCLE_APPROVAL_DECIDE, name: '出具审批结论', description: '对价格变更 / 协商定价做决策', sort: 170 },
 ];
 
 @Injectable()
@@ -53,8 +46,6 @@ export class SeedService implements OnModuleInit {
     private readonly businesses: Repository<BusinessEntity>,
     @InjectRepository(BusinessMemberEntity)
     private readonly members: Repository<BusinessMemberEntity>,
-    @InjectRepository(BusinessPermissionEntity)
-    private readonly businessPermissions: Repository<BusinessPermissionEntity>,
     @InjectRepository(ClientEntity)
     private readonly clients: Repository<ClientEntity>,
     @InjectRepository(UserEntity)
@@ -184,10 +175,6 @@ export class SeedService implements OnModuleInit {
 
     for (const permission of allPermissions) {
       await this.link(this.rolePermissions, { roleId: admin.id, permissionId: permission.id });
-      await this.link(this.businessPermissions, {
-        businessId: platform.id,
-        permissionId: permission.id,
-      });
     }
 
     const userView = allPermissions.find((item) => item.code === PERMISSIONS.USER_QUERY);

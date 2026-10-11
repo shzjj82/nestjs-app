@@ -235,6 +235,9 @@ export class OrdersService {
     return {
       ...this.toView(order, actor),
       items: items.map((item) => ({
+        typeId: item.typeId,
+        brandId: item.brandId,
+        modelId: item.modelId,
         cartridgeType: item.cartridgeType,
         brand: item.brand,
         model: item.model,
@@ -517,12 +520,15 @@ export class OrdersService {
    *
    * ⚠️ 客户端带来的 price / chip / spec 一律丢弃：价目表只认 `recycle_models`，
    * 否则用户改一个字段就能把 9 元的空墨盒报成 900 元。
-   * 型号不在目录里直接 400，前端应先调 POST /recycle/quotes。
+   * 型号不在目录里直接 400。展示用预估由前端用目录单价 × 数量计算。
    */
   private async readItems(raw: unknown): Promise<OrderItemInput[]> {
     const requested = this.catalog.readQuoteItems(raw);
     const priced = await this.catalog.priceItems(requested);
     return priced.map((line) => ({
+      typeId: line.typeId,
+      brandId: line.brandId,
+      modelId: line.modelId,
       cartridgeType: line.cartridgeType,
       brand: line.brand,
       model: line.model,

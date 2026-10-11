@@ -1,30 +1,34 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
-import { CartridgeType } from '../domain';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { RecycleCartridgeTypeEntity } from './recycle-cartridge-type.entity';
 
 /**
- * 品牌字典：一行 = 一个「品牌 × 类型」组合。
- *
- * 同一个品牌既做墨盒也做硒鼓（惠普 / 佳能 / 兄弟），
- * 所以唯一键是 (brand, type) 而不是 brand。
+ * 品牌字典：一行挂在一个 typeId 下。
+ * 同一品牌既做墨盒也做硒鼓，所以唯一键是 (typeId, brand)。
  */
 @Entity('recycle_brands')
-@Index(['brand', 'type'], { unique: true })
+@Index(['typeId', 'brand'], { unique: true })
+@Index(['typeId'])
 export class RecycleBrandEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  /** 品牌名，如「惠普 HP」 */
+  @Column({ name: 'type_id', type: 'uuid' })
+  typeId: string;
+
+  @ManyToOne(() => RecycleCartridgeTypeEntity, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'type_id' })
+  typeRef?: RecycleCartridgeTypeEntity;
+
   @Column({ type: 'varchar', length: 64 })
   brand: string;
 
-  @Column({ type: 'varchar', length: 16 })
-  type: CartridgeType;
-
-  /**
-   * 品牌 logo 地址。
-   * 当前暂不上 logo（恒为空串，前端降级为文字占位块）；
-   * 以后要上时直接把 CDN URL 写进这一列，接口与前端都不用改。
-   */
   @Column({ type: 'varchar', length: 512, default: '' })
   logo: string;
 

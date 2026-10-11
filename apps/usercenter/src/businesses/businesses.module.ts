@@ -5,8 +5,6 @@ import {
   AccountRoleEntity,
   BusinessEntity,
   BusinessMemberEntity,
-  BusinessPermissionEntity,
-  PermissionEntity,
   RoleEntity,
 } from '../entities';
 import { BusinessesController } from './businesses.controller';
@@ -17,8 +15,6 @@ import { BusinessesService } from './businesses.service';
     TypeOrmModule.forFeature([
       BusinessEntity,
       BusinessMemberEntity,
-      BusinessPermissionEntity,
-      PermissionEntity,
       RoleEntity,
       AccountEntity,
       AccountRoleEntity,

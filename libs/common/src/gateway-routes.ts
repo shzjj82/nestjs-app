@@ -14,8 +14,9 @@ export type GatewayAuth = 'jwt' | 'admin' | 'docs-key' | 'upload-key';
 export type GatewayHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /**
- * platform：仅接受 platform 业务会话（admin 控制台）；
- * business：必须携带已启用业务的 X-Biz-Code，token 需属于该业务，且业务开通了该接口；
+ * platform：仅接受 platform 业务会话（admin 控制台），并按用户功能点鉴权；
+ * business：必须带已启用业务的 X-Biz-Code，token 属于该业务，且业务开通了该接口。
+ *   功能点只针对业务层开放；业务内身份（客户 / 业务员 …）由下游服务限制。
  * 未设置：不校验业务（健康检查、登出）。
  */
 export type GatewayScope = 'platform' | 'business';
@@ -126,28 +127,26 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'GET', path: '/wechat/subscribe-templates', client: WECHAT_CLIENT, pattern: MQTT_PATTERNS.WECHAT_SUBSCRIBE_TEMPLATES, auth: ['jwt'] }),
 
   { method: 'GET', path: '/recycle/health', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_HEALTH },
-  business({ method: 'GET', path: '/recycle/policy/transitions', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_POLICY_TRANSITIONS, permissions: [PERMISSIONS.RECYCLE_ORDER_VIEW] }),
+  business({ method: 'GET', path: '/recycle/policy/transitions', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_POLICY_TRANSITIONS, auth: ['jwt'] }),
 
-  // ⚠️ 回收目录是**公开的价目表**：不挂 permissions（挂了就隐式要求登录，见 AuthService.enforce）。
-  // 仍受 business scope 约束：必须带 X-Biz-Code，且该业务开通了这几个接口。
+  // 目录公开；订单/审批只需登录。功能点是业务开通的接口，不按用户勾选。
   business({ method: 'GET', path: '/recycle/cartridges', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_CATALOG_ALL }),
   business({ method: 'GET', path: '/recycle/cartridges/types', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_CATALOG_TYPES }),
   business({ method: 'GET', path: '/recycle/cartridges/brands', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_CATALOG_BRANDS }),
   business({ method: 'GET', path: '/recycle/cartridges/models', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_CATALOG_MODELS }),
-  business({ method: 'POST', path: '/recycle/quotes', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_QUOTE_CREATE, permissions: [PERMISSIONS.RECYCLE_QUOTE_CREATE] }),
 
-  business({ method: 'GET', path: '/recycle/orders', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_FIND_ALL, permissions: [PERMISSIONS.RECYCLE_ORDER_VIEW] }),
-  business({ method: 'POST', path: '/recycle/orders', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_CREATE, permissions: [PERMISSIONS.RECYCLE_ORDER_CREATE] }),
-  business({ method: 'GET', path: '/recycle/orders/:id', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_FIND_ONE, permissions: [PERMISSIONS.RECYCLE_ORDER_VIEW] }),
-  business({ method: 'POST', path: '/recycle/orders/:id/actions/:action', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_ACTION, permissions: [PERMISSIONS.RECYCLE_ORDER_ACTION] }),
-  business({ method: 'GET', path: '/recycle/orders/:id/timeline', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_TIMELINE, permissions: [PERMISSIONS.RECYCLE_ORDER_VIEW] }),
-  business({ method: 'GET', path: '/recycle/orders/:id/audit', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_AUDIT, permissions: [PERMISSIONS.RECYCLE_ORDER_VIEW] }),
+  business({ method: 'GET', path: '/recycle/orders', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_FIND_ALL, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/recycle/orders', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_CREATE, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/recycle/orders/:id', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_FIND_ONE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/recycle/orders/:id/actions/:action', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_ACTION, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/recycle/orders/:id/timeline', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_TIMELINE, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/recycle/orders/:id/audit', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_AUDIT, auth: ['jwt'] }),
 
-  business({ method: 'GET', path: '/recycle/approvals', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_APPROVAL_FIND_ALL, permissions: [PERMISSIONS.RECYCLE_APPROVAL_VIEW] }),
-  business({ method: 'GET', path: '/recycle/approvals/:id', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_APPROVAL_FIND_ONE, permissions: [PERMISSIONS.RECYCLE_APPROVAL_VIEW] }),
-  business({ method: 'POST', path: '/recycle/approvals/:id/decide', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_APPROVAL_DECIDE, permissions: [PERMISSIONS.RECYCLE_APPROVAL_DECIDE] }),
-  business({ method: 'POST', path: '/recycle/approvals/:id/cancel', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_APPROVAL_CANCEL, permissions: [PERMISSIONS.RECYCLE_APPROVAL_DECIDE] }),
-  business({ method: 'GET', path: '/recycle/approvals/:id/records', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_APPROVAL_RECORDS, permissions: [PERMISSIONS.RECYCLE_APPROVAL_VIEW] }),
+  business({ method: 'GET', path: '/recycle/approvals', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_APPROVAL_FIND_ALL, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/recycle/approvals/:id', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_APPROVAL_FIND_ONE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/recycle/approvals/:id/decide', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_APPROVAL_DECIDE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/recycle/approvals/:id/cancel', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_APPROVAL_CANCEL, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/recycle/approvals/:id/records', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_APPROVAL_RECORDS, auth: ['jwt'] }),
 
   { method: 'GET', path: '/agents/health', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_HEALTH },
   business({ method: 'GET', path: '/agents/chat/status', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CHAT_STATUS, auth: ['jwt'] }),

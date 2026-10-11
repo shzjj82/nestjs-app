@@ -59,7 +59,8 @@ function ServiceGroup({
         <div className="flex min-w-0 items-center gap-2">
           {selectable ? (
             <Checkbox
-              checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+              checked={allSelected}
+              indeterminate={someSelected}
               onCheckedChange={(checked) => onToggleAll(checked === true)}
               aria-label={`全选 ${service.label}`}
             />

@@ -11,6 +11,8 @@ function actor(roles: string[], userId = 'u-1'): Actor {
     permissions: [],
     nickname: null,
     regionCode: null,
+    openid: null,
+    wechatAppId: null,
   };
 }
 
@@ -52,6 +54,15 @@ describe('OrderPolicyService', () => {
       providers: [OrderPolicyService],
     }).compile();
     policy = module.get(OrderPolicyService);
+  });
+
+  it('未挂回收角色的登录用户按客户身份估价', () => {
+    const ok = policy.authorize('quote', {
+      actor: actor([]),
+      order: order({ status: OrderStatus.DRAFT }),
+      payload: {},
+    });
+    expect(ok.to).toBe(OrderStatus.QUOTED);
   });
 
   it('角色不符：客户不能在验收中状态评估报价', () => {

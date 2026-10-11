@@ -9,7 +9,10 @@ import {
 import { BusinessEntity } from './business.entity';
 import { PermissionEntity } from './permission.entity';
 
-/** 业务能力包：该业务下的角色只能生效这里列出的功能点 */
+/**
+ * 遗留表：功能点已改为业务开通的 HTTP 接口（uc_businesses.apis）。
+ * 身份用业务角色 code，不再用这张表做能力包交集。
+ */
 @Entity('uc_business_permissions')
 @Index(['businessId', 'permissionId'], { unique: true })
 export class BusinessPermissionEntity {

@@ -4,6 +4,7 @@ import type { WechatMiniProgram } from '@app/common';
 import { FindOptionsWhere, Repository } from 'typeorm';
 import { optionalString, requiredString, rpcFail } from '../common/rpc';
 import { MiniProgramEntity } from '../entities';
+import { normalizeSubscribeTemplates } from './subscribe-templates';
 
 @Injectable()
 export class MiniProgramsService {
@@ -55,6 +56,9 @@ export class MiniProgramsService {
         appId,
         secret,
         status: 1,
+        subscribeTemplates: normalizeSubscribeTemplates(
+          payload.subscribeTemplates,
+        ),
       }),
     );
     return this.toInfo(saved);
@@ -95,6 +99,13 @@ export class MiniProgramsService {
     if (payload.status !== undefined) {
       row.status = Number(payload.status) === 0 ? 0 : 1;
     }
+    // 订阅消息配置是「整份替换」语义：传了就按传入的算，去掉某个场景即停发该场景。
+    // 不做深合并 —— 否则删掉一个场景会被旧值悄悄补回来。
+    if (payload.subscribeTemplates !== undefined) {
+      row.subscribeTemplates = normalizeSubscribeTemplates(
+        payload.subscribeTemplates,
+      );
+    }
     row.updatedAt = new Date();
     return this.toInfo(await this.programs.save(row));
   }
@@ -118,6 +129,7 @@ export class MiniProgramsService {
       appId: row.appId,
       hasSecret: !!row.secret,
       status: row.status,
+      subscribeTemplates: row.subscribeTemplates ?? {},
     };
   }
 

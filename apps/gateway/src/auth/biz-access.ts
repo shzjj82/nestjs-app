@@ -17,7 +17,7 @@ export type BizRouteView = Pick<GatewayRoute, 'scope'> &
  * 业务准入规则：
  * - platform 路由只接受 platform 业务会话；
  * - business 路由必须带已启用业务的 X-Biz-Code，会话需属于该业务（平台超管除外），
- *   且业务开通了该接口（platform 业务全部放行）；
+ *   且业务开通了该接口（platform 业务全部放行）。开通按业务功能点，不按用户勾选；
  * - 未标记 scope 的路由不拦截，业务合法时仍向下游透传。
  */
 export function evaluateBizAccess(input: {

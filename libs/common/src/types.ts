@@ -205,6 +205,37 @@ export interface PermissionInfo {
   sort: number;
 }
 
+/**
+ * 单个场景的订阅消息配置。
+ *
+ * 微信模板的 data 字段名（thing1 / character_string2 / amount3 …）
+ * 是模板申请下来才确定的，业务服务不可能知道。所以这里配一份
+ * 「模板字段 → 业务语义字段」的映射：业务服务只上报语义值
+ * （orderCode / title / amount …），由 wechat 服务按这份配置填进模板。
+ */
+export interface WechatSubscribeTemplate {
+  /** 小程序后台申请的模板 ID */
+  templateId: string;
+  /** 模板字段名 → 语义字段名；省略时回落到默认填充（thing1 = title） */
+  fields?: Record<string, string>;
+}
+
+/**
+ * 业务服务上报订阅消息时**必须**使用的语义字段名。
+ *
+ * 映射值只允许取这里的取值：拼错会让模板字段渲染成空串，而微信接口
+ * 依然返回成功（errcode=0），等于静默丢字段。所以宁可在配置期就拒掉。
+ */
+export const SUBSCRIBE_SEMANTICS = [
+  'orderCode',
+  'title',
+  'statusLabel',
+  'amount',
+  'at',
+] as const;
+
+export type SubscribeSemantic = (typeof SUBSCRIBE_SEMANTICS)[number];
+
 export interface WechatMiniProgram {
   id: string;
   code: string;
@@ -212,6 +243,12 @@ export interface WechatMiniProgram {
   appId: string;
   hasSecret: boolean;
   status: number;
+  /**
+   * 场景 → 模板配置。业务侧只说「发什么场景」，
+   * 模板 ID 与字段映射由这份配置补全，客户端绝不自己编模板 ID。
+   * 未配置的场景不下发（空串）也不发送。
+   */
+  subscribeTemplates: Record<string, WechatSubscribeTemplate>;
 }
 
 export interface WechatSession {
@@ -271,18 +308,6 @@ export const PERMISSIONS = {
   PERMISSION_EXPORT: 'permission.export',
   WECHAT_MANAGE: 'wechat.manage',
   WECHAT_QRCODE: 'wechat.qrcode',
-  /**
-   * 服务端定价；只申报型号与数量，单价由目录回填。
-   * 需要登录 —— 估价是写型语义（POST）且可刷，登录后才能按用户限流。
-   * 注：目录读取（/recycle/cartridges*）是公开的，不设权限点。
-   */
-  RECYCLE_QUOTE_CREATE: 'recycle.quote.create',
-  RECYCLE_ORDER_VIEW: 'recycle.order.view',
-  RECYCLE_ORDER_CREATE: 'recycle.order.create',
-  /** 订单动作总开关；具体「谁能在什么状态下做什么」由回收服务内的策略引擎判定 */
-  RECYCLE_ORDER_ACTION: 'recycle.order.action',
-  RECYCLE_APPROVAL_VIEW: 'recycle.approval.view',
-  RECYCLE_APPROVAL_DECIDE: 'recycle.approval.decide',
 } as const;
 
 export type AgentChatRole = 'user' | 'assistant';

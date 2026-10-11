@@ -4,7 +4,7 @@ import type { ClientInfo } from '@app/common';
 import { Repository } from 'typeorm';
 import type { ClientType } from '../entities';
 import { BusinessEntity, ClientEntity } from '../entities';
-import { optionalString, requiredString, rpcFail } from '../rpc';
+import { clientCodeOf, optionalString, requiredString, rpcFail } from '../rpc';
 import { normalizeAppCode } from './wechat-app-code';
 
 @Injectable()
@@ -74,8 +74,16 @@ export class ClientsService {
     return rows.map((row) => this.toInfo(row));
   }
 
+  /**
+   * 新建接入端。
+   *
+   * 接入端的 code 走 `clientCode` 字段，**不能叫 `appCode`**：网关 `buildProxyPayload`
+   * 会把请求体里的 `appCode` 一律丢弃（该字段被保留给「调用方身份」，只认请求头
+   * `X-App-Code` 注入的 `_appCode`），用 `appCode` 传值到不了这里。命名与
+   * `/auth/login` 选择接入端时的 `clientCode` 保持一致。
+   */
   async create(payload: Record<string, unknown>): Promise<ClientInfo> {
-    const appCode = normalizeAppCode(requiredString(payload.appCode, 'appCode'));
+    const appCode = normalizeAppCode(clientCodeOf(payload, true));
     const name = requiredString(payload.name, 'name');
     const business = await this.requireBusiness(requiredString(payload.businessId, 'businessId'));
     const exists = await this.clients.findOne({ where: { appCode } });
@@ -102,8 +110,9 @@ export class ClientsService {
 
   async update(payload: Record<string, unknown>): Promise<ClientInfo> {
     const client = await this.requireById(requiredString(payload.id, 'id'));
-    if (payload.appCode !== undefined) {
-      const appCode = normalizeAppCode(requiredString(payload.appCode, 'appCode'));
+    const nextAppCode = clientCodeOf(payload);
+    if (nextAppCode !== undefined) {
+      const appCode = normalizeAppCode(nextAppCode);
       const taken = await this.clients.findOne({ where: { appCode } });
       if (taken && taken.id !== client.id) {
         rpcFail(409, `接入端 ${appCode} 已存在`);

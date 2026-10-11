@@ -24,6 +24,15 @@ export type RecycleRole = (typeof RECYCLE_ROLES)[keyof typeof RECYCLE_ROLES];
 
 export const RECYCLE_ROLE_VALUES: string[] = Object.values(RECYCLE_ROLES);
 
+/**
+ * 业务内身份。没挂回收角色的登录用户默认是客户（C 端）。
+ * 网关不按功能点挡人；谁能看单、谁能收货由这些身份决定。
+ */
+export function recycleIdentities(roles: string[]): string[] {
+  const assigned = roles.filter((role) => RECYCLE_ROLE_VALUES.includes(role));
+  return assigned.length ? assigned : [RECYCLE_ROLES.CUSTOMER];
+}
+
 export const RECYCLE_ROLE_LABELS: Record<string, string> = {
   [RECYCLE_ROLES.CUSTOMER]: '客户',
   [RECYCLE_ROLES.AGENT]: '业务员',

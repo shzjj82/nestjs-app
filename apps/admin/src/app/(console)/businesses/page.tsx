@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { DataTable } from '@/components/data-table';
 import type { FilterField } from '@/components/filter-bar';
 import { PageHeader } from '@/components/page-header';
-import { PermissionChecklist } from '@/components/permission-checklist';
 import { SelectField } from '@/components/select-field';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,14 +20,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { actionsColumn } from '@/lib/admin-table-columns';
 import type { AdminColumnDef } from '@/lib/admin-table-types';
@@ -36,7 +27,6 @@ import { adminFetch } from '@/lib/api';
 import {
   type Business,
   type BusinessRole,
-  type Permission,
 } from '@/lib/businesses';
 import { BusinessModulesSheet } from './business-modules-sheet';
 
@@ -72,30 +62,18 @@ function errorMessage(err: unknown, fallback: string) {
 
 export default function BusinessesPage() {
   const [items, setItems] = useState<Business[]>([]);
-  const [permissions, setPermissions] = useState<Permission[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Business | null>(null);
   const [form, setForm] = useState<BusinessForm>(EMPTY_FORM);
   const [editRoles, setEditRoles] = useState<BusinessRole[]>([]);
-  const [selected, setSelected] = useState<Business | null>(null);
-  const [permIds, setPermIds] = useState<string[]>([]);
-  const [savingPerms, setSavingPerms] = useState(false);
   const [modulesTarget, setModulesTarget] = useState<Business | null>(null);
 
   const load = useCallback(async () => {
-    const next = await adminFetch<Business[]>('/businesses');
-    setItems(next);
-    setSelected((current) => {
-      if (!current) return current;
-      return next.find((item) => item.id === current.id) ?? null;
-    });
+    setItems(await adminFetch<Business[]>('/businesses'));
   }, []);
 
   useEffect(() => {
     load().catch((err) => toast.error(errorMessage(err, '加载失败')));
-    adminFetch<Permission[]>('/permissions')
-      .then(setPermissions)
-      .catch(() => undefined);
   }, [load]);
 
   function openCreate() {
@@ -167,28 +145,6 @@ export default function BusinessesPage() {
     },
     [load],
   );
-
-  const openCode = useCallback((business: Business) => {
-    setSelected(business);
-    setPermIds(business.permissionIds);
-  }, []);
-
-  async function savePermissions() {
-    if (!selected) return;
-    setSavingPerms(true);
-    try {
-      await adminFetch(`/businesses/${selected.id}/permissions`, {
-        method: 'PUT',
-        body: JSON.stringify({ permissionIds: permIds }),
-      });
-      toast.success('功能点已更新，该业务成员需重新登录');
-      await load();
-    } catch (err) {
-      toast.error(errorMessage(err, '保存失败'));
-    } finally {
-      setSavingPerms(false);
-    }
-  }
 
   const columns = useMemo<AdminColumnDef<Business>[]>(
     () => [
@@ -264,30 +220,6 @@ export default function BusinessesPage() {
         emptyMessage="暂无业务，点击右上角新建"
       />
 
-      <Sheet open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
-        <SheetContent className="w-full gap-0 overflow-hidden data-[side=right]:sm:max-w-3xl">
-          <SheetHeader className="border-b">
-            <SheetTitle className="font-mono">{selected?.code}</SheetTitle>
-            <SheetDescription>
-              {selected?.name}。这里勾选的功能点是该业务角色的上限，保存后成员需重新登录
-            </SheetDescription>
-          </SheetHeader>
-          <div className="flex-1 overflow-y-auto p-4">
-            <PermissionChecklist
-              idPrefix="biz-perm"
-              permissions={permissions}
-              value={permIds}
-              onChange={setPermIds}
-            />
-          </div>
-          <SheetFooter className="border-t">
-            <Button onClick={savePermissions} disabled={!selected || savingPerms}>
-              保存功能点
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -295,7 +227,7 @@ export default function BusinessesPage() {
             <DialogDescription>
               {editing
                 ? `业务 code ${editing.code} 创建后不可修改`
-                : '创建后在操作菜单「开通模块」开通微服务，点击 code 勾选功能点'}
+                : '创建后点「开通」勾选该业务可用的接口'}
             </DialogDescription>
           </DialogHeader>
           <form id="business-form" className="space-y-4" onSubmit={submitForm}>

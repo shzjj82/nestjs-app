@@ -4,6 +4,7 @@ import {
   recycleInternalKey,
   rpcFail,
 } from '@app/common';
+import { recycleIdentities } from './roles';
 
 /**
  * 调用者身份。
@@ -85,7 +86,8 @@ export function bizCodeOf(
 }
 
 export function hasAnyRole(actor: Actor, roles: string[]): boolean {
-  return roles.some((role) => actor.roles.includes(role));
+  const identities = recycleIdentities(actor.roles);
+  return roles.some((role) => identities.includes(role));
 }
 
 export function isAdmin(actor: Actor): boolean {

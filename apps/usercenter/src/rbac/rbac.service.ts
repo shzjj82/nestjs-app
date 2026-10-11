@@ -7,7 +7,6 @@ import {
   AccountEntity,
   AccountRoleEntity,
   BusinessEntity,
-  BusinessPermissionEntity,
   PermissionEntity,
   RoleEntity,
   RolePermissionEntity,
@@ -30,13 +29,12 @@ export class RbacService {
     private readonly accounts: Repository<AccountEntity>,
     @InjectRepository(BusinessEntity)
     private readonly businesses: Repository<BusinessEntity>,
-    @InjectRepository(BusinessPermissionEntity)
-    private readonly businessPermissions: Repository<BusinessPermissionEntity>,
     private readonly tokens: TokenStore,
   ) {}
 
   /**
-   * 会话权限 = 该账户的平台级角色 + 该用户在当前业务下的角色（与业务能力包取交集）。
+   * 会话：平台级角色带功能点（admin 控制台）；
+   * 业务角色只带身份 code，功能点由该业务开通的接口决定。
    */
   async loadAccountRbac(accountId: string, businessId: string) {
     const account = await this.accounts.findOne({ where: { id: accountId } });
@@ -55,10 +53,10 @@ export class RbacService {
       .filter((row) => row.role?.businessId === businessId)
       .map((row) => row.role);
 
-    const roleIds = [...platformRoles, ...businessRoles].map((role) => role.id);
-    const links = roleIds.length
+    const platformIds = platformRoles.map((role) => role.id);
+    const links = platformIds.length
       ? await this.rolePermissions.find({
-          where: { roleId: In(roleIds) },
+          where: { roleId: In(platformIds) },
           relations: ['permission'],
         })
       : [];
@@ -68,14 +66,9 @@ export class RbacService {
         .filter((link) => link.roleId === role.id)
         .map((link) => link.permission.code),
     });
-    const capabilityLinks = await this.businessPermissions.find({
-      where: { businessId },
-      relations: ['permission'],
-    });
     return mergeBusinessRbac({
       platformRoles: platformRoles.map(grant),
-      businessRoles: businessRoles.map(grant),
-      capability: new Set(capabilityLinks.map((link) => link.permission.code)),
+      businessRoles: businessRoles.map((role) => ({ code: role.code, permissions: [] })),
     });
   }
 
@@ -137,6 +130,9 @@ export class RbacService {
 
   async setRolePermissions(payload: Record<string, unknown>): Promise<RoleInfo> {
     const role = await this.requireRole(requiredString(payload.id, 'id'));
+    if (role.businessId) {
+      rpcFail(400, '业务角色只表示身份，不配置功能点');
+    }
     const permissionIds = Array.isArray(payload.permissionIds)
       ? payload.permissionIds.map(String)
       : [];
@@ -318,17 +314,6 @@ export class RbacService {
   }
 
   private async grantToAdminRole(permission: PermissionEntity) {
-    const platform = await this.businesses.findOne({ where: { code: PLATFORM_BIZ_CODE } });
-    if (platform) {
-      const linked = await this.businessPermissions.findOne({
-        where: { businessId: platform.id, permissionId: permission.id },
-      });
-      if (!linked) {
-        await this.businessPermissions.save(
-          this.businessPermissions.create({ businessId: platform.id, permissionId: permission.id }),
-        );
-      }
-    }
     const admin = await this.roles.findOne({ where: { code: 'admin', businessId: IsNull() } });
     if (!admin) {
       return;

@@ -173,11 +173,12 @@ curl -X POST http://localhost:3000/auth/alipay \
   -d '{"code":"alipay-auth-code","nickname":"支付宝用户"}'
 
 # 给业务登记接入端，wechatAppId 必须已在微信服务存在
+# 接入端的 code 用 clientCode 传；请求体里的 appCode 会被网关丢弃（那是调用方身份字段）
 curl -X POST http://localhost:3000/clients \
   -H 'X-Biz-Code: platform' \
   -H "Authorization: Bearer <token>" \
   -H 'Content-Type: application/json' \
-  -d '{"businessId":"<业务 id>","appCode":"mall-wechat","name":"商城小程序","type":"wechat_mp","wechatAppId":"wxaaaaaaaa"}'
+  -d '{"businessId":"<业务 id>","clientCode":"mall-wechat","name":"商城小程序","type":"wechat_mp","wechatAppId":"wxaaaaaaaa"}'
 ```
 
 登录可带 `phone`，与账密账号合并。微信登录签发的 token 会话里会带 **wechatAppId**（真正的微信小程序 appId），刷新后仍保留，用来区分属于哪一套小程序。
