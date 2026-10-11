@@ -1,5 +1,4 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
-import { CartridgeType } from '../domain';
 
 /**
  * 耗材类型字典（墨盒 / 硒鼓）。
@@ -13,7 +12,7 @@ export class RecycleCartridgeTypeEntity {
 
   @Index({ unique: true })
   @Column({ type: 'varchar', length: 16 })
-  key: CartridgeType;
+  key: string;
 
   @Column({ type: 'varchar', length: 32 })
   label: string;

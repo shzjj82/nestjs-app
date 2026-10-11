@@ -9,6 +9,7 @@ import { ApprovalsModule } from './approvals/approvals.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { DatabaseModule } from './database/database.module';
 import { OrdersModule } from './orders/orders.module';
+import { StoresModule } from './stores/stores.module';
 import { PolicyModule } from './policy/policy.module';
 import { RecycleController } from './recycle.controller';
 
@@ -25,6 +26,7 @@ import { RecycleController } from './recycle.controller';
     DatabaseModule,
     PolicyModule,
     CatalogModule,
+    StoresModule,
     OrdersModule,
     ApprovalsModule,
     ApiDocsModule.forService({

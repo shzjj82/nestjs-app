@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { recycleDatabaseUrl } from '@app/common';
 import { RECYCLE_ENTITIES } from '../entities';
 import { CatalogIds1760500000000 } from './migrations/1760500000000-catalog-ids';
+import { Stores1760600000000 } from './migrations/1760600000000-stores';
 import { OrderWechatAppId1760400000000 } from './migrations/1760400000000-order-wechat-appid';
 import { CatalogSchema1760300000000 } from './migrations/1760300000000-catalog-schema';
 import { InitRecycleSchema1760200000000 } from './migrations/1760200000000-init-recycle-schema';
@@ -22,6 +23,7 @@ const sync = process.env.TYPEORM_SYNC === 'true';
         CatalogSchema1760300000000,
         OrderWechatAppId1760400000000,
         CatalogIds1760500000000,
+        Stores1760600000000,
       ],
       logging: process.env.TYPEORM_LOGGING === 'true',
     }),

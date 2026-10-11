@@ -122,6 +122,23 @@ describe('matchRoute', () => {
     expect(matchRoute('GET', '/agents/jobs/job-1')).toBeNull();
   });
 
+  it('registers recycle catalog writes and store bind before :id', () => {
+    expect(matchRoute('POST', '/recycle/cartridges/types')?.auth).toEqual(['jwt']);
+    expect(matchRoute('PATCH', '/recycle/cartridges/models/m-1')?.pattern).toBe(
+      MQTT_PATTERNS.RECYCLE_CATALOG_MODEL_UPDATE,
+    );
+    expect(matchRoute('GET', '/recycle/stores')?.auth).toBeUndefined();
+    expect(matchRoute('GET', '/recycle/stores/mine')?.pattern).toBe(
+      MQTT_PATTERNS.RECYCLE_STORE_MINE,
+    );
+    expect(matchRoute('POST', '/recycle/stores/bind')?.pattern).toBe(
+      MQTT_PATTERNS.RECYCLE_STORE_BIND,
+    );
+    expect(matchRoute('POST', '/recycle/stores/s-1/qrcode')?.pattern).toBe(
+      MQTT_PATTERNS.RECYCLE_STORE_QRCODE,
+    );
+  });
+
   it('protects wechat miniprogram admin and qrcode override', () => {
     expect(matchRoute('GET', '/wechat/miniprograms')?.permissions).toEqual([
       'wechat.manage',

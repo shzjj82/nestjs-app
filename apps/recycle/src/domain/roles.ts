@@ -3,7 +3,7 @@
  *
  * 这些角色应建在「回收业务」下（role.businessId = 回收业务ID），
  * 不要建成平台级角色（businessId 为空），否则会在所有业务中生效。
- * 角色与功能点的绑定沿用 usercenter 的 RBAC，回收服务只消费会话里的 roles/permissions。
+ * 业务角色只表示身份，不绑功能点。网关按业务开通接口；本服务按身份限制动作。
  */
 export const RECYCLE_ROLES = {
   /** C 端客户：下单、提交、接受/拒绝报价、发起协商 */
