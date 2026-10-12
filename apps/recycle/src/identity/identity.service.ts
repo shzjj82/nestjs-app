@@ -10,37 +10,20 @@ import { lastValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import type { Actor } from '../domain';
 import {
-  isAdmin,
-  isStaffRole,
   RECYCLE_IDENTITY,
   RECYCLE_IDENTITY_LABELS,
   recycleMemberIdentities,
 } from '../domain';
 import { StoresService } from '../stores/stores.service';
 
+/**
+ * GET /recycle/me 精简视图。
+ * 客户为默认身份，不单独返回；identities 只列额外身份（业务员 / 超管）。
+ */
 export interface RecycleIdentityView {
   userId: string;
-  accountId: string | null;
   nickname: string | null;
-  bizCode: string;
-  wechatAppId: string | null;
-  /** 当前会话账户（标识 / 类型；不含手机号） */
-  account: {
-    id: string;
-    identifier: string;
-    type: string;
-  } | null;
-  /**
-   * 回收业务成员身份（粗粒度），来自账户**实时角色**（不读过期会话 roles）：
-   * customer=客户 / staff=业务员 / admin=超管。
-   */
   identities: Array<{ code: string; label: string }>;
-  primaryIdentity: string;
-  primaryIdentityLabel: string;
-  /** 账户实时角色含业务员 / 超管 */
-  isStaff: boolean;
-  isAdmin: boolean;
-  /** 当前账户绑定的门店（含本店别名）；绑定本身不是身份，须伴随 agent 角色 */
   stores: Array<{
     id: string;
     name: string;
@@ -48,12 +31,6 @@ export interface RecycleIdentityView {
     enabled: boolean;
   }>;
 }
-
-const PRIMARY_PRIORITY = [
-  RECYCLE_IDENTITY.ADMIN,
-  RECYCLE_IDENTITY.STAFF,
-  RECYCLE_IDENTITY.CUSTOMER,
-] as const;
 
 @Injectable()
 export class IdentityService {
@@ -68,38 +45,18 @@ export class IdentityService {
     const account = await this.loadAccount(actor.accountId);
     // 身份以 usercenter 实时角色为准，避免绑店赋角色后旧 token 仍显示客户
     const liveRoles = account?.roles?.length ? account.roles : actor.roles;
-    const identities = recycleMemberIdentities(liveRoles).map((code) => ({
-      code,
-      label: RECYCLE_IDENTITY_LABELS[code] ?? code,
-    }));
-    const primaryIdentity = pickPrimary(identities.map((item) => item.code));
+    const identities = recycleMemberIdentities(liveRoles)
+      .filter((code) => code !== RECYCLE_IDENTITY.CUSTOMER)
+      .map((code) => ({
+        code,
+        label: RECYCLE_IDENTITY_LABELS[code] ?? code,
+      }));
     const stores = await this.stores.boundStores(actor, bizCode);
 
     return {
       userId: actor.userId,
-      accountId: actor.accountId,
       nickname: actor.nickname,
-      bizCode,
-      wechatAppId: actor.wechatAppId,
-      account: account
-        ? {
-            id: account.id,
-            identifier: account.identifier,
-            type: account.type,
-          }
-        : actor.accountId
-          ? {
-              id: actor.accountId,
-              identifier: actor.accountId,
-              type: 'unknown',
-            }
-          : null,
       identities,
-      primaryIdentity,
-      primaryIdentityLabel:
-        RECYCLE_IDENTITY_LABELS[primaryIdentity] ?? primaryIdentity,
-      isStaff: isStaffRole(liveRoles),
-      isAdmin: isAdmin({ ...actor, roles: liveRoles }),
       stores: stores.map((store) => ({
         id: store.id,
         name: store.name,
@@ -130,13 +87,4 @@ export class IdentityService {
       return null;
     }
   }
-}
-
-function pickPrimary(codes: string[]): string {
-  for (const code of PRIMARY_PRIORITY) {
-    if (codes.includes(code)) {
-      return code;
-    }
-  }
-  return codes[0] ?? RECYCLE_IDENTITY.CUSTOMER;
 }

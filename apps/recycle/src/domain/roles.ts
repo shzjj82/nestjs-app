@@ -58,6 +58,7 @@ export function recycleIdentities(roles: string[]): string[] {
 /**
  * 对外成员身份：客户 / 业务员 / 超管（去重）。
  * 只认账户上的业务角色；门店绑定必须伴随 agent 等角色，不在这里用 stores 冒充。
+ * 无业务角色时视为客户（客户是默认身份）。
  */
 export function recycleMemberIdentities(roles: string[]): RecycleIdentity[] {
   const assigned = roles.filter((role) => RECYCLE_ROLE_VALUES.includes(role));
