@@ -186,4 +186,51 @@ export class AccountsService {
     const [info] = await this.toInfoList([account]);
     return info;
   }
+
+  async findMany(ids: string[]): Promise<UserAccountInfo[]> {
+    const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+    if (!unique.length) {
+      return [];
+    }
+    const rows = await this.accounts.find({ where: { id: In(unique) } });
+    return this.toInfoList(rows);
+  }
+
+  /**
+   * 给账户补齐某业务下的角色（只增不删）。
+   * 业务未配置对应角色时返回 missing，不抛错——避免扫码绑定被角色种子挡住。
+   */
+  async ensureBusinessRoles(
+    accountId: string,
+    bizCode: string,
+    codes: string[],
+  ): Promise<{ added: string[]; missing: string[] }> {
+    const unique = [...new Set(codes.map((c) => c.trim()).filter(Boolean))];
+    if (!unique.length) {
+      return { added: [], missing: [] };
+    }
+    await this.findEntity(accountId);
+    const roles = await this.roles
+      .createQueryBuilder('r')
+      .innerJoin('r.business', 'b')
+      .where('b.code = :bizCode', { bizCode })
+      .andWhere('r.code IN (:...codes)', { codes: unique })
+      .getMany();
+    const found = new Set(roles.map((role) => role.code));
+    const missing = unique.filter((code) => !found.has(code));
+    if (!roles.length) {
+      return { added: [], missing };
+    }
+    const current = await this.accountRoles.find({ where: { accountId } });
+    const have = new Set(current.map((row) => row.roleId));
+    const toAdd = roles.filter((role) => !have.has(role.id));
+    if (toAdd.length) {
+      await this.accountRoles.save(
+        toAdd.map((role) =>
+          this.accountRoles.create({ accountId, roleId: role.id }),
+        ),
+      );
+    }
+    return { added: toAdd.map((role) => role.code), missing };
+  }
 }

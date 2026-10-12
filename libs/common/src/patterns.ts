@@ -25,6 +25,10 @@ export const MQTT_PATTERNS = {
   USER_UPDATE: 'user.update',
   ACCOUNT_UPDATE: 'account.update',
   ACCOUNT_ASSIGN_ROLES: 'account.assignRoles',
+  /** 按 id 批量查账户（不含用户手机号等 PII） */
+  ACCOUNT_FIND_MANY: 'account.findMany',
+  /** 给账户补齐某业务下的角色（只增不删） */
+  ACCOUNT_ENSURE_ROLES: 'account.ensureRoles',
   AUTH_REGISTER: 'auth.register',
   AUTH_LOGIN: 'auth.login',
   AUTH_WECHAT: 'auth.wechat',
@@ -114,6 +118,8 @@ export const MQTT_PATTERNS = {
   AGENTS_VISION_PARSE: 'agents.vision.parse',
   RECYCLE_HEALTH: 'recycle.health',
   RECYCLE_API_DOCS: 'recycle.apiDocs',
+  /** 当前登录用户在回收业务下的身份（会话用户 + 账户角色 + 门店绑定） */
+  RECYCLE_ME: 'recycle.me',
   RECYCLE_POLICY_TRANSITIONS: 'recycle.policy.transitions',
   RECYCLE_CATALOG_ALL: 'recycle.catalog.all',
   RECYCLE_CATALOG_TYPES: 'recycle.catalog.types',
@@ -129,16 +135,23 @@ export const MQTT_PATTERNS = {
   RECYCLE_CATALOG_MODEL_UPDATE: 'recycle.catalog.model.update',
   RECYCLE_CATALOG_MODEL_DELETE: 'recycle.catalog.model.delete',
   RECYCLE_STORE_FIND_ALL: 'recycle.store.findAll',
+  /** 按用户经纬度就近排序的门店列表（小程序） */
+  RECYCLE_STORE_NEARBY: 'recycle.store.nearby',
   RECYCLE_STORE_FIND_ONE: 'recycle.store.findOne',
   RECYCLE_STORE_CREATE: 'recycle.store.create',
   RECYCLE_STORE_UPDATE: 'recycle.store.update',
   RECYCLE_STORE_DELETE: 'recycle.store.delete',
   RECYCLE_STORE_MINE: 'recycle.store.mine',
   RECYCLE_STORE_STAFF: 'recycle.store.staff',
+  RECYCLE_STORE_STAFF_UPDATE: 'recycle.store.staff.update',
   RECYCLE_STORE_BIND: 'recycle.store.bind',
   RECYCLE_STORE_UNBIND: 'recycle.store.unbind',
   RECYCLE_STORE_QRCODE: 'recycle.store.qrcode',
   RECYCLE_ORDER_FIND_ALL: 'recycle.order.findAll',
+  /** 客户视角：我的订单 */
+  RECYCLE_ORDER_FIND_MINE: 'recycle.order.findMine',
+  /** 业务员视角：工作台订单 */
+  RECYCLE_ORDER_FIND_STAFF: 'recycle.order.findStaff',
   RECYCLE_ORDER_FIND_ONE: 'recycle.order.findOne',
   RECYCLE_ORDER_CREATE: 'recycle.order.create',
   RECYCLE_ORDER_ACTION: 'recycle.order.action',

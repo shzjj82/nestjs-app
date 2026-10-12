@@ -224,6 +224,31 @@ export class UsersService {
     return this.findOne(account.userId);
   }
 
+  async findAccounts(payload: Record<string, unknown>) {
+    const ids = Array.isArray(payload.ids)
+      ? payload.ids.map(String)
+      : stringList(payload.ids);
+    return this.accounts.findMany(ids);
+  }
+
+  async ensureAccountRoles(payload: Record<string, unknown>) {
+    const accountId = requiredString(payload.id ?? payload.accountId, 'accountId');
+    const bizCode = requiredString(payload.bizCode, 'bizCode');
+    const codes = Array.isArray(payload.codes)
+      ? payload.codes.map(String)
+      : stringList(payload.codes);
+    const account = await this.accounts.findEntity(accountId);
+    const result = await this.accounts.ensureBusinessRoles(
+      accountId,
+      bizCode,
+      codes,
+    );
+    if (result.added.length) {
+      await this.tokens.revokeAll(account.userId);
+    }
+    return result;
+  }
+
   async createUser(input: {
     nickname: string;
     phone?: string | null;

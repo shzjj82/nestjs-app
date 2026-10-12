@@ -34,8 +34,14 @@ import {
 } from '../entities';
 import { OrderPolicyService } from '../policy/policy.service';
 import { OrderAction } from '../policy/transitions';
-import { scopeFor } from './order-scope';
+import {
+  canAccessOrder,
+  customerScope,
+  staffScope,
+  type OrderScope,
+} from './order-scope';
 import { toOrderView } from './order-view';
+import { isCustomerOnly, requireStaff } from '../domain';
 
 const STAFF_ROLES: string[] = [
   RECYCLE_ROLES.AGENT,
@@ -197,10 +203,55 @@ export class OrdersService {
 
   // ---------------------------------------------------------------- 读
 
+  /** 个人中心：当前用户自己的订单 */
+  async listMine(
+    actor: Actor,
+    bizCode: string,
+    query: Record<string, unknown> = {},
+  ) {
+    return this.listWithScope(
+      actor,
+      customerScope(actor, bizCode),
+      'customer',
+      query,
+    );
+  }
+
+  /** 业务员工作台：业务内订单（需业务员 / 超管身份） */
+  async listStaff(
+    actor: Actor,
+    bizCode: string,
+    query: Record<string, unknown> = {},
+  ) {
+    requireStaff(actor, '查看业务订单');
+    return this.listWithScope(
+      actor,
+      staffScope(actor, bizCode),
+      'staff',
+      query,
+    );
+  }
+
+  /**
+   * 兼容旧客户端：有业务员身份走工作台，否则走个人单。
+   * 新客户端请分别用 /orders/mine 与 /orders/staff。
+   */
   async list(
     actor: Actor,
     bizCode: string,
     query: Record<string, unknown> = {},
+  ) {
+    if (isCustomerOnly(actor)) {
+      return this.listMine(actor, bizCode, query);
+    }
+    return this.listStaff(actor, bizCode, query);
+  }
+
+  private async listWithScope(
+    actor: Actor,
+    scope: OrderScope,
+    view: 'customer' | 'staff',
+    query: Record<string, unknown>,
   ) {
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(50, Math.max(1, Number(query.pageSize) || 20));
@@ -208,7 +259,6 @@ export class OrdersService {
     const status =
       statusRaw && isOrderStatus(statusRaw) ? statusRaw : undefined;
 
-    const scope = scopeFor(actor, bizCode);
     const where = scope.where.map((clause) =>
       status ? { ...clause, status } : clause,
     );
@@ -223,6 +273,7 @@ export class OrdersService {
       total,
       page,
       pageSize,
+      view,
     };
   }
 
@@ -373,7 +424,7 @@ export class OrdersService {
       if (!order) {
         rpcFail(404, '订单不存在');
       }
-      if (!scopeFor(actor, bizCode).allows(order)) {
+      if (!canAccessOrder(actor, bizCode, order)) {
         // 越统一返回 404，避免用错误码探测订单是否存在
         rpcFail(404, '订单不存在');
       }
@@ -504,7 +555,7 @@ export class OrdersService {
     if (!order) {
       rpcFail(404, '订单不存在');
     }
-    if (!scopeFor(actor, bizCode).allows(order)) {
+    if (!canAccessOrder(actor, bizCode, order)) {
       rpcFail(404, '订单不存在');
     }
     return order;

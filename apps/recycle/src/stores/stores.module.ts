@@ -5,6 +5,7 @@ import {
   mqttClientOptions,
   UPLOAD_CLIENT,
   UploadClient,
+  USER_CLIENT,
   WECHAT_CLIENT,
 } from '@app/common';
 import { RecycleStoreEntity, RecycleStoreStaffEntity } from '../entities';
@@ -23,6 +24,10 @@ import { StoresService } from './stores.service';
         name: UPLOAD_CLIENT,
         ...mqttClientOptions('recycle-stores-to-upload'),
       },
+      {
+        name: USER_CLIENT,
+        ...mqttClientOptions('recycle-stores-to-user'),
+      },
     ]),
   ],
   controllers: [StoresController],
@@ -30,9 +35,12 @@ import { StoresService } from './stores.service';
   exports: [StoresService],
 })
 export class StoresModule implements OnModuleInit {
-  constructor(@Inject(WECHAT_CLIENT) private readonly wechat: ClientProxy) {}
+  constructor(
+    @Inject(WECHAT_CLIENT) private readonly wechat: ClientProxy,
+    @Inject(USER_CLIENT) private readonly users: ClientProxy,
+  ) {}
 
   async onModuleInit() {
-    await this.wechat.connect();
+    await Promise.all([this.wechat.connect(), this.users.connect()]);
   }
 }

@@ -145,7 +145,18 @@ describe('matchRoute', () => {
     expect(matchRoute('PATCH', '/recycle/cartridges/models/m-1')?.pattern).toBe(
       MQTT_PATTERNS.RECYCLE_CATALOG_MODEL_UPDATE,
     );
+    expect(matchRoute('GET', '/recycle/me')?.auth).toEqual(['jwt']);
+    expect(matchRoute('GET', '/recycle/me')?.pattern).toBe(MQTT_PATTERNS.RECYCLE_ME);
+    expect(matchRoute('GET', '/recycle/orders/mine')?.pattern).toBe(
+      MQTT_PATTERNS.RECYCLE_ORDER_FIND_MINE,
+    );
+    expect(matchRoute('GET', '/recycle/orders/staff')?.pattern).toBe(
+      MQTT_PATTERNS.RECYCLE_ORDER_FIND_STAFF,
+    );
     expect(matchRoute('GET', '/recycle/stores')?.auth).toBeUndefined();
+    expect(matchRoute('GET', '/recycle/stores/nearby')?.pattern).toBe(
+      MQTT_PATTERNS.RECYCLE_STORE_NEARBY,
+    );
     expect(matchRoute('GET', '/recycle/stores/mine')?.pattern).toBe(
       MQTT_PATTERNS.RECYCLE_STORE_MINE,
     );

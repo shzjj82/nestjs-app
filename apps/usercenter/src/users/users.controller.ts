@@ -38,4 +38,14 @@ export class UsersController {
   assignAccountRoles(payload: Record<string, unknown>) {
     return this.users.assignAccountRoles(payload);
   }
+
+  @MessagePattern(ucPattern(MQTT_PATTERNS.ACCOUNT_FIND_MANY))
+  findAccounts(payload: Record<string, unknown>) {
+    return this.users.findAccounts(payload ?? {});
+  }
+
+  @MessagePattern(ucPattern(MQTT_PATTERNS.ACCOUNT_ENSURE_ROLES))
+  ensureAccountRoles(payload: Record<string, unknown>) {
+    return this.users.ensureAccountRoles(payload ?? {});
+  }
 }

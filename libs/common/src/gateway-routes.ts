@@ -138,6 +138,7 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'GET', path: '/wechat/subscribe-templates', client: WECHAT_CLIENT, pattern: MQTT_PATTERNS.WECHAT_SUBSCRIBE_TEMPLATES, auth: ['jwt'] }),
 
   { method: 'GET', path: '/recycle/health', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_HEALTH },
+  business({ method: 'GET', path: '/recycle/me', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ME, auth: ['jwt'] }),
   business({ method: 'GET', path: '/recycle/policy/transitions', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_POLICY_TRANSITIONS, auth: ['jwt'] }),
 
   // 目录公开；订单/审批只需登录。功能点是业务开通的接口，不按用户勾选。
@@ -156,16 +157,20 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'DELETE', path: '/recycle/cartridges/models/:id', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_CATALOG_MODEL_DELETE, auth: ['jwt'] }),
 
   business({ method: 'GET', path: '/recycle/stores', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_STORE_FIND_ALL }),
+  business({ method: 'GET', path: '/recycle/stores/nearby', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_STORE_NEARBY }),
   business({ method: 'POST', path: '/recycle/stores', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_STORE_CREATE, auth: ['jwt'] }),
   business({ method: 'GET', path: '/recycle/stores/mine', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_STORE_MINE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/recycle/stores/bind', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_STORE_BIND, auth: ['jwt'] }),
   business({ method: 'GET', path: '/recycle/stores/:id/staff', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_STORE_STAFF, auth: ['jwt'] }),
+  business({ method: 'PATCH', path: '/recycle/stores/:id/staff/:accountId', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_STORE_STAFF_UPDATE, auth: ['jwt'] }),
   business({ method: 'DELETE', path: '/recycle/stores/:id/staff/:accountId', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_STORE_UNBIND, auth: ['jwt'] }),
   business({ method: 'POST', path: '/recycle/stores/:id/qrcode', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_STORE_QRCODE, auth: ['jwt'] }),
   business({ method: 'GET', path: '/recycle/stores/:id', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_STORE_FIND_ONE }),
   business({ method: 'PATCH', path: '/recycle/stores/:id', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_STORE_UPDATE, auth: ['jwt'] }),
   business({ method: 'DELETE', path: '/recycle/stores/:id', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_STORE_DELETE, auth: ['jwt'] }),
 
+  business({ method: 'GET', path: '/recycle/orders/mine', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_FIND_MINE, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/recycle/orders/staff', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_FIND_STAFF, auth: ['jwt'] }),
   business({ method: 'GET', path: '/recycle/orders', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_FIND_ALL, auth: ['jwt'] }),
   business({ method: 'POST', path: '/recycle/orders', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_CREATE, auth: ['jwt'] }),
   business({ method: 'GET', path: '/recycle/orders/:id', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_FIND_ONE, auth: ['jwt'] }),

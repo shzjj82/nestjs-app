@@ -33,6 +33,18 @@ export class StoresController {
   }
 
   @MessagePattern(
+    sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_STORE_NEARBY),
+  )
+  @ApiDoc({
+    name: '就近门店列表',
+    description:
+      '小程序传入用户 longitude/latitude，按与门店坐标的直线距离升序返回；可选 limit、maxKm',
+  })
+  nearby(payload: Record<string, unknown>) {
+    return this.stores.nearby(publicBiz(payload), payload);
+  }
+
+  @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_STORE_MINE),
   )
   @ApiDoc({ name: '我绑定的门店' })
@@ -86,13 +98,28 @@ export class StoresController {
   @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_STORE_STAFF),
   )
-  @ApiDoc({ name: '门店已绑账号' })
+  @ApiDoc({ name: '门店已绑账号', description: '账户维度：标识 / 别名 / 业务角色，不含手机号' })
   staff(payload: Record<string, unknown>) {
     const actor = requireActor(payload);
     return this.stores.listStaff(
       actor,
       bizCodeOf(payload, actor),
       requiredString(payload.id, 'id'),
+    );
+  }
+
+  @MessagePattern(
+    sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_STORE_STAFF_UPDATE),
+  )
+  @ApiDoc({ name: '更新门店绑定账号', description: '目前支持改别名 alias' })
+  updateStaff(payload: Record<string, unknown>) {
+    const actor = requireActor(payload);
+    return this.stores.updateStaff(
+      actor,
+      bizCodeOf(payload, actor),
+      requiredString(payload.id, 'id'),
+      requiredString(payload.accountId, 'accountId'),
+      payload,
     );
   }
 

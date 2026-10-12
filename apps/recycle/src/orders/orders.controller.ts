@@ -21,9 +21,38 @@ export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
 
   @MessagePattern(
+    sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_FIND_MINE),
+  )
+  @ApiDoc({
+    name: '我的回收订单',
+    description: '客户视角：只返回当前用户自己的单（个人中心）',
+  })
+  findMine(payload: Record<string, unknown>) {
+    const actor = requireActor(payload);
+    return this.orders.listMine(actor, bizCodeOf(payload, actor), payload);
+  }
+
+  @MessagePattern(
+    sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_FIND_STAFF),
+  )
+  @ApiDoc({
+    name: '业务员订单列表',
+    description:
+      '业务员视角：业务内工作单；需业务员/超管身份（agent/inspector/approver/finance 均视为业务员）',
+  })
+  findStaff(payload: Record<string, unknown>) {
+    const actor = requireActor(payload);
+    return this.orders.listStaff(actor, bizCodeOf(payload, actor), payload);
+  }
+
+  @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_FIND_ALL),
   )
-  @ApiDoc({ name: '回收订单列表', description: '按调用者身份自动收窄数据范围' })
+  @ApiDoc({
+    name: '回收订单列表（兼容）',
+    description:
+      '有业务员身份走工作台，否则走个人单；新客户端请用 /orders/mine 或 /orders/staff',
+  })
   findAll(payload: Record<string, unknown>) {
     const actor = requireActor(payload);
     return this.orders.list(actor, bizCodeOf(payload, actor), payload);

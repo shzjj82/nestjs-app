@@ -34,6 +34,10 @@ export class RecycleStoreStaffEntity {
   @Column({ name: 'user_id', type: 'varchar', length: 64 })
   userId: string;
 
+  /** 门店侧展示别名（不改账户本身） */
+  @Column({ type: 'varchar', length: 64, default: '' })
+  alias: string;
+
   /** 绑定时间（创建时间） */
   @CreateDateColumn({ name: 'bound_at', type: 'timestamptz' })
   boundAt: Date;
