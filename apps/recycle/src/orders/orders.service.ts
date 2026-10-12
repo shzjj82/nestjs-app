@@ -385,14 +385,17 @@ export class OrdersService {
       );
 
       const patch = this.buildPatch(authorized.action, order, payload, actor);
-      patch.status = authorized.to;
-      patch.version = order.version + 1;
-      patch.updatedAt = new Date();
 
       const result = await manager
         .createQueryBuilder()
         .update(RecycleOrderEntity)
-        .set(patch)
+        // QueryBuilder.update 不会触发 @UpdateDateColumn，需显式写库时间
+        .set({
+          ...patch,
+          status: authorized.to,
+          version: order.version + 1,
+          updatedAt: () => 'CURRENT_TIMESTAMP',
+        })
         .where('id = :id', { id: order.id })
         .andWhere('version = :version', { version: order.version })
         .execute();

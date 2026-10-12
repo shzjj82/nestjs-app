@@ -149,7 +149,6 @@ export class BusinessesService implements OnApplicationBootstrap {
       }
       business.defaultRoleId = roleId;
     }
-    business.updatedAt = new Date();
     const saved = await this.businesses.save(business);
     await this.publishRegistry();
     return this.toInfo(saved);

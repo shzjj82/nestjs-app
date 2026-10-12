@@ -5,6 +5,8 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { BusinessEntity } from './business.entity';
 
@@ -35,6 +37,9 @@ export class RoleEntity {
   @JoinColumn({ name: 'business_id' })
   business: BusinessEntity | null;
 
-  @Column({ name: 'created_at', type: 'timestamptz', default: () => 'now()' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt: Date;
 }

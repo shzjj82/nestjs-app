@@ -1,5 +1,6 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -50,6 +51,6 @@ export class RecycleAuditReportEntity {
   @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
   photos: string[];
 
-  @Column({ name: 'created_at', type: 'timestamptz', default: () => 'now()' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

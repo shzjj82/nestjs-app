@@ -1,4 +1,11 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 /** 业务：博客、wiki 等；数据按业务 code 隔离，角色与成员归属业务 */
 @Entity('uc_businesses')
@@ -30,9 +37,9 @@ export class BusinessEntity {
   @Column({ name: 'is_system', type: 'boolean', default: false })
   isSystem: boolean;
 
-  @Column({ name: 'created_at', type: 'timestamptz', default: () => 'now()' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @Column({ name: 'updated_at', type: 'timestamptz', default: () => 'now()' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

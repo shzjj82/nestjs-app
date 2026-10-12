@@ -141,7 +141,6 @@ export class ClientsService {
     if (payload.status !== undefined) {
       client.status = Number(payload.status) === 0 ? 0 : 1;
     }
-    client.updatedAt = new Date();
     return this.toInfo(await this.clients.save(client));
   }
 

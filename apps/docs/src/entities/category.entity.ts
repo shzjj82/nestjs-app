@@ -1,4 +1,11 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  PrimaryColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('doc_categories')
 @Index('uq_doc_categories_app_slug', ['appCode', 'slug'], { unique: true })
@@ -31,9 +38,9 @@ export class CategoryEntity {
   @Column({ type: 'int', default: 0 })
   sort!: number;
 
-  @Column({ name: 'created_at', type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 
-  @Column({ name: 'updated_at', type: 'timestamptz' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
 }

@@ -1,5 +1,6 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -28,4 +29,7 @@ export class RolePermissionEntity {
   @ManyToOne(() => PermissionEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'permission_id' })
   permission: PermissionEntity;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  createdAt: Date;
 }

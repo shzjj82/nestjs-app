@@ -1,5 +1,5 @@
-import { requireStaff } from './staff';
-import type { Actor } from './actor';
+import type { Actor } from '../../src/domain/actor';
+import { requireStaff } from '../../src/domain/staff';
 
 function actor(roles: string[]): Actor {
   return {

@@ -107,6 +107,47 @@ export interface AuthResult {
   wechatAppId?: string;
 }
 
+/** 小程序码用途：bind 绑定关系；login 扫码登录（走 MQTT 推送） */
+export type QrPurpose = 'bind' | 'login';
+
+export type LoginQrStatus = 'pending' | 'scanned' | 'confirmed' | 'expired';
+
+export interface LoginQrCreateResult {
+  purpose: 'login';
+  ticket: string;
+  scene: string;
+  /** 浏览器可用 SSE；也可直接用 MQTT 订阅该 topic */
+  mqttTopic: string;
+  /** 网关 SSE：GET /auth/login/qrcode/:ticket/events */
+  eventsPath: string;
+  expiresIn: number;
+  expiresAt: string;
+  image: {
+    mime: string;
+    filename: string;
+    /** OSS / 对象存储公网地址，前端直接用作 img src */
+    url: string;
+    key: string;
+  };
+}
+
+export interface LoginQrEvent {
+  purpose: 'login';
+  ticket: string;
+  status: LoginQrStatus;
+  at: string;
+  auth?: AuthResult;
+}
+
+export interface LoginQrStatusResult {
+  purpose: 'login';
+  ticket: string;
+  status: LoginQrStatus;
+  mqttTopic: string;
+  expiresAt: string;
+  auth?: AuthResult;
+}
+
 export interface RefreshTokenDto {
   refreshToken: string;
 }

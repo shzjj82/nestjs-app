@@ -60,8 +60,6 @@ export class OrderService {
         status: this.status(body.status),
         title: optionalString(body.title) ?? null,
         amount,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       }),
     );
     const savedItems = await this.items.save(

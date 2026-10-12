@@ -437,8 +437,6 @@ export class DocumentsService {
         teamId: input.teamId ?? null,
         visibility,
         publishedAt: visibility === 'public' ? now : null,
-        createdAt: now,
-        updatedAt: now,
       }),
     );
     const created = await this.findById(id);
@@ -526,7 +524,7 @@ export class DocumentsService {
         ...(input.teamId !== undefined ? { teamId: input.teamId } : {}),
         visibility,
         publishedAt,
-        updatedAt: now,
+        updatedAt: () => 'CURRENT_TIMESTAMP',
       },
     );
     return this.findById(id);
@@ -614,7 +612,7 @@ export class DocumentsService {
           treeSort: await this.nextTreeSort(child.appCode, resolvedParentId, 'article'),
           visibility,
           publishedAt,
-          updatedAt: now,
+          updatedAt: () => 'CURRENT_TIMESTAMP',
         },
       );
       const updatedChild = await this.findById(childId);
@@ -699,7 +697,7 @@ export class DocumentsService {
       { id: parentId },
       {
         body: parent.body as never,
-        updatedAt: new Date(),
+        updatedAt: () => 'CURRENT_TIMESTAMP',
       },
     );
     return this.findById(parentId);
@@ -722,7 +720,7 @@ export class DocumentsService {
       { id: parentId },
       {
         body: { ...parent.body, time: Date.now(), blocks: next } as never,
-        updatedAt: new Date(),
+        updatedAt: () => 'CURRENT_TIMESTAMP',
       },
     );
   }

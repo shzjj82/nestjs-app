@@ -5,6 +5,8 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import type { TeamRole } from '@app/common';
 import { AccountEntity } from './account.entity';
@@ -36,9 +38,9 @@ export class TeamMemberEntity {
   @JoinColumn({ name: 'account_id' })
   account: AccountEntity;
 
-  @Column({ name: 'created_at', type: 'timestamptz', default: () => 'now()' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @Column({ name: 'updated_at', type: 'timestamptz', default: () => 'now()' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

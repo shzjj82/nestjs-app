@@ -104,7 +104,6 @@ export class UsersService {
     const owner = await this.findByPhone(phone);
     if (!owner) {
       current.phone = phone;
-      current.updatedAt = new Date();
       return { user: await this.users.save(current), mergedFromUserId: null };
     }
 
@@ -127,7 +126,7 @@ export class UsersService {
 
       await accounts.update(
         { userId: loser.id },
-        { userId: survivor.id, updatedAt: new Date() },
+        { userId: survivor.id, updatedAt: () => 'CURRENT_TIMESTAMP' },
       );
 
       if (!survivor.email && loser.email) {
@@ -150,7 +149,6 @@ export class UsersService {
       await users.remove(loser);
 
       survivor.phone = phone;
-      survivor.updatedAt = new Date();
       await users.save(survivor);
     });
   }
@@ -210,7 +208,6 @@ export class UsersService {
     if (payload.status !== undefined) {
       user.status = Number(payload.status) === 0 ? 0 : 1;
     }
-    user.updatedAt = new Date();
     return this.toPublic(await this.users.save(user));
   }
 

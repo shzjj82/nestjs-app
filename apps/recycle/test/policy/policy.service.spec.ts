@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
-import { Actor, OrderSnapshot, OrderStatus } from '../domain';
-import { OrderPolicyService } from './policy.service';
+import { Actor, OrderSnapshot, OrderStatus } from '../../src/domain';
+import { OrderPolicyService } from '../../src/policy/policy.service';
 
 function actor(roles: string[], userId = 'u-1'): Actor {
   return {

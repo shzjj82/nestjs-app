@@ -1,4 +1,11 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 /** 团队：按接入端 appCode 与业务 code 隔离，成员挂在账户上 */
 @Entity('uc_teams')
@@ -29,9 +36,9 @@ export class TeamEntity {
   @Column({ type: 'smallint', default: 1 })
   status: number;
 
-  @Column({ name: 'created_at', type: 'timestamptz', default: () => 'now()' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @Column({ name: 'updated_at', type: 'timestamptz', default: () => 'now()' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

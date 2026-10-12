@@ -34,6 +34,11 @@ export const MQTT_PATTERNS = {
   AUTH_ME: 'auth.me',
   AUTH_BIND_PHONE: 'auth.bindPhone',
   AUTH_CHANGE_PASSWORD: 'auth.changePassword',
+  /** 登录小程序码：创建 / 扫码中 / 确认 / 查状态 */
+  AUTH_LOGIN_QR_CREATE: 'auth.loginQr.create',
+  AUTH_LOGIN_QR_SCAN: 'auth.loginQr.scan',
+  AUTH_LOGIN_QR_CONFIRM: 'auth.loginQr.confirm',
+  AUTH_LOGIN_QR_STATUS: 'auth.loginQr.status',
   BUSINESS_FIND_ALL: 'business.findAll',
   BUSINESS_FIND_ONE: 'business.findOne',
   BUSINESS_CREATE: 'business.create',

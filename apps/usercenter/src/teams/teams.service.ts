@@ -57,7 +57,6 @@ export class TeamsService {
     if (name.length > 64) {
       rpcFail(400, '团队名称不能超过 64 字');
     }
-    const now = new Date();
     const team = await this.teams.save(
       this.teams.create({
         appCode: scope.appCode,
@@ -66,8 +65,6 @@ export class TeamsService {
         name,
         description: optionalString(payload.description) ?? null,
         status: 1,
-        createdAt: now,
-        updatedAt: now,
       }),
     );
     await this.members.save(
@@ -75,8 +72,6 @@ export class TeamsService {
         teamId: team.id,
         accountId: scope.accountId,
         role: 'owner',
-        createdAt: now,
-        updatedAt: now,
       }),
     );
     return this.toInfo(team, 'owner');
@@ -92,17 +87,14 @@ export class TeamsService {
     if (existing) {
       return this.toInfo(team, existing.role);
     }
-    const now = new Date();
     const row = await this.members.save(
       this.members.create({
         teamId: team.id,
         accountId: scope.accountId,
         role: 'user',
-        createdAt: now,
-        updatedAt: now,
       }),
     );
-    await this.touch(team, now);
+    await this.touch(team);
     return this.toInfo(team, row.role);
   }
 
@@ -113,9 +105,7 @@ export class TeamsService {
     if (!canManageTeam(actor.role)) {
       rpcFail(403, '只有拥有者可以刷新团队码');
     }
-    const now = new Date();
     team.code = await this.allocateCode(scope.appCode, scope.bizCode);
-    team.updatedAt = now;
     await this.teams.save(team);
     return this.toInfo(team, actor.role);
   }
@@ -128,7 +118,7 @@ export class TeamsService {
       await this.assertOtherOwner(team.id, scope.accountId);
     }
     await this.members.delete({ id: me.id });
-    await this.touch(team, new Date());
+    await this.touch(team);
     return { left: true as const, teamId: team.id };
   }
 
@@ -156,11 +146,9 @@ export class TeamsService {
     if (target.role === 'owner' && role !== 'owner') {
       await this.assertOtherOwner(team.id, target.accountId);
     }
-    const now = new Date();
     target.role = role;
-    target.updatedAt = now;
     await this.members.save(target);
-    await this.touch(team, now);
+    await this.touch(team);
     return this.toMember(target);
   }
 
@@ -224,9 +212,8 @@ export class TeamsService {
     rpcFail(500, '团队码生成失败');
   }
 
-  private async touch(team: TeamEntity, at: Date) {
-    team.updatedAt = at;
-    await this.teams.save(team);
+  private async touch(team: TeamEntity) {
+    await this.teams.update(team.id, { updatedAt: () => 'CURRENT_TIMESTAMP' });
   }
 
   private async requireTeam(id: string, appCode: string, bizCode: string) {

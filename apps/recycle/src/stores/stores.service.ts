@@ -4,9 +4,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import {
   MQTT_PATTERNS,
   optionalString,
+  qrImageFilename,
   requiredString,
   rpcFail,
+  sniffImageMime,
   unwrapData,
+  UploadClient,
   WECHAT_CLIENT,
 } from '@app/common';
 import { lastValueFrom, TimeoutError } from 'rxjs';
@@ -37,6 +40,8 @@ export interface StoreView {
   latitude: number | null;
   enabled: boolean;
   detail: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface StoreStaffView {
@@ -53,6 +58,7 @@ export class StoresService {
     @InjectRepository(RecycleStoreStaffEntity)
     private readonly staff: Repository<RecycleStoreStaffEntity>,
     @Inject(WECHAT_CLIENT) private readonly wechat: ClientProxy,
+    private readonly upload: UploadClient,
   ) {}
 
   async list(bizCode: string, includeDisabled = false): Promise<StoreView[]> {
@@ -220,13 +226,27 @@ export class StoresService {
       if (!file?.base64) {
         rpcFail(502, '未返回小程序码');
       }
+      const mime = sniffImageMime(file.base64, file.mime);
+      const filename = qrImageFilename(
+        `store-bind-${store.id}`,
+        mime,
+        file.filename,
+      );
+      const stored = await this.upload.put({
+        bizCode,
+        filename,
+        contentType: mime,
+        base64: file.base64,
+        prefix: 'store-bind-qr',
+      });
       return {
         storeId: store.id,
         scene: store.bindScene,
         page,
-        mime: file.mime,
-        filename: file.filename,
-        base64: file.base64,
+        mime,
+        filename,
+        url: stored.url,
+        key: stored.key,
       };
     } catch (err) {
       if (err instanceof TimeoutError) {
@@ -275,7 +295,7 @@ export class StoresService {
       fields.district = optionalTrim(payload.district, 32, 'district') ?? '';
     }
     if (creating || payload.address !== undefined) {
-      fields.address = optionalTrim(payload.address, 255, 'address') ?? '';
+      fields.address = requiredTrim(payload.address, 255, 'address');
     }
     if (creating || payload.postal !== undefined) {
       fields.postal = optionalTrim(payload.postal, 16, 'postal') ?? '';
@@ -305,6 +325,8 @@ export class StoresService {
       latitude: row.latitude,
       enabled: row.enabled,
       detail,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     };
   }
 

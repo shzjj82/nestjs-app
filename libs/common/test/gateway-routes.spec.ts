@@ -8,6 +8,24 @@ describe('matchRoute', () => {
     expect(route?.auth).toBeUndefined();
   });
 
+  it('registers login qrcode routes and sse override', () => {
+    expect(matchRoute('POST', '/auth/login/qrcode')?.pattern).toBe(
+      MQTT_PATTERNS.AUTH_LOGIN_QR_CREATE,
+    );
+    expect(matchRoute('POST', '/auth/login/qrcode/scan')?.pattern).toBe(
+      MQTT_PATTERNS.AUTH_LOGIN_QR_SCAN,
+    );
+    expect(matchRoute('POST', '/auth/login/qrcode/confirm')?.pattern).toBe(
+      MQTT_PATTERNS.AUTH_LOGIN_QR_CONFIRM,
+    );
+    expect(matchRoute('GET', '/auth/login/qrcode/labc')?.pattern).toBe(
+      MQTT_PATTERNS.AUTH_LOGIN_QR_STATUS,
+    );
+    expect(matchRoute('GET', '/auth/login/qrcode/labc/events')?.override).toBe(
+      true,
+    );
+  });
+
   it('matches wechat and alipay login routes', () => {
     expect(matchRoute('POST', '/auth/wechat')?.pattern).toBe(
       MQTT_PATTERNS.AUTH_WECHAT,

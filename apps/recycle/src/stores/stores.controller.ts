@@ -131,7 +131,7 @@ export class StoresController {
   )
   @ApiDoc({
     name: '门店绑定小程序码',
-    description: '内部调微信 getwxacodeunlimit，返回 PNG base64',
+    description: '内部调微信 getwxacodeunlimit，上传 OSS 后返回 url / scene',
   })
   qrcode(payload: Record<string, unknown>) {
     const actor = requireActor(payload);

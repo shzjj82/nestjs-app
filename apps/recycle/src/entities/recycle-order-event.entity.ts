@@ -1,5 +1,6 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -70,6 +71,6 @@ export class RecycleOrderEventEntity {
   @Column({ type: 'jsonb', default: () => "'{}'::jsonb" })
   payload: Record<string, unknown>;
 
-  @Column({ name: 'created_at', type: 'timestamptz', default: () => 'now()' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

@@ -1,5 +1,6 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -28,4 +29,7 @@ export class AccountRoleEntity {
   @ManyToOne(() => RoleEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'role_id' })
   role: RoleEntity;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  createdAt: Date;
 }

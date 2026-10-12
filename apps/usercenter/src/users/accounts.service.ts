@@ -98,7 +98,6 @@ export class AccountsService {
 
   async setPassword(account: AccountEntity, password: string) {
     account.passwordHash = await hash(password, PASSWORD_ROUNDS);
-    account.updatedAt = new Date();
     return this.accounts.save(account);
   }
 
@@ -121,7 +120,6 @@ export class AccountsService {
       }
       account.passwordHash = await hash(password, PASSWORD_ROUNDS);
     }
-    account.updatedAt = new Date();
     return this.accounts.save(account);
   }
 

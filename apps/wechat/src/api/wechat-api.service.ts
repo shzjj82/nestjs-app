@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { optionalString, REDIS } from '@app/common';
+import { optionalString, REDIS, wechatQrcodeCheckPath } from '@app/common';
 import type Redis from 'ioredis';
 import { rpcFail } from '../common/rpc';
 import type { MiniProgramEntity } from '../entities';
@@ -59,7 +59,7 @@ export class WechatApiService {
     const body = {
       scene,
       page: typeof payload.page === 'string' ? payload.page : undefined,
-      check_path: payload.checkPath !== false,
+      check_path: resolveQrcodeCheckPath(payload.checkPath),
       env_version: typeof payload.envVersion === 'string' ? payload.envVersion : 'release',
       width: Number(payload.width) > 0 ? Number(payload.width) : 280,
     };
@@ -267,4 +267,15 @@ export class WechatApiService {
       rpcFail(502, '微信接口不可用');
     }
   }
+}
+
+/** 请求显式传 checkPath 优先；否则读 WECHAT_QRCODE_CHECK_PATH，默认 false */
+function resolveQrcodeCheckPath(raw: unknown): boolean {
+  if (raw === true || raw === 'true' || raw === '1') {
+    return true;
+  }
+  if (raw === false || raw === 'false' || raw === '0') {
+    return false;
+  }
+  return wechatQrcodeCheckPath();
 }

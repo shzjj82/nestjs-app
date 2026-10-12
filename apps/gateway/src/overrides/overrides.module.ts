@@ -7,6 +7,7 @@ import { OrdersOverrideController } from './orders.controller';
 import { VisionOverrideController } from './vision.controller';
 import { PermissionsFileController } from './permissions-file.controller';
 import { UploadOverrideController } from './upload.controller';
+import { LoginQrEventsController } from './login-qr-events.controller';
 import { WechatQrcodeController } from './wechat-qrcode.controller';
 
 @Module({
@@ -19,6 +20,7 @@ import { WechatQrcodeController } from './wechat-qrcode.controller';
     PermissionsFileController,
     UploadOverrideController,
     WechatQrcodeController,
+    LoginQrEventsController,
   ],
 })
 export class OverridesModule {}

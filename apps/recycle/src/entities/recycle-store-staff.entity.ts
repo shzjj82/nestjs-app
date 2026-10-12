@@ -1,10 +1,12 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { RecycleStoreEntity } from './recycle-store.entity';
 
@@ -32,6 +34,10 @@ export class RecycleStoreStaffEntity {
   @Column({ name: 'user_id', type: 'varchar', length: 64 })
   userId: string;
 
-  @Column({ name: 'bound_at', type: 'timestamptz', default: () => 'now()' })
+  /** 绑定时间（创建时间） */
+  @CreateDateColumn({ name: 'bound_at', type: 'timestamptz' })
   boundAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt: Date;
 }

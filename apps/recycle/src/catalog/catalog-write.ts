@@ -2,6 +2,19 @@ import { optionalString, requiredString, rpcFail } from '@app/common';
 
 const KEY_RE = /^[a-z][a-z0-9_]{0,15}$/;
 
+/** page / pageSize 都不传时不分页（返回全量）；任一传入则按页取 */
+export function toCatalogPage(page?: unknown, pageSize?: unknown) {
+  if (
+    (page === undefined || page === null || page === '') &&
+    (pageSize === undefined || pageSize === null || pageSize === '')
+  ) {
+    return null;
+  }
+  const current = Math.max(1, Number(page) || 1);
+  const size = Math.min(100, Math.max(1, Number(pageSize) || 20));
+  return { page: current, pageSize: size, skip: (current - 1) * size };
+}
+
 export function parseTypeKey(value: unknown): string {
   const key = requiredString(value, 'key').toLowerCase();
   if (!KEY_RE.test(key)) {

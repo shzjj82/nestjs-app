@@ -1,4 +1,4 @@
-import { normalizeSubscribeTemplates } from './subscribe-templates';
+import { normalizeSubscribeTemplates } from '../../src/miniprograms/subscribe-templates';
 
 /**
  * 只测纯函数，不引入 Nest / TypeORM：

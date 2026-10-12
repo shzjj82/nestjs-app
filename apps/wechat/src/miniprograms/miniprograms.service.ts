@@ -106,7 +106,6 @@ export class MiniProgramsService {
         payload.subscribeTemplates,
       );
     }
-    row.updatedAt = new Date();
     return this.toInfo(await this.programs.save(row));
   }
 

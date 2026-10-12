@@ -1,10 +1,12 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { CartridgeType } from '../domain';
 import { RecycleOrderEntity } from './recycle-order.entity';
@@ -57,4 +59,10 @@ export class RecycleOrderItemEntity {
 
   @Column({ name: 'sort', type: 'int', default: 0 })
   sort: number;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt: Date;
 }

@@ -1,7 +1,12 @@
 import { Inject, Module, OnModuleInit } from '@nestjs/common';
 import { ClientProxy, ClientsModule } from '@nestjs/microservices';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { mqttClientOptions, WECHAT_CLIENT } from '@app/common';
+import {
+  mqttClientOptions,
+  UPLOAD_CLIENT,
+  UploadClient,
+  WECHAT_CLIENT,
+} from '@app/common';
 import { RecycleStoreEntity, RecycleStoreStaffEntity } from '../entities';
 import { StoresController } from './stores.controller';
 import { StoresService } from './stores.service';
@@ -14,10 +19,14 @@ import { StoresService } from './stores.service';
         name: WECHAT_CLIENT,
         ...mqttClientOptions('recycle-stores-to-wechat'),
       },
+      {
+        name: UPLOAD_CLIENT,
+        ...mqttClientOptions('recycle-stores-to-upload'),
+      },
     ]),
   ],
   controllers: [StoresController],
-  providers: [StoresService],
+  providers: [StoresService, UploadClient],
   exports: [StoresService],
 })
 export class StoresModule implements OnModuleInit {

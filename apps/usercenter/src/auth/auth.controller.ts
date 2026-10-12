@@ -3,11 +3,15 @@ import { MessagePattern } from '@nestjs/microservices';
 import { ApiDoc, MQTT_PATTERNS, UsercenterHandleLogInterceptor } from '@app/common';
 import { ucPattern } from '../rpc';
 import { AuthService } from './auth.service';
+import { LoginQrService } from './login-qr.service';
 
 @Controller()
 @UseInterceptors(UsercenterHandleLogInterceptor)
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly loginQr: LoginQrService,
+  ) {}
 
   @MessagePattern(ucPattern(MQTT_PATTERNS.AUTH_REGISTER))
   @ApiDoc({ name: '注册用户', description: '账密注册到当前业务；手机号可选' })
@@ -60,5 +64,39 @@ export class AuthController {
   @ApiDoc({ name: '修改密码', description: '校验旧密码后设置新密码' })
   changePassword(payload: Record<string, unknown>) {
     return this.auth.changePassword(payload);
+  }
+
+  @MessagePattern(ucPattern(MQTT_PATTERNS.AUTH_LOGIN_QR_CREATE))
+  @ApiDoc({
+    name: '创建登录小程序码',
+    description:
+      'purpose=login。返回 MQTT topic 与 SSE 路径；与门店绑定码（purpose=bind）分离',
+  })
+  createLoginQr(payload: Record<string, unknown>) {
+    return this.loginQr.create(payload);
+  }
+
+  @MessagePattern(ucPattern(MQTT_PATTERNS.AUTH_LOGIN_QR_SCAN))
+  @ApiDoc({
+    name: '登录码已扫',
+    description: '小程序打开登录页时调用，PC 端经 MQTT/SSE 收到 scanned',
+  })
+  scanLoginQr(payload: Record<string, unknown>) {
+    return this.loginQr.scan(payload);
+  }
+
+  @MessagePattern(ucPattern(MQTT_PATTERNS.AUTH_LOGIN_QR_CONFIRM))
+  @ApiDoc({
+    name: '确认扫码登录',
+    description: '小程序用 code 换登录态后推送 confirmed + token',
+  })
+  confirmLoginQr(payload: Record<string, unknown>) {
+    return this.loginQr.confirm(payload);
+  }
+
+  @MessagePattern(ucPattern(MQTT_PATTERNS.AUTH_LOGIN_QR_STATUS))
+  @ApiDoc({ name: '登录码状态', description: '轮询兜底；优先用 MQTT 或 SSE' })
+  loginQrStatus(payload: Record<string, unknown>) {
+    return this.loginQr.status(payload);
   }
 }

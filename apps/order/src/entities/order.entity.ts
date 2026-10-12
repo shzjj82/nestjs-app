@@ -1,4 +1,12 @@
-import { Column, Entity, Index, OneToMany, PrimaryColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  OneToMany,
+  PrimaryColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { OrderItemEntity } from './order-item.entity';
 
 /** 传统订单头。业务差异由调用方在写入前映射，不在这里加专用字段。 */
@@ -23,10 +31,10 @@ export class OrderEntity {
   @Column({ type: 'int', default: 0 })
   amount: number;
 
-  @Column({ name: 'created_at', type: 'timestamptz', default: () => 'now()' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @Column({ name: 'updated_at', type: 'timestamptz', default: () => 'now()' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 
   @OneToMany(() => OrderItemEntity, (item) => item.order)

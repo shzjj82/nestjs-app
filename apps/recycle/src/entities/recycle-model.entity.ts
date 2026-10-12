@@ -1,10 +1,12 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { RecycleBrandEntity } from './recycle-brand.entity';
 import { RecycleCartridgeTypeEntity } from './recycle-cartridge-type.entity';
@@ -54,4 +56,10 @@ export class RecycleModelEntity {
 
   @Column({ type: 'boolean', default: true })
   enabled: boolean;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt: Date;
 }

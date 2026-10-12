@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { rpcFail } from '@app/common';
+import { rpcFail, type PageResult } from '@app/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
+import { CartridgeType, isCartridgeType } from '../domain';
 import {
   RecycleBrandEntity,
   RecycleCartridgeTypeEntity,
@@ -20,6 +21,7 @@ import {
   parseNonNegInt,
   parseTypeKey,
   requiredTrim,
+  toCatalogPage,
 } from './catalog-write';
 
 export type { QuoteRequestItem } from './catalog-items';
@@ -29,7 +31,8 @@ export interface CatalogTypeRow {
   key: string;
   label: string;
   desc: string;
-  color: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CatalogBrandRow {
@@ -37,6 +40,8 @@ export interface CatalogBrandRow {
   typeId: string;
   brand: string;
   logo: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CatalogModelRow {
@@ -48,13 +53,15 @@ export interface CatalogModelRow {
   fits: string;
   chip: boolean;
   price: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface QuoteLine {
   typeId: string;
   brandId: string;
   modelId: string;
-  cartridgeType: string;
+  cartridgeType: CartridgeType;
   brand: string;
   model: string;
   spec: string;
@@ -74,53 +81,41 @@ export class CatalogService {
     private readonly modelRepo: Repository<RecycleModelEntity>,
   ) {}
 
-  async types(): Promise<CatalogTypeRow[]> {
-    const rows = await this.typeRepo.find({
-      where: { enabled: true },
-      order: { sort: 'ASC' },
-    });
-    return rows.map((row) => ({
-      id: row.id,
-      key: row.key,
-      label: row.label,
-      desc: row.desc,
-      color: row.color,
-    }));
+  async types(payload: Record<string, unknown> = {}): Promise<PageResult<CatalogTypeRow>> {
+    return this.pageQuery(
+      this.typeRepo,
+      { enabled: true },
+      { sort: 'ASC' },
+      payload,
+      (row) => this.toType(row),
+    );
   }
 
-  async brands(typeId?: string): Promise<CatalogBrandRow[]> {
-    const rows = await this.brandRepo.find({
-      where: { enabled: true, ...(this.typeIdOf(typeId) ?? {}) },
-      order: { sort: 'ASC' },
-    });
-    return rows.map((row) => ({
-      id: row.id,
-      typeId: row.typeId,
-      brand: row.brand,
-      logo: row.logo,
-    }));
-  }
-
-  async models(typeId?: string, brandId?: string): Promise<CatalogModelRow[]> {
-    const where: Record<string, unknown> = { enabled: true };
-    const parsedTypeId = optionalId(typeId, 'typeId');
-    if (parsedTypeId) where.typeId = parsedTypeId;
-    const parsedBrandId = optionalId(brandId, 'brandId');
-    if (parsedBrandId) where.brandId = parsedBrandId;
-    const rows = await this.modelRepo.find({
+  async brands(payload: Record<string, unknown> = {}): Promise<PageResult<CatalogBrandRow>> {
+    const where: FindOptionsWhere<RecycleBrandEntity> = { enabled: true };
+    Object.assign(where, this.typeIdOf(payload.typeId as string | undefined) ?? {});
+    return this.pageQuery(
+      this.brandRepo,
       where,
-      order: { sort: 'ASC' },
-    });
-    return rows.map((row) => ({
-      id: row.id,
-      typeId: row.typeId,
-      brandId: row.brandId,
-      name: row.name,
-      spec: row.spec,
-      fits: row.fits,
-      chip: row.chip,
-      price: row.price,
-    }));
+      { sort: 'ASC' },
+      payload,
+      (row) => this.toBrand(row),
+    );
+  }
+
+  async models(payload: Record<string, unknown> = {}): Promise<PageResult<CatalogModelRow>> {
+    const where: FindOptionsWhere<RecycleModelEntity> = { enabled: true };
+    const typeId = optionalId(payload.typeId, 'typeId');
+    if (typeId) where.typeId = typeId;
+    const brandId = optionalId(payload.brandId, 'brandId');
+    if (brandId) where.brandId = brandId;
+    return this.pageQuery(
+      this.modelRepo,
+      where,
+      { sort: 'ASC' },
+      payload,
+      (row) => this.toModel(row),
+    );
   }
 
   async all(): Promise<{
@@ -133,7 +128,11 @@ export class CatalogService {
       this.brands(),
       this.models(),
     ]);
-    return { types, brands, models };
+    return {
+      types: types.items,
+      brands: brands.items,
+      models: models.items,
+    };
   }
 
   async priceItems(items: QuoteRequestItem[]): Promise<QuoteLine[]> {
@@ -156,6 +155,9 @@ export class CatalogService {
       }
       if (item.brandId && item.brandId !== row.brandId) {
         rpcFail(400, 'brandId 与型号不匹配');
+      }
+      if (!isCartridgeType(row.typeRef.key)) {
+        rpcFail(400, '型号的耗材类型无效');
       }
       return {
         typeId: row.typeId,
@@ -186,7 +188,6 @@ export class CatalogService {
         key,
         label: requiredTrim(payload.label, 32, 'label'),
         desc: optionalTrim(payload.desc ?? payload.description, 128, 'desc') ?? '',
-        color: optionalTrim(payload.color, 16, 'color') ?? '#3b82f6',
         sort: optionalNonNegInt(payload.sort, 'sort') ?? 0,
         enabled: optionalBool(payload.enabled) ?? true,
       }),
@@ -210,9 +211,6 @@ export class CatalogService {
     if (payload.desc !== undefined || payload.description !== undefined) {
       row.desc =
         optionalTrim(payload.desc ?? payload.description, 128, 'desc') ?? '';
-    }
-    if (payload.color !== undefined) {
-      row.color = optionalTrim(payload.color, 16, 'color') ?? row.color;
     }
     if (payload.sort !== undefined) {
       row.sort = parseNonNegInt(payload.sort, 'sort');
@@ -369,7 +367,8 @@ export class CatalogService {
       key: row.key,
       label: row.label,
       desc: row.desc,
-      color: row.color,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     };
   }
 
@@ -379,6 +378,8 @@ export class CatalogService {
       typeId: row.typeId,
       brand: row.brand,
       logo: row.logo,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     };
   }
 
@@ -392,6 +393,8 @@ export class CatalogService {
       fits: row.fits,
       chip: row.chip,
       price: row.price,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     };
   }
 
@@ -422,5 +425,27 @@ export class CatalogService {
   private typeIdOf(value?: string): { typeId: string } | undefined {
     const typeId = optionalId(value, 'typeId');
     return typeId ? { typeId } : undefined;
+  }
+
+  private async pageQuery<E extends object, T>(
+    repo: Repository<E>,
+    where: FindOptionsWhere<E>,
+    order: Record<string, 'ASC' | 'DESC'>,
+    payload: Record<string, unknown>,
+    map: (row: E) => T,
+  ): Promise<PageResult<T>> {
+    const paging = toCatalogPage(payload.page, payload.pageSize);
+    const [rows, total] = await repo.findAndCount({
+      where,
+      order: order as never,
+      ...(paging ? { skip: paging.skip, take: paging.pageSize } : {}),
+    });
+    const items = rows.map(map);
+    return {
+      items,
+      total,
+      page: paging?.page ?? 1,
+      pageSize: paging?.pageSize ?? total,
+    };
   }
 }

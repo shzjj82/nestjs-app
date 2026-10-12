@@ -214,7 +214,6 @@ export class ApprovalsService {
             : ApprovalStatus.APPROVED,
         decidedBy: actor.userId,
         decidedAt: new Date(),
-        updatedAt: new Date(),
       });
       await manager.save(
         RecycleApprovalRecordEntity,
@@ -270,7 +269,6 @@ export class ApprovalsService {
       status: ApprovalStatus.CANCELLED,
       decidedBy: actor.userId,
       decidedAt: new Date(),
-      updatedAt: new Date(),
     });
     await this.recordRepo.save(
       this.recordRepo.create({

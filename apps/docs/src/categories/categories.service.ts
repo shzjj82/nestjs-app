@@ -111,7 +111,6 @@ export class CategoriesService {
     if (await this.findByName(input.appCode, nameCheck.value)) {
       rpcFail(409, 'TAG_NAME_EXISTS');
     }
-    const now = new Date();
     const slug = await this.uniqueSlug(input.appCode, slugCheck.value || nameCheck.value);
     let sort = input.sort;
     if (typeof sort !== 'number') {
@@ -133,8 +132,6 @@ export class CategoriesService {
         kind: input.kind,
         nav: input.nav === true,
         sort,
-        createdAt: now,
-        updatedAt: now,
       }),
     );
     return this.toCategory(saved);
@@ -181,7 +178,6 @@ export class CategoriesService {
       existing.nav = input.nav;
     }
     existing.sort = typeof input.sort === 'number' ? input.sort : existing.sort;
-    existing.updatedAt = new Date();
     await this.categories.save(existing);
     if (slug !== oldSlug) {
       await this.renameSlugOnPosts(appCode, oldSlug, slug);
@@ -237,7 +233,7 @@ export class CategoriesService {
     await this.posts
       .createQueryBuilder()
       .update()
-      .set({ category: to, categoryId: next?.id ?? null, updatedAt: new Date() })
+      .set({ category: to, categoryId: next?.id ?? null, updatedAt: () => 'CURRENT_TIMESTAMP' })
       .where('app_code = :appCode AND category = :from', { appCode, from })
       .execute();
     await this.posts.query(
@@ -282,7 +278,6 @@ export class CategoriesService {
     if (!rows.length) {
       return;
     }
-    const now = new Date();
     for (const row of rows) {
       const tags = tagsFromProps(row.props);
       const nextTags = tags.filter((tag) => tag !== slug);
@@ -296,7 +291,6 @@ export class CategoriesService {
       row.category = nextSlug;
       row.categoryId = nextCat?.id ?? null;
       row.props = propsWithTags(row.props, nextTags);
-      row.updatedAt = now;
     }
     await this.posts.save(rows);
   }

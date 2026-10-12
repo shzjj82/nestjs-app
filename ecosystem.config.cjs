@@ -163,6 +163,7 @@ module.exports = {
         WECHAT_APP_ID: process.env.WECHAT_APP_ID ?? '',
         WECHAT_SECRET: process.env.WECHAT_SECRET ?? '',
         WECHAT_MP_CODE: process.env.WECHAT_MP_CODE ?? 'wechat',
+        WECHAT_QRCODE_CHECK_PATH: process.env.WECHAT_QRCODE_CHECK_PATH ?? 'false',
       },
     },
     {

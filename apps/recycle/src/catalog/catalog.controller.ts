@@ -32,17 +32,23 @@ export class CatalogController {
   @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_CATALOG_TYPES),
   )
-  @ApiDoc({ name: '耗材类型列表', description: '墨盒 / 硒鼓，也可自建类型' })
-  types() {
-    return this.catalog.types();
+  @ApiDoc({
+    name: '耗材类型列表',
+    description: '墨盒 / 硒鼓，也可自建类型；支持 page / pageSize',
+  })
+  types(payload: Record<string, unknown> = {}) {
+    return this.catalog.types(payload);
   }
 
   @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_CATALOG_BRANDS),
   )
-  @ApiDoc({ name: '品牌列表', description: '按 typeId 过滤' })
-  brands(payload: Record<string, unknown>) {
-    return this.catalog.brands(payload?.typeId as string | undefined);
+  @ApiDoc({
+    name: '品牌列表',
+    description: '按 typeId 过滤；支持 page / pageSize',
+  })
+  brands(payload: Record<string, unknown> = {}) {
+    return this.catalog.brands(payload);
   }
 
   @MessagePattern(
@@ -50,13 +56,10 @@ export class CatalogController {
   )
   @ApiDoc({
     name: '型号列表',
-    description: '含回收单价；按 typeId / brandId 过滤',
+    description: '含回收单价；按 typeId / brandId 过滤；支持 page / pageSize',
   })
-  models(payload: Record<string, unknown>) {
-    return this.catalog.models(
-      payload?.typeId as string | undefined,
-      payload?.brandId as string | undefined,
-    );
+  models(payload: Record<string, unknown> = {}) {
+    return this.catalog.models(payload);
   }
 
   @MessagePattern(

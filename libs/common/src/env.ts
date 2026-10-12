@@ -205,3 +205,11 @@ export function redisUrl(): string {
   const { host, port } = redisConfig();
   return `redis://${host}:${port}`;
 }
+
+/**
+ * 生成小程序码时是否校验 page 已在正式版发布。
+ * 默认 false，方便联调未上线页面；生产可设 WECHAT_QRCODE_CHECK_PATH=true。
+ */
+export function wechatQrcodeCheckPath(): boolean {
+  return process.env.WECHAT_QRCODE_CHECK_PATH === 'true';
+}

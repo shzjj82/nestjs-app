@@ -1,4 +1,10 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('ag_vision_jobs')
 export class VisionJobEntity {
@@ -26,8 +32,11 @@ export class VisionJobEntity {
   @Column({ name: 'error_message', type: 'text', nullable: true })
   errorMessage: string | null;
 
-  @Column({ name: 'created_at', type: 'timestamptz', default: () => 'now()' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt: Date;
 
   @Column({ name: 'finished_at', type: 'timestamptz', nullable: true })
   finishedAt: Date | null;

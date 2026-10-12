@@ -1,4 +1,4 @@
-import { readQuoteItems } from './catalog-items';
+import { readQuoteItems } from '../../src/catalog/catalog-items';
 
 describe('catalog items', () => {
   it('requires modelId', () => {
