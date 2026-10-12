@@ -29,7 +29,7 @@ export const RECYCLE_ENTITIES = [
   RecycleAuditReportEntity,
   RecycleApprovalTaskEntity,
   RecycleApprovalRecordEntity,
-  // 目录（参考数据，只读字典）
+  // 目录 / 门店（与订单同库，按模块 forFeature 收窄）
   RecycleCartridgeTypeEntity,
   RecycleBrandEntity,
   RecycleModelEntity,

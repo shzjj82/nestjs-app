@@ -31,6 +31,7 @@ import {
   RecycleOrderItemEntity,
   toOrderSnapshot,
 } from '../entities';
+import { LiveRolesService } from '../identity/live-roles.service';
 import { OrderPolicyService } from '../policy/policy.service';
 import { OrderAction } from '../policy/transitions';
 import {
@@ -42,6 +43,7 @@ import {
   type OrderScope,
   type OrderView,
 } from './order-scope';
+import { readOrderLines } from './order-items';
 import { toOrderView } from './order-view';
 import { isCustomerOnly, requireStaff } from '../domain';
 
@@ -193,6 +195,7 @@ export class OrdersService {
     private readonly policy: OrderPolicyService,
     /** 单向依赖：只用来查目录价，目录不认识订单 */
     private readonly catalog: CatalogService,
+    private readonly liveRoles: LiveRolesService,
   ) {}
 
   // ---------------------------------------------------------------- 读
@@ -217,7 +220,7 @@ export class OrdersService {
     bizCode: string,
     query: Record<string, unknown> = {},
   ) {
-    requireStaff(actor, '查看业务订单');
+    actor = await this.liveRoles.requireStaff(actor, '查看业务订单');
     return this.listWithScope(
       actor,
       staffScope(actor, bizCode),
@@ -235,6 +238,7 @@ export class OrdersService {
     bizCode: string,
     query: Record<string, unknown> = {},
   ) {
+    actor = await this.liveRoles.hydrate(actor);
     if (isCustomerOnly(actor)) {
       return this.listMine(actor, bizCode, query);
     }
@@ -277,6 +281,7 @@ export class OrdersService {
     id: string,
     payload: Record<string, unknown> = {},
   ) {
+    actor = await this.liveRoles.hydrate(actor);
     const order = await this.loadVisible(actor, bizCode, id, payload);
     const items = await this.orderItems.find({
       where: { orderId: order.id },
@@ -306,6 +311,7 @@ export class OrdersService {
     id: string,
     payload: Record<string, unknown> = {},
   ) {
+    actor = await this.liveRoles.hydrate(actor);
     const order = await this.loadVisible(actor, bizCode, id, payload);
     const rows = await this.events.find({
       where: { orderId: order.id },
@@ -328,6 +334,7 @@ export class OrdersService {
     id: string,
     payload: Record<string, unknown> = {},
   ) {
+    actor = await this.liveRoles.hydrate(actor);
     const order = await this.loadVisible(actor, bizCode, id, payload);
     const report = await this.audits.findOne({ where: { orderId: order.id } });
     if (!report) {
@@ -427,6 +434,7 @@ export class OrdersService {
     payload: Record<string, unknown>,
     options: { internal?: boolean } = {},
   ) {
+    actor = await this.liveRoles.hydrate(actor);
     return this.dataSource.transaction(async (manager) => {
       const order = await manager.findOne(RecycleOrderEntity, {
         where: { id, bizCode },
@@ -611,7 +619,7 @@ export class OrdersService {
    * 型号不在目录里直接 400。展示用预估由前端用目录单价 × 数量计算。
    */
   private async readItems(raw: unknown): Promise<OrderItemInput[]> {
-    const requested = this.catalog.readQuoteItems(raw);
+    const requested = readOrderLines(raw);
     const priced = await this.catalog.priceItems(requested);
     return priced.map((line) => ({
       typeId: line.typeId,

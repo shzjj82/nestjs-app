@@ -1,6 +1,6 @@
 import { optionalString } from '@app/common';
 import type { FindOptionsWhere } from 'typeorm';
-import { Actor, isAdmin, isStaffRole, RECYCLE_ROLES } from '../domain';
+import { Actor, isStaffRole, RECYCLE_ROLES } from '../domain';
 import type { RecycleOrderEntity } from '../entities';
 
 /** 行级数据范围判断需要的字段 */
@@ -87,14 +87,6 @@ export function resolveOrderView(
   requested: unknown,
 ): OrderView {
   return parseOrderView(requested) ?? inferOrderView(actor, bizCode, order);
-}
-
-/** @deprecated 使用 customerScope / staffScope；保留给未改完的调用方 */
-export function scopeFor(actor: Actor, bizCode: string): OrderScope {
-  if (isAdmin(actor) || isStaffRole(actor.roles)) {
-    return staffScope(actor, bizCode);
-  }
-  return customerScope(actor, bizCode);
 }
 
 export function canAccessOrder(

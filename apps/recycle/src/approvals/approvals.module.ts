@@ -1,8 +1,9 @@
-import { Inject, Module, OnModuleInit } from '@nestjs/common';
-import { ClientProxy, ClientsModule } from '@nestjs/microservices';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { mqttClientOptions, RECYCLE_CLIENT } from '@app/common';
-import { RECYCLE_ENTITIES } from '../entities';
+import {
+  RecycleApprovalRecordEntity,
+  RecycleApprovalTaskEntity,
+} from '../entities';
 import { ApprovalsController } from './approvals.controller';
 import { ApprovalsService } from './approvals.service';
 
@@ -15,22 +16,13 @@ import { ApprovalsService } from './approvals.service';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature(RECYCLE_ENTITIES),
-    ClientsModule.register([
-      {
-        name: RECYCLE_CLIENT,
-        ...mqttClientOptions('recycle-self-approvals'),
-      },
+    TypeOrmModule.forFeature([
+      RecycleApprovalTaskEntity,
+      RecycleApprovalRecordEntity,
     ]),
   ],
   controllers: [ApprovalsController],
   providers: [ApprovalsService],
   exports: [ApprovalsService],
 })
-export class ApprovalsModule implements OnModuleInit {
-  constructor(@Inject(RECYCLE_CLIENT) private readonly bus: ClientProxy) {}
-
-  async onModuleInit() {
-    await this.bus.connect();
-  }
-}
+export class ApprovalsModule {}

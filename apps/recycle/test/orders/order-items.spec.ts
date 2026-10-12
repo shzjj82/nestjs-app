@@ -1,15 +1,15 @@
-import { readQuoteItems } from '../../src/catalog/catalog-items';
+import { readOrderLines } from '../../src/orders/order-items';
 
-describe('catalog items', () => {
+describe('order lines', () => {
   it('requires modelId', () => {
     expect(() =>
-      readQuoteItems([{ brand: '惠普 HP', model: 'HP 803', quantity: 1 }]),
+      readOrderLines([{ brand: '惠普 HP', model: 'HP 803', quantity: 1 }]),
     ).toThrow(/modelId/);
   });
 
   it('accepts modelId with quantity', () => {
     expect(
-      readQuoteItems([
+      readOrderLines([
         {
           typeId: '11111111-1111-4111-8111-111111111111',
           brandId: '22222222-2222-4222-8222-222222222222',

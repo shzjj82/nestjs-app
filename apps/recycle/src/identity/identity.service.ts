@@ -1,19 +1,11 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
-import {
-  MQTT_PATTERNS,
-  unwrapData,
-  USER_CLIENT,
-  type UserAccountInfo,
-} from '@app/common';
-import { lastValueFrom } from 'rxjs';
-import { timeout } from 'rxjs/operators';
+import { Injectable } from '@nestjs/common';
 import type { Actor } from '../domain';
 import {
   RECYCLE_IDENTITY,
   RECYCLE_IDENTITY_LABELS,
   recycleMemberIdentities,
 } from '../domain';
+import { LiveRolesService } from './live-roles.service';
 import { StoresService } from '../stores/stores.service';
 
 /**
@@ -34,18 +26,14 @@ export interface RecycleIdentityView {
 
 @Injectable()
 export class IdentityService {
-  private readonly logger = new Logger(IdentityService.name);
-
   constructor(
     private readonly stores: StoresService,
-    @Inject(USER_CLIENT) private readonly users: ClientProxy,
+    private readonly liveRoles: LiveRolesService,
   ) {}
 
   async me(actor: Actor, bizCode: string): Promise<RecycleIdentityView> {
-    const account = await this.loadAccount(actor.accountId);
-    // 身份以 usercenter 实时角色为准，避免绑店赋角色后旧 token 仍显示客户
-    const liveRoles = account?.roles?.length ? account.roles : actor.roles;
-    const identities = recycleMemberIdentities(liveRoles)
+    const live = await this.liveRoles.hydrate(actor);
+    const identities = recycleMemberIdentities(live.roles)
       .filter((code) => code !== RECYCLE_IDENTITY.CUSTOMER)
       .map((code) => ({
         code,
@@ -64,27 +52,5 @@ export class IdentityService {
         enabled: store.enabled,
       })),
     };
-  }
-
-  private async loadAccount(
-    accountId: string | null,
-  ): Promise<UserAccountInfo | null> {
-    if (!accountId) {
-      return null;
-    }
-    try {
-      const raw = await lastValueFrom(
-        this.users
-          .send(MQTT_PATTERNS.ACCOUNT_FIND_MANY, { ids: [accountId] })
-          .pipe(timeout(8000)),
-      );
-      const list = unwrapData<UserAccountInfo[]>(raw);
-      return Array.isArray(list) ? (list[0] ?? null) : null;
-    } catch (err) {
-      this.logger.warn(
-        `拉取当前账户失败：${err instanceof Error ? err.message : String(err)}`,
-      );
-      return null;
-    }
   }
 }

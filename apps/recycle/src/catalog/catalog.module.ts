@@ -1,7 +1,11 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { RECYCLE_ENTITIES } from '../entities';
+import {
+  RecycleBrandEntity,
+  RecycleCartridgeTypeEntity,
+  RecycleModelEntity,
+} from '../entities';
 import { seedCatalog } from './catalog-seed';
 import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
@@ -13,7 +17,13 @@ import { CatalogService } from './catalog.service';
  * 也不发任何事件。查询公开；增改下架由业务身份限制。
  */
 @Module({
-  imports: [TypeOrmModule.forFeature(RECYCLE_ENTITIES)],
+  imports: [
+    TypeOrmModule.forFeature([
+      RecycleCartridgeTypeEntity,
+      RecycleBrandEntity,
+      RecycleModelEntity,
+    ]),
+  ],
   controllers: [CatalogController],
   providers: [CatalogService],
   exports: [CatalogService],
@@ -21,7 +31,7 @@ import { CatalogService } from './catalog.service';
 export class CatalogModule implements OnModuleInit {
   constructor(private readonly dataSource: DataSource) {}
 
-  /** 启动时灌目录种子；改价改完重启即生效（幂等 upsert） */
+  /** 空库时灌目录种子；已有数据不覆盖 */
   async onModuleInit() {
     await seedCatalog(this.dataSource);
   }

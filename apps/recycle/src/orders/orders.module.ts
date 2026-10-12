@@ -1,13 +1,12 @@
-import { Inject, Module, OnModuleInit } from '@nestjs/common';
-import { ClientProxy, ClientsModule } from '@nestjs/microservices';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import {
-  mqttClientOptions,
-  RECYCLE_CLIENT,
-  WECHAT_CLIENT,
-} from '@app/common';
 import { CatalogModule } from '../catalog/catalog.module';
-import { RECYCLE_ENTITIES } from '../entities';
+import {
+  RecycleAuditReportEntity,
+  RecycleOrderEntity,
+  RecycleOrderEventEntity,
+  RecycleOrderItemEntity,
+} from '../entities';
 import { PolicyModule } from '../policy/policy.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
@@ -21,32 +20,17 @@ import { OrdersService } from './orders.service';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature(RECYCLE_ENTITIES),
+    TypeOrmModule.forFeature([
+      RecycleOrderEntity,
+      RecycleOrderItemEntity,
+      RecycleOrderEventEntity,
+      RecycleAuditReportEntity,
+    ]),
     PolicyModule,
     CatalogModule,
-    ClientsModule.register([
-      {
-        name: RECYCLE_CLIENT,
-        ...mqttClientOptions('recycle-self-orders'),
-      },
-      {
-        name: WECHAT_CLIENT,
-        ...mqttClientOptions('recycle-to-wechat'),
-      },
-    ]),
   ],
   controllers: [OrdersController],
   providers: [OrdersService],
   exports: [OrdersService],
 })
-export class OrdersModule implements OnModuleInit {
-  constructor(
-    @Inject(RECYCLE_CLIENT) private readonly bus: ClientProxy,
-    @Inject(WECHAT_CLIENT) private readonly wechat: ClientProxy,
-  ) {}
-
-  async onModuleInit() {
-    await this.bus.connect();
-    await this.wechat.connect();
-  }
-}
+export class OrdersModule {}

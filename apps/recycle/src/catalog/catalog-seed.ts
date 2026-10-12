@@ -16,7 +16,8 @@ import {
  * 价格口径：**只回收空耗材**（空墨盒 / 空硒鼓），单位「分」，区间 5~30 元/支；
  * 原装带芯片、可再利用性好的型号取高位；空硒鼓整体略高于空墨盒。
  *
- * 灌数方式：类型按 key、品牌按 (typeId, brand)、型号按 (brandId, name) upsert。
+ * 灌数方式：仅空库写入一次。类型/品牌/型号已有数据时跳过，
+ * 避免重启把接口改过的报价覆盖回种子。
  */
 
 type SeedType = {
@@ -117,11 +118,15 @@ export const SEED_MODELS: SeedModel[] = [
   { type: CartridgeType.TONER, brand: '三星 Samsung', name: 'CLT-K406S 四色套装', spec: '四色套装', fits: 'SL-C430 / C480W', chip: true, price: 2400 },
 ];
 
-/** 按唯一键 upsert，重复执行幂等 */
+/** 空库灌入种子；已有目录则不动（改价走接口，不靠重启） */
 export async function seedCatalog(dataSource: DataSource): Promise<void> {
   const types = dataSource.getRepository(RecycleCartridgeTypeEntity);
   const brands = dataSource.getRepository(RecycleBrandEntity);
   const models = dataSource.getRepository(RecycleModelEntity);
+
+  if ((await types.count()) > 0) {
+    return;
+  }
 
   await types.upsert(
     SEED_TYPES.map((row, index) => ({ ...row, sort: index + 1, enabled: true })),

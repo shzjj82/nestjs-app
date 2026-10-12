@@ -24,6 +24,7 @@ import {
   RecycleApprovalRecordEntity,
   RecycleApprovalTaskEntity,
 } from '../entities';
+import { LiveRolesService } from '../identity/live-roles.service';
 
 /** 需要审批员决策的任务，统一由审批员角色承接 */
 const APPROVER_ROLE = RECYCLE_ROLES.APPROVER;
@@ -71,6 +72,7 @@ export class ApprovalsService {
     @InjectRepository(RecycleApprovalRecordEntity)
     private readonly recordRepo: Repository<RecycleApprovalRecordEntity>,
     @Inject(RECYCLE_CLIENT) private readonly bus: ClientProxy,
+    private readonly liveRoles: LiveRolesService,
   ) {}
 
   /** 内部事件：订单侧请求审批 */
@@ -115,6 +117,7 @@ export class ApprovalsService {
     bizCode: string,
     query: Record<string, unknown> = {},
   ) {
+    actor = await this.liveRoles.hydrate(actor);
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(50, Math.max(1, Number(query.pageSize) || 20));
     const statusRaw = optionalString(query.status);
@@ -144,11 +147,13 @@ export class ApprovalsService {
   }
 
   async detail(actor: Actor, bizCode: string, id: string) {
+    actor = await this.liveRoles.hydrate(actor);
     const task = await this.loadTask(actor, bizCode, id);
     return this.toTaskView(task);
   }
 
   async records(actor: Actor, bizCode: string, id: string) {
+    actor = await this.liveRoles.hydrate(actor);
     const task = await this.loadTask(actor, bizCode, id);
     const rows = await this.recordRepo.find({
       where: { taskId: task.id },
@@ -179,6 +184,7 @@ export class ApprovalsService {
     id: string,
     payload: Record<string, unknown>,
   ) {
+    actor = await this.liveRoles.hydrate(actor);
     const task = await this.loadTask(actor, bizCode, id);
 
     if (!isStaffRole(actor.roles)) {
@@ -247,6 +253,7 @@ export class ApprovalsService {
     id: string,
     payload: Record<string, unknown>,
   ) {
+    actor = await this.liveRoles.hydrate(actor);
     const task = await this.loadTask(actor, bizCode, id);
     if (
       !isStaffRole(actor.roles) &&

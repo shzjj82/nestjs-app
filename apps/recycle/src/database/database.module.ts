@@ -31,7 +31,6 @@ const sync = process.env.TYPEORM_SYNC === 'true';
       ],
       logging: process.env.TYPEORM_LOGGING === 'true',
     }),
-    TypeOrmModule.forFeature(RECYCLE_ENTITIES),
   ],
   exports: [TypeOrmModule],
 })

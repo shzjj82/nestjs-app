@@ -75,3 +75,23 @@ export function requiredTrim(value: unknown, max: number, field: string): string
   }
   return raw;
 }
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function requireId(value: unknown, field: string): string {
+  const raw = optionalString(value);
+  if (!raw || !UUID_RE.test(raw)) {
+    rpcFail(400, `${field} 必填`);
+  }
+  return raw;
+}
+
+export function optionalId(value: unknown, field: string): string | undefined {
+  const raw = optionalString(value);
+  if (!raw) return undefined;
+  if (!UUID_RE.test(raw)) {
+    rpcFail(400, `${field} 非法`);
+  }
+  return raw;
+}

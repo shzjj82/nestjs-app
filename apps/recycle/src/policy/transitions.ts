@@ -4,7 +4,6 @@ import {
   ApprovalDecision,
   ApprovalType,
   AuditItemInput,
-  CartridgeType,
   OrderSnapshot,
   OrderStatus,
   readCents,
@@ -303,12 +302,4 @@ export const TRANSITIONS: Record<OrderAction, Transition> = {
 
 export function isOrderAction(value: unknown): value is OrderAction {
   return typeof value === 'string' && value in TRANSITIONS;
-}
-
-export function cartridgeTypeOf(value: unknown): CartridgeType {
-  const raw = optionalString(value);
-  if (raw === CartridgeType.INK || raw === CartridgeType.TONER) {
-    return raw;
-  }
-  return CartridgeType.INK;
 }

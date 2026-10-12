@@ -7,7 +7,8 @@ import {
   requiredString,
   sharePattern,
 } from '@app/common';
-import { requireActor, requireStaff } from '../domain';
+import { requireActor } from '../domain';
+import { LiveRolesService } from '../identity/live-roles.service';
 import { CatalogService } from './catalog.service';
 
 /**
@@ -16,7 +17,10 @@ import { CatalogService } from './catalog.service';
  */
 @Controller()
 export class CatalogController {
-  constructor(private readonly catalog: CatalogService) {}
+  constructor(
+    private readonly catalog: CatalogService,
+    private readonly liveRoles: LiveRolesService,
+  ) {}
 
   @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_CATALOG_ALL),
@@ -66,8 +70,8 @@ export class CatalogController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_CATALOG_TYPE_CREATE),
   )
   @ApiDoc({ name: '新增耗材类型' })
-  createType(payload: Record<string, unknown>) {
-    this.assertStaff(payload, '新增类型');
+  async createType(payload: Record<string, unknown>) {
+    await this.assertStaff(payload, '新增类型');
     return this.catalog.createType(payload);
   }
 
@@ -75,8 +79,8 @@ export class CatalogController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_CATALOG_TYPE_UPDATE),
   )
   @ApiDoc({ name: '更新耗材类型' })
-  updateType(payload: Record<string, unknown>) {
-    this.assertStaff(payload, '更新类型');
+  async updateType(payload: Record<string, unknown>) {
+    await this.assertStaff(payload, '更新类型');
     return this.catalog.updateType(payload);
   }
 
@@ -84,8 +88,8 @@ export class CatalogController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_CATALOG_TYPE_DELETE),
   )
   @ApiDoc({ name: '下架耗材类型', description: '软删 enabled=false' })
-  deleteType(payload: Record<string, unknown>) {
-    this.assertStaff(payload, '下架类型');
+  async deleteType(payload: Record<string, unknown>) {
+    await this.assertStaff(payload, '下架类型');
     return this.catalog.disableType(requiredString(payload.id, 'id'));
   }
 
@@ -93,8 +97,8 @@ export class CatalogController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_CATALOG_BRAND_CREATE),
   )
   @ApiDoc({ name: '新增品牌' })
-  createBrand(payload: Record<string, unknown>) {
-    this.assertStaff(payload, '新增品牌');
+  async createBrand(payload: Record<string, unknown>) {
+    await this.assertStaff(payload, '新增品牌');
     return this.catalog.createBrand(payload);
   }
 
@@ -102,8 +106,8 @@ export class CatalogController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_CATALOG_BRAND_UPDATE),
   )
   @ApiDoc({ name: '更新品牌' })
-  updateBrand(payload: Record<string, unknown>) {
-    this.assertStaff(payload, '更新品牌');
+  async updateBrand(payload: Record<string, unknown>) {
+    await this.assertStaff(payload, '更新品牌');
     return this.catalog.updateBrand(payload);
   }
 
@@ -111,8 +115,8 @@ export class CatalogController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_CATALOG_BRAND_DELETE),
   )
   @ApiDoc({ name: '下架品牌' })
-  deleteBrand(payload: Record<string, unknown>) {
-    this.assertStaff(payload, '下架品牌');
+  async deleteBrand(payload: Record<string, unknown>) {
+    await this.assertStaff(payload, '下架品牌');
     return this.catalog.disableBrand(requiredString(payload.id, 'id'));
   }
 
@@ -120,8 +124,8 @@ export class CatalogController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_CATALOG_MODEL_CREATE),
   )
   @ApiDoc({ name: '新增型号', description: 'price 为回收指导价（分）' })
-  createModel(payload: Record<string, unknown>) {
-    this.assertStaff(payload, '新增型号');
+  async createModel(payload: Record<string, unknown>) {
+    await this.assertStaff(payload, '新增型号');
     return this.catalog.createModel(payload);
   }
 
@@ -129,8 +133,8 @@ export class CatalogController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_CATALOG_MODEL_UPDATE),
   )
   @ApiDoc({ name: '更新型号 / 报价' })
-  updateModel(payload: Record<string, unknown>) {
-    this.assertStaff(payload, '更新型号');
+  async updateModel(payload: Record<string, unknown>) {
+    await this.assertStaff(payload, '更新型号');
     return this.catalog.updateModel(payload);
   }
 
@@ -138,12 +142,12 @@ export class CatalogController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_CATALOG_MODEL_DELETE),
   )
   @ApiDoc({ name: '下架型号' })
-  deleteModel(payload: Record<string, unknown>) {
-    this.assertStaff(payload, '下架型号');
+  async deleteModel(payload: Record<string, unknown>) {
+    await this.assertStaff(payload, '下架型号');
     return this.catalog.disableModel(requiredString(payload.id, 'id'));
   }
 
   private assertStaff(payload: Record<string, unknown>, action: string) {
-    requireStaff(requireActor(payload), action);
+    return this.liveRoles.requireStaff(requireActor(payload), action);
   }
 }

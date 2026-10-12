@@ -9,22 +9,23 @@ import {
   RecycleModelEntity,
 } from '../entities';
 import {
-  optionalId,
-  readQuoteItems,
-  requireId,
-  type QuoteRequestItem,
-} from './catalog-items';
-import {
   optionalBool,
+  optionalId,
   optionalNonNegInt,
   optionalTrim,
   parseNonNegInt,
   parseTypeKey,
+  requireId,
   requiredTrim,
   toCatalogPage,
 } from './catalog-write';
 
-export type { QuoteRequestItem } from './catalog-items';
+export interface CatalogPriceItem {
+  typeId?: string;
+  brandId?: string;
+  modelId: string;
+  quantity: number;
+}
 
 export interface CatalogTypeRow {
   id: string;
@@ -135,7 +136,7 @@ export class CatalogService {
     };
   }
 
-  async priceItems(items: QuoteRequestItem[]): Promise<QuoteLine[]> {
+  async priceItems(items: CatalogPriceItem[]): Promise<QuoteLine[]> {
     const rows = await Promise.all(
       items.map((item) =>
         this.modelRepo.findOne({
@@ -172,10 +173,6 @@ export class CatalogService {
         price: row.price,
       };
     });
-  }
-
-  readQuoteItems(raw: unknown): QuoteRequestItem[] {
-    return readQuoteItems(raw);
   }
 
   async createType(payload: Record<string, unknown>): Promise<CatalogTypeRow> {

@@ -1,26 +1,14 @@
-import { Inject, Module, OnModuleInit } from '@nestjs/common';
-import { ClientProxy, ClientsModule } from '@nestjs/microservices';
-import { mqttClientOptions, USER_CLIENT } from '@app/common';
+import { forwardRef, Global, Module } from '@nestjs/common';
 import { StoresModule } from '../stores/stores.module';
+import { IdentityController } from './identity.controller';
 import { IdentityService } from './identity.service';
+import { LiveRolesService } from './live-roles.service';
 
+@Global()
 @Module({
-  imports: [
-    StoresModule,
-    ClientsModule.register([
-      {
-        name: USER_CLIENT,
-        ...mqttClientOptions('recycle-identity-to-user'),
-      },
-    ]),
-  ],
-  providers: [IdentityService],
-  exports: [IdentityService],
+  imports: [forwardRef(() => StoresModule)],
+  controllers: [IdentityController],
+  providers: [IdentityService, LiveRolesService],
+  exports: [IdentityService, LiveRolesService],
 })
-export class IdentityModule implements OnModuleInit {
-  constructor(@Inject(USER_CLIENT) private readonly users: ClientProxy) {}
-
-  async onModuleInit() {
-    await this.users.connect();
-  }
-}
+export class IdentityModule {}

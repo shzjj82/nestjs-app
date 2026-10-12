@@ -1,4 +1,4 @@
-import { Controller } from '@nestjs/common';
+import { Controller, Inject, forwardRef } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import {
   ApiDoc,
@@ -10,6 +10,7 @@ import {
   sharePattern,
 } from '@app/common';
 import { bizCodeOf, requireActor } from '../domain';
+import { LiveRolesService } from '../identity/live-roles.service';
 import { StoresService } from './stores.service';
 
 function publicBiz(payload: Record<string, unknown>): string {
@@ -22,7 +23,11 @@ function publicBiz(payload: Record<string, unknown>): string {
 
 @Controller()
 export class StoresController {
-  constructor(private readonly stores: StoresService) {}
+  constructor(
+    private readonly stores: StoresService,
+    @Inject(forwardRef(() => LiveRolesService))
+    private readonly liveRoles: LiveRolesService,
+  ) {}
 
   @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_STORE_FIND_ALL),
@@ -68,8 +73,8 @@ export class StoresController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_STORE_CREATE),
   )
   @ApiDoc({ name: '新增回收门店' })
-  create(payload: Record<string, unknown>) {
-    const actor = requireActor(payload);
+  async create(payload: Record<string, unknown>) {
+    const actor = await this.staffOf(payload, '创建门店');
     return this.stores.create(actor, bizCodeOf(payload, actor), payload);
   }
 
@@ -77,8 +82,8 @@ export class StoresController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_STORE_UPDATE),
   )
   @ApiDoc({ name: '更新回收门店' })
-  update(payload: Record<string, unknown>) {
-    const actor = requireActor(payload);
+  async update(payload: Record<string, unknown>) {
+    const actor = await this.staffOf(payload, '更新门店');
     return this.stores.update(actor, bizCodeOf(payload, actor), payload);
   }
 
@@ -86,8 +91,8 @@ export class StoresController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_STORE_DELETE),
   )
   @ApiDoc({ name: '停用回收门店' })
-  remove(payload: Record<string, unknown>) {
-    const actor = requireActor(payload);
+  async remove(payload: Record<string, unknown>) {
+    const actor = await this.staffOf(payload, '下架门店');
     return this.stores.disable(
       actor,
       bizCodeOf(payload, actor),
@@ -99,8 +104,8 @@ export class StoresController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_STORE_STAFF),
   )
   @ApiDoc({ name: '门店已绑账号', description: '账户维度：标识 / 别名 / 业务角色，不含手机号' })
-  staff(payload: Record<string, unknown>) {
-    const actor = requireActor(payload);
+  async staff(payload: Record<string, unknown>) {
+    const actor = await this.staffOf(payload, '查看门店账号');
     return this.stores.listStaff(
       actor,
       bizCodeOf(payload, actor),
@@ -112,8 +117,8 @@ export class StoresController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_STORE_STAFF_UPDATE),
   )
   @ApiDoc({ name: '更新门店绑定账号', description: '目前支持改别名 alias' })
-  updateStaff(payload: Record<string, unknown>) {
-    const actor = requireActor(payload);
+  async updateStaff(payload: Record<string, unknown>) {
+    const actor = await this.staffOf(payload, '更新门店账号');
     return this.stores.updateStaff(
       actor,
       bizCodeOf(payload, actor),
@@ -127,8 +132,8 @@ export class StoresController {
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_STORE_UNBIND),
   )
   @ApiDoc({ name: '解除门店与账号绑定' })
-  unbind(payload: Record<string, unknown>) {
-    const actor = requireActor(payload);
+  async unbind(payload: Record<string, unknown>) {
+    const actor = await this.staffOf(payload, '解除门店绑定');
     return this.stores.unbind(
       actor,
       bizCodeOf(payload, actor),
@@ -160,8 +165,12 @@ export class StoresController {
     name: '门店绑定小程序码',
     description: '内部调微信 getwxacodeunlimit，上传 OSS 后返回 url / scene',
   })
-  qrcode(payload: Record<string, unknown>) {
-    const actor = requireActor(payload);
+  async qrcode(payload: Record<string, unknown>) {
+    const actor = await this.staffOf(payload, '生成门店绑定码');
     return this.stores.qrcode(actor, bizCodeOf(payload, actor), payload);
+  }
+
+  private staffOf(payload: Record<string, unknown>, action: string) {
+    return this.liveRoles.requireStaff(requireActor(payload), action);
   }
 }
