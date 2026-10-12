@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { Actor, OrderSnapshot, OrderStatus } from '../../src/domain';
+import { actorForOrderView } from '../../src/orders/order-scope';
 import { OrderPolicyService } from '../../src/policy/policy.service';
 
 function actor(roles: string[], userId = 'u-1'): Actor {
@@ -195,11 +196,71 @@ describe('OrderPolicyService', () => {
     );
     expect(customer).toEqual(['negotiate', 'accept', 'reject_offer']);
 
-    const agent = policy.availableActions(
+    const agentOnQuoted = policy.availableActions(
       actor(['agent']),
       order({ status: OrderStatus.EVALUATED }),
     );
-    expect(agent).toEqual([]);
+    expect(agentOnQuoted).toEqual([]);
+
+    const agentOnInspect = policy.availableActions(
+      actor(['agent']),
+      order({ status: OrderStatus.INSPECTING }),
+    );
+    expect(agentOnInspect).toEqual(['evaluate', 'reject_inspect']);
+
+    const agentOnAccepted = policy.availableActions(
+      actor(['agent']),
+      order({ status: OrderStatus.ACCEPTED }),
+    );
+    expect(agentOnAccepted).toEqual(['transfer']);
+  });
+
+  it('业务员可以评估、打款、退货', () => {
+    expect(
+      policy.authorize('evaluate', {
+        actor: actor(['agent']),
+        order: order({ status: OrderStatus.INSPECTING, estimatePrice: 3000 }),
+        payload: { price: 3000 },
+      }).to,
+    ).toBe(OrderStatus.EVALUATED);
+
+    expect(
+      policy.authorize('transfer', {
+        actor: actor(['agent']),
+        order: order({ status: OrderStatus.ACCEPTED, finalPrice: 2000 }),
+        payload: { amount: 2000 },
+      }).to,
+    ).toBe(OrderStatus.PAID);
+
+    expect(
+      policy.authorize('return', {
+        actor: actor(['agent']),
+        order: order({ status: OrderStatus.REJECTED }),
+        payload: { returnLogisticsNo: 'SF999' },
+      }).to,
+    ).toBe(OrderStatus.RETURNED);
+  });
+
+  it('同一账号按入口拆权限：mine 顾客动作，staff 作业动作', () => {
+    const both = actor(['customer', 'agent']);
+    const inspecting = order({ status: OrderStatus.INSPECTING });
+    const evaluated = order({
+      status: OrderStatus.EVALUATED,
+      bOfferPrice: 2000,
+    });
+
+    expect(
+      policy.availableActions(actorForOrderView(both, 'customer'), inspecting),
+    ).toEqual([]);
+    expect(
+      policy.availableActions(actorForOrderView(both, 'staff'), inspecting),
+    ).toEqual(['evaluate', 'reject_inspect']);
+    expect(
+      policy.availableActions(actorForOrderView(both, 'customer'), evaluated),
+    ).toEqual(['negotiate', 'accept', 'reject_offer']);
+    expect(
+      policy.availableActions(actorForOrderView(both, 'staff'), evaluated),
+    ).toEqual([]);
   });
 
   it('业务员不能收别人名下的单', () => {

@@ -153,6 +153,24 @@ describe('matchRoute', () => {
     expect(matchRoute('GET', '/recycle/orders/staff')?.pattern).toBe(
       MQTT_PATTERNS.RECYCLE_ORDER_FIND_STAFF,
     );
+    expect(matchRoute('GET', '/recycle/orders/mine/o-1')?.pattern).toBe(
+      MQTT_PATTERNS.RECYCLE_ORDER_FIND_MINE_ONE,
+    );
+    expect(matchRoute('GET', '/recycle/orders/mine/o-1')?.params).toEqual({
+      id: 'o-1',
+    });
+    expect(
+      matchRoute('GET', '/recycle/orders/o-1/timeline')?.pattern,
+    ).toBe(MQTT_PATTERNS.RECYCLE_ORDER_TIMELINE);
+    expect(
+      matchRoute('GET', '/recycle/orders/o-1/audit')?.pattern,
+    ).toBe(MQTT_PATTERNS.RECYCLE_ORDER_AUDIT);
+    expect(
+      matchRoute('POST', '/recycle/orders/staff/o-1/actions/receive')?.params,
+    ).toEqual({ id: 'o-1', action: 'receive' });
+    expect(matchRoute('GET', '/recycle/orders/o-1')?.params).toEqual({
+      id: 'o-1',
+    });
     expect(matchRoute('GET', '/recycle/stores')?.auth).toBeUndefined();
     expect(matchRoute('GET', '/recycle/stores/nearby')?.pattern).toBe(
       MQTT_PATTERNS.RECYCLE_STORE_NEARBY,

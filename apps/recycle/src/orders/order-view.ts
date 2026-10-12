@@ -1,11 +1,9 @@
 import {
   Actor,
   CartridgeType,
-  hasAnyRole,
   ORDER_STATUS_LABELS,
   OrderStatus,
 } from '../domain';
-import { RECYCLE_ROLES } from '../domain/roles';
 import type { RecycleOrderEntity } from '../entities';
 import type { OrderAction } from '../policy/transitions';
 
@@ -43,19 +41,11 @@ export interface OrderView {
   payment?: OrderPaymentView;
   /** 当前调用者在该订单上可执行的动作 */
   availableActions: OrderAction[];
+  /** 本次接口视角：customer=顾客权限，staff=业务员权限 */
+  view: 'customer' | 'staff';
   createdAt: string;
   updatedAt: string;
 }
-
-const STAFF_ROLES = [
-  RECYCLE_ROLES.AGENT,
-  RECYCLE_ROLES.INSPECTOR,
-  RECYCLE_ROLES.APPROVER,
-  RECYCLE_ROLES.FINANCE,
-  RECYCLE_ROLES.ADMIN,
-];
-
-const FINANCE_ROLES = [RECYCLE_ROLES.FINANCE, RECYCLE_ROLES.ADMIN];
 
 /**
  * 出口序列化：按角色裁剪字段。
@@ -65,11 +55,11 @@ const FINANCE_ROLES = [RECYCLE_ROLES.FINANCE, RECYCLE_ROLES.ADMIN];
  */
 export function toOrderView(
   order: RecycleOrderEntity,
-  actor: Actor,
+  _actor: Actor,
   availableActions: OrderAction[],
+  accessView: 'customer' | 'staff' = 'customer',
 ): OrderView {
-  const isStaff = hasAnyRole(actor, STAFF_ROLES);
-  const isFinance = hasAnyRole(actor, FINANCE_ROLES);
+  const showStaffFields = accessView === 'staff';
 
   const view: OrderView = {
     id: order.id,
@@ -93,14 +83,13 @@ export function toOrderView(
     },
     bEvalNote: order.bEvalNote,
     availableActions,
+    view: accessView,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
   };
 
-  if (isStaff) {
+  if (showStaffFields) {
     view.internalNote = order.internalNote;
-  }
-  if (isFinance) {
     view.payment = {
       billNo: order.transferBillNo,
       paidAt: order.paidAt ? order.paidAt.toISOString() : null,

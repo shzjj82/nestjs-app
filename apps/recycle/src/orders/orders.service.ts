@@ -24,7 +24,6 @@ import {
   requireInternal,
 } from '../domain';
 import { CatalogService } from '../catalog/catalog.service';
-import { RECYCLE_ROLES } from '../domain/roles';
 import {
   RecycleAuditReportEntity,
   RecycleOrderEntity,
@@ -35,21 +34,16 @@ import {
 import { OrderPolicyService } from '../policy/policy.service';
 import { OrderAction } from '../policy/transitions';
 import {
+  actorForOrderView,
   canAccessOrder,
   customerScope,
+  resolveOrderView,
   staffScope,
   type OrderScope,
+  type OrderView,
 } from './order-scope';
 import { toOrderView } from './order-view';
 import { isCustomerOnly, requireStaff } from '../domain';
-
-const STAFF_ROLES: string[] = [
-  RECYCLE_ROLES.AGENT,
-  RECYCLE_ROLES.INSPECTOR,
-  RECYCLE_ROLES.APPROVER,
-  RECYCLE_ROLES.FINANCE,
-  RECYCLE_ROLES.ADMIN,
-];
 
 const ACTION_TITLES: Record<OrderAction, string> = {
   quote: '已获取预估报价',
@@ -269,7 +263,7 @@ export class OrdersService {
       skip: (page - 1) * pageSize,
     });
     return {
-      items: rows.map((row) => this.toView(row, actor)),
+      items: rows.map((row) => this.toView(row, actor, view)),
       total,
       page,
       pageSize,
@@ -277,14 +271,20 @@ export class OrdersService {
     };
   }
 
-  async detail(actor: Actor, bizCode: string, id: string) {
-    const order = await this.loadVisible(actor, bizCode, id);
+  async detail(
+    actor: Actor,
+    bizCode: string,
+    id: string,
+    payload: Record<string, unknown> = {},
+  ) {
+    const order = await this.loadVisible(actor, bizCode, id, payload);
     const items = await this.orderItems.find({
       where: { orderId: order.id },
       order: { sort: 'ASC' },
     });
+    const view = this.viewOf(actor, bizCode, order, payload);
     return {
-      ...this.toView(order, actor),
+      ...this.toView(order, actor, view),
       items: items.map((item) => ({
         typeId: item.typeId,
         brandId: item.brandId,
@@ -300,8 +300,13 @@ export class OrdersService {
     };
   }
 
-  async timeline(actor: Actor, bizCode: string, id: string) {
-    const order = await this.loadVisible(actor, bizCode, id);
+  async timeline(
+    actor: Actor,
+    bizCode: string,
+    id: string,
+    payload: Record<string, unknown> = {},
+  ) {
+    const order = await this.loadVisible(actor, bizCode, id, payload);
     const rows = await this.events.find({
       where: { orderId: order.id },
       order: { createdAt: 'ASC' },
@@ -317,13 +322,18 @@ export class OrdersService {
     }));
   }
 
-  async audit(actor: Actor, bizCode: string, id: string) {
-    const order = await this.loadVisible(actor, bizCode, id);
+  async audit(
+    actor: Actor,
+    bizCode: string,
+    id: string,
+    payload: Record<string, unknown> = {},
+  ) {
+    const order = await this.loadVisible(actor, bizCode, id, payload);
     const report = await this.audits.findOne({ where: { orderId: order.id } });
     if (!report) {
       rpcFail(404, '该订单暂无审核报告');
     }
-    const isStaff = actor.roles.some((role) => STAFF_ROLES.includes(role));
+    const isStaff = this.viewOf(actor, bizCode, order, payload) === 'staff';
     return {
       result: report.result,
       items: report.items ?? [],
@@ -400,7 +410,7 @@ export class OrdersService {
           estimatePrice,
         },
       );
-      return this.toView(order, actor);
+      return this.toView(order, actor, 'customer');
     });
   }
 
@@ -424,14 +434,21 @@ export class OrdersService {
       if (!order) {
         rpcFail(404, '订单不存在');
       }
-      if (!canAccessOrder(actor, bizCode, order)) {
+      const view: OrderView = options.internal
+        ? 'staff'
+        : this.viewOf(actor, bizCode, order, payload);
+      if (!canAccessOrder(actor, bizCode, order, view)) {
         // 越统一返回 404，避免用错误码探测订单是否存在
         rpcFail(404, '订单不存在');
       }
 
       const authorized = this.policy.authorize(
         action,
-        { actor, order: toOrderSnapshot(order), payload },
+        {
+          actor: actorForOrderView(actor, view),
+          order: toOrderSnapshot(order),
+          payload,
+        },
         options,
       );
 
@@ -482,7 +499,7 @@ export class OrdersService {
 
       this.publishNotice(saved, authorized.action);
 
-      return this.toView(saved, actor);
+      return this.toView(saved, actor, view);
     });
   }
 
@@ -550,22 +567,39 @@ export class OrdersService {
     actor: Actor,
     bizCode: string,
     id: string,
+    payload: Record<string, unknown> = {},
   ): Promise<RecycleOrderEntity> {
     const order = await this.orders.findOne({ where: { id } });
     if (!order) {
       rpcFail(404, '订单不存在');
     }
-    if (!canAccessOrder(actor, bizCode, order)) {
+    const view = this.viewOf(actor, bizCode, order, payload);
+    if (!canAccessOrder(actor, bizCode, order, view)) {
       rpcFail(404, '订单不存在');
     }
     return order;
   }
 
-  private toView(order: RecycleOrderEntity, actor: Actor) {
+  private viewOf(
+    actor: Actor,
+    bizCode: string,
+    order: RecycleOrderEntity,
+    payload: Record<string, unknown>,
+  ): OrderView {
+    return resolveOrderView(actor, bizCode, order, payload.view);
+  }
+
+  private toView(
+    order: RecycleOrderEntity,
+    actor: Actor,
+    view: OrderView,
+  ) {
+    const lens = actorForOrderView(actor, view);
     return toOrderView(
       order,
-      actor,
-      this.policy.availableActions(actor, toOrderSnapshot(order)),
+      lens,
+      this.policy.availableActions(lens, toOrderSnapshot(order)),
+      view,
     );
   }
 

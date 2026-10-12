@@ -5,19 +5,18 @@
  * 不要建成平台级角色（businessId 为空），否则会在所有业务中生效。
  *
  * 对外「成员身份」只分三档：客户 / 业务员 / 超管。
- * agent / inspector / approver / finance 在流程动作上仍可区分，
- * 但对用户展示与列表数据范围一律视为「业务员」。
+ * agent / inspector / approver / finance 一律视为业务员，作业动作不再按这四个角色拆。
  */
 export const RECYCLE_ROLES = {
   /** C 端客户：下单、提交、接受/拒绝报价、发起协商 */
   CUSTOMER: 'customer',
-  /** 业务员（收货、退货等；对外与 inspector/approver/finance 同属业务员） */
+  /** 业务员（作业全流程：收货、验收、审批、打款、退货） */
   AGENT: 'agent',
-  /** 验收动作（流程用）；对外身份 = 业务员 */
+  /** 兼容旧账号；对外与动作均同业务员 */
   INSPECTOR: 'inspector',
-  /** 审批动作（流程用）；对外身份 = 业务员 */
+  /** 兼容旧账号；对外与动作均同业务员 */
   APPROVER: 'approver',
-  /** 打款动作（流程用）；对外身份 = 业务员 */
+  /** 兼容旧账号；对外与动作均同业务员 */
   FINANCE: 'finance',
   /** 超管 */
   ADMIN: 'admin',

@@ -16,6 +16,7 @@ import {
   ApprovalStatus,
   ApprovalType,
   internalPayload,
+  isStaffRole,
   requireInternal,
 } from '../domain';
 import { RECYCLE_ROLES } from '../domain/roles';
@@ -124,11 +125,7 @@ export class ApprovalsService {
         : ApprovalStatus.PENDING;
 
     const where: Record<string, unknown> = { bizCode, status };
-    // 非超管 / 非审批员只能看到自己发起的
-    if (
-      !actor.roles.includes(RECYCLE_ROLES.ADMIN) &&
-      !actor.roles.includes(APPROVER_ROLE)
-    ) {
+    if (!actor.roles.includes(RECYCLE_ROLES.ADMIN) && !isStaffRole(actor.roles)) {
       where.requestedBy = actor.userId;
     }
 
@@ -184,17 +181,14 @@ export class ApprovalsService {
   ) {
     const task = await this.loadTask(actor, bizCode, id);
 
-    if (!actor.roles.includes(APPROVER_ROLE)) {
-      rpcFail(403, '只有审批员可以出具审批结论');
+    if (!isStaffRole(actor.roles)) {
+      rpcFail(403, '当前身份不能出具审批结论');
     }
     if (task.status !== ApprovalStatus.PENDING) {
       rpcFail(409, '该审批任务已结束');
     }
     if (task.assigneeId && task.assigneeId !== actor.userId) {
-      rpcFail(403, '该审批任务已指派给其他审批员');
-    }
-    if (task.requestedBy === actor.userId) {
-      rpcFail(403, '不能审批自己发起的申请');
+      rpcFail(403, '该审批任务已指派给其他业务员');
     }
 
     const decision = readDecision(payload.decision);
@@ -255,7 +249,7 @@ export class ApprovalsService {
   ) {
     const task = await this.loadTask(actor, bizCode, id);
     if (
-      !actor.roles.includes(APPROVER_ROLE) &&
+      !isStaffRole(actor.roles) &&
       !actor.roles.includes(RECYCLE_ROLES.ADMIN)
     ) {
       rpcFail(403, '没有权限取消审批任务');
@@ -297,7 +291,7 @@ export class ApprovalsService {
     }
     const visible =
       actor.roles.includes(RECYCLE_ROLES.ADMIN) ||
-      actor.roles.includes(APPROVER_ROLE) ||
+      isStaffRole(actor.roles) ||
       task.requestedBy === actor.userId ||
       task.assigneeId === actor.userId;
     if (!visible) {

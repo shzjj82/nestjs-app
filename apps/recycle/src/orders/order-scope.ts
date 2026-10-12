@@ -1,5 +1,6 @@
+import { optionalString } from '@app/common';
 import type { FindOptionsWhere } from 'typeorm';
-import { Actor, isAdmin, isStaffRole } from '../domain';
+import { Actor, isAdmin, isStaffRole, RECYCLE_ROLES } from '../domain';
 import type { RecycleOrderEntity } from '../entities';
 
 /** 行级数据范围判断需要的字段 */
@@ -9,6 +10,30 @@ type ScopedFields = Pick<
 >;
 
 export type OrderView = 'customer' | 'staff';
+
+/** 路径 /mine、query view=customer|mine → 客户权限；/staff → 业务员权限 */
+export function parseOrderView(value: unknown): OrderView | undefined {
+  const raw = optionalString(value);
+  if (raw === 'customer' || raw === 'mine') {
+    return 'customer';
+  }
+  if (raw === 'staff' || raw === 'admin') {
+    return 'staff';
+  }
+  return undefined;
+}
+
+/**
+ * 按入口裁剪身份，避免「既是客户又是业务员」时按钮并集。
+ * mine：只保留客户；staff：去掉客户，保留作业角色。
+ */
+export function actorForOrderView(actor: Actor, view: OrderView): Actor {
+  if (view === 'customer') {
+    return { ...actor, roles: [RECYCLE_ROLES.CUSTOMER] };
+  }
+  const roles = actor.roles.filter((role) => role !== RECYCLE_ROLES.CUSTOMER);
+  return { ...actor, roles };
+}
 
 export interface OrderScope {
   /** 给 TypeORM 的 where（多组之间取 OR） */
@@ -43,6 +68,27 @@ export function staffScope(actor: Actor, bizCode: string): OrderScope {
   };
 }
 
+export function inferOrderView(
+  actor: Actor,
+  bizCode: string,
+  order: ScopedFields,
+): OrderView {
+  const asOwner = customerScope(actor, bizCode).allows(order);
+  if (isStaffRole(actor.roles) && !asOwner) {
+    return 'staff';
+  }
+  return 'customer';
+}
+
+export function resolveOrderView(
+  actor: Actor,
+  bizCode: string,
+  order: ScopedFields,
+  requested: unknown,
+): OrderView {
+  return parseOrderView(requested) ?? inferOrderView(actor, bizCode, order);
+}
+
 /** @deprecated 使用 customerScope / staffScope；保留给未改完的调用方 */
 export function scopeFor(actor: Actor, bizCode: string): OrderScope {
   if (isAdmin(actor) || isStaffRole(actor.roles)) {
@@ -51,17 +97,14 @@ export function scopeFor(actor: Actor, bizCode: string): OrderScope {
   return customerScope(actor, bizCode);
 }
 
-/** 详情 / 动作：客户单或业务员单任一可见即可 */
 export function canAccessOrder(
   actor: Actor,
   bizCode: string,
   order: ScopedFields,
+  view: OrderView,
 ): boolean {
-  if (customerScope(actor, bizCode).allows(order)) {
-    return true;
+  if (view === 'customer') {
+    return customerScope(actor, bizCode).allows(order);
   }
-  if (isStaffRole(actor.roles) && staffScope(actor, bizCode).allows(order)) {
-    return true;
-  }
-  return false;
+  return isStaffRole(actor.roles) && staffScope(actor, bizCode).allows(order);
 }

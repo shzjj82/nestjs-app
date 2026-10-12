@@ -9,7 +9,7 @@ import {
   OrderStatus,
   readCents,
 } from '../domain';
-import { RECYCLE_ROLES } from '../domain/roles';
+import { RECYCLE_ROLES, RECYCLE_STAFF_ROLES } from '../domain/roles';
 
 /**
  * 订单动作。
@@ -221,7 +221,7 @@ export const TRANSITIONS: Record<OrderAction, Transition> = {
   receive: {
     from: [OrderStatus.SUBMITTED],
     to: OrderStatus.INSPECTING,
-    roles: [RECYCLE_ROLES.AGENT],
+    roles: RECYCLE_STAFF_ROLES,
     guard: (ctx) => {
       const actor = requireActor(ctx);
       // 业务员只能收自己名下（或尚未分配）的单；超管不受限
@@ -238,7 +238,7 @@ export const TRANSITIONS: Record<OrderAction, Transition> = {
   evaluate: {
     from: [OrderStatus.INSPECTING],
     to: OrderStatus.EVALUATED,
-    roles: [RECYCLE_ROLES.INSPECTOR],
+    roles: RECYCLE_STAFF_ROLES,
     guard: guardEvaluate,
     approval: (ctx) =>
       Number(ctx.payload.price) < ctx.order.estimatePrice
@@ -249,7 +249,7 @@ export const TRANSITIONS: Record<OrderAction, Transition> = {
   reject_inspect: {
     from: [OrderStatus.INSPECTING],
     to: OrderStatus.REJECTED,
-    roles: [RECYCLE_ROLES.INSPECTOR],
+    roles: RECYCLE_STAFF_ROLES,
     guard: guardRejectInspect,
   },
 
@@ -274,11 +274,11 @@ export const TRANSITIONS: Record<OrderAction, Transition> = {
     roles: [RECYCLE_ROLES.CUSTOMER],
   },
 
-  // 涉及资金：超管不绕过，只认财务角色
+  // 涉及资金：超管不绕过，业务员可打款
   transfer: {
     from: [OrderStatus.ACCEPTED],
     to: OrderStatus.PAID,
-    roles: [RECYCLE_ROLES.FINANCE],
+    roles: RECYCLE_STAFF_ROLES,
     allowAdmin: false,
     guard: guardTransfer,
   },
@@ -286,7 +286,7 @@ export const TRANSITIONS: Record<OrderAction, Transition> = {
   return: {
     from: [OrderStatus.REJECTED],
     to: OrderStatus.RETURNED,
-    roles: [RECYCLE_ROLES.AGENT],
+    roles: RECYCLE_STAFF_ROLES,
     guard: guardReturn,
   },
 
@@ -294,7 +294,7 @@ export const TRANSITIONS: Record<OrderAction, Transition> = {
   decide: {
     from: [OrderStatus.NEGOTIATING],
     to: decideTarget,
-    roles: [RECYCLE_ROLES.APPROVER],
+    roles: RECYCLE_STAFF_ROLES,
     internalOnly: true,
     allowAdmin: false,
     guard: guardDecide,

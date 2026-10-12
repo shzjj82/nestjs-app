@@ -59,15 +59,36 @@ export class OrdersController {
   }
 
   @MessagePattern(
+    sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_FIND_MINE_ONE),
+  )
+  @ApiDoc({ name: '我的订单详情', description: '顾客权限按钮' })
+  findMineOne(payload: Record<string, unknown>) {
+    return this.findOne({ ...payload, view: 'mine' });
+  }
+
+  @MessagePattern(
+    sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_FIND_STAFF_ONE),
+  )
+  @ApiDoc({ name: '工作台订单详情', description: '业务员权限按钮' })
+  findStaffOne(payload: Record<string, unknown>) {
+    return this.findOne({ ...payload, view: 'staff' });
+  }
+
+  @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_FIND_ONE),
   )
-  @ApiDoc({ name: '回收订单详情', description: '含明细与当前可执行动作' })
+  @ApiDoc({
+    name: '回收订单详情',
+    description:
+      '含明细与当前可执行动作；view=mine 仅顾客按钮，view=staff 仅业务员按钮',
+  })
   findOne(payload: Record<string, unknown>) {
     const actor = requireActor(payload);
     return this.orders.detail(
       actor,
       bizCodeOf(payload, actor),
       requiredString(payload.id, 'id'),
+      payload,
     );
   }
 
@@ -89,7 +110,7 @@ export class OrdersController {
   @ApiDoc({
     name: '执行订单动作',
     description:
-      '动作 × 角色 × 起始状态由策略引擎裁决；不提供直接改 status 的接口',
+      'view=mine|customer 走顾客权限，view=staff 走业务员权限；路径 /orders/mine/:id 与 /orders/staff/:id 会带上 view',
   })
   action(payload: Record<string, unknown>) {
     const actor = requireActor(payload);
@@ -103,6 +124,20 @@ export class OrdersController {
   }
 
   @MessagePattern(
+    sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_ACTION_MINE),
+  )
+  actionMine(payload: Record<string, unknown>) {
+    return this.action({ ...payload, view: 'mine' });
+  }
+
+  @MessagePattern(
+    sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_ACTION_STAFF),
+  )
+  actionStaff(payload: Record<string, unknown>) {
+    return this.action({ ...payload, view: 'staff' });
+  }
+
+  @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_TIMELINE),
   )
   @ApiDoc({ name: '订单时间轴' })
@@ -112,7 +147,22 @@ export class OrdersController {
       actor,
       bizCodeOf(payload, actor),
       requiredString(payload.id, 'id'),
+      payload,
     );
+  }
+
+  @MessagePattern(
+    sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_TIMELINE_MINE),
+  )
+  timelineMine(payload: Record<string, unknown>) {
+    return this.timeline({ ...payload, view: 'mine' });
+  }
+
+  @MessagePattern(
+    sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_TIMELINE_STAFF),
+  )
+  timelineStaff(payload: Record<string, unknown>) {
+    return this.timeline({ ...payload, view: 'staff' });
   }
 
   @MessagePattern(
@@ -125,7 +175,22 @@ export class OrdersController {
       actor,
       bizCodeOf(payload, actor),
       requiredString(payload.id, 'id'),
+      payload,
     );
+  }
+
+  @MessagePattern(
+    sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_AUDIT_MINE),
+  )
+  auditMine(payload: Record<string, unknown>) {
+    return this.audit({ ...payload, view: 'mine' });
+  }
+
+  @MessagePattern(
+    sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_AUDIT_STAFF),
+  )
+  auditStaff(payload: Record<string, unknown>) {
+    return this.audit({ ...payload, view: 'staff' });
   }
 
   /** 内部事件：审批出结论后回调订单（不注册到网关） */
