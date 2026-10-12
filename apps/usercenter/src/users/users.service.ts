@@ -237,11 +237,13 @@ export class UsersService {
     const codes = Array.isArray(payload.codes)
       ? payload.codes.map(String)
       : stringList(payload.codes);
+    const createMissing = payload.createMissing === true;
     const account = await this.accounts.findEntity(accountId);
     const result = await this.accounts.ensureBusinessRoles(
       accountId,
       bizCode,
       codes,
+      { createMissing },
     );
     if (result.added.length) {
       await this.tokens.revokeAll(account.userId);

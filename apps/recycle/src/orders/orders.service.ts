@@ -217,7 +217,7 @@ export class OrdersService {
     );
   }
 
-  /** 业务员工作台：业务内订单（需业务员 / 超管身份） */
+  /** 业务员工作台：业务内订单（需业务员 / 超管角色） */
   async listStaff(
     actor: Actor,
     bizCode: string,

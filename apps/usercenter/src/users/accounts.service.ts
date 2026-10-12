@@ -7,12 +7,23 @@ import { In, IsNull, Repository } from 'typeorm';
 import {
   AccountEntity,
   AccountRoleEntity,
+  BusinessEntity,
   RoleEntity,
   type AccountType,
 } from '../entities';
 import { requiredString, rpcFail } from '../rpc';
 
 const PASSWORD_ROUNDS = 10;
+
+/** 业务角色缺失时 createMissing 用的默认中文名 */
+const DEFAULT_BUSINESS_ROLE_NAMES: Record<string, string> = {
+  customer: '客户',
+  agent: '业务员',
+  inspector: '业务员',
+  approver: '业务员',
+  finance: '业务员',
+  admin: '超管',
+};
 
 @Injectable()
 export class AccountsService {
@@ -23,6 +34,8 @@ export class AccountsService {
     private readonly accountRoles: Repository<AccountRoleEntity>,
     @InjectRepository(RoleEntity)
     private readonly roles: Repository<RoleEntity>,
+    @InjectRepository(BusinessEntity)
+    private readonly businesses: Repository<BusinessEntity>,
   ) {}
 
   async findEntity(id: string): Promise<AccountEntity> {
@@ -198,26 +211,49 @@ export class AccountsService {
 
   /**
    * 给账户补齐某业务下的角色（只增不删）。
-   * 业务未配置对应角色时返回 missing，不抛错——避免扫码绑定被角色种子挡住。
+   * createMissing=true 时，业务下没有的角色会按默认名自动创建（避免绑店留下脏数据）。
    */
   async ensureBusinessRoles(
     accountId: string,
     bizCode: string,
     codes: string[],
+    options?: { createMissing?: boolean },
   ): Promise<{ added: string[]; missing: string[] }> {
     const unique = [...new Set(codes.map((c) => c.trim()).filter(Boolean))];
     if (!unique.length) {
       return { added: [], missing: [] };
     }
     await this.findEntity(accountId);
-    const roles = await this.roles
+    let roles = await this.roles
       .createQueryBuilder('r')
       .innerJoin('r.business', 'b')
       .where('b.code = :bizCode', { bizCode })
       .andWhere('r.code IN (:...codes)', { codes: unique })
       .getMany();
-    const found = new Set(roles.map((role) => role.code));
-    const missing = unique.filter((code) => !found.has(code));
+    let found = new Set(roles.map((role) => role.code));
+    let missing = unique.filter((code) => !found.has(code));
+
+    if (missing.length && options?.createMissing) {
+      const business = await this.businesses.findOne({ where: { code: bizCode } });
+      if (!business) {
+        rpcFail(404, `业务 ${bizCode} 不存在`);
+      }
+      for (const code of missing) {
+        const created = await this.roles.save(
+          this.roles.create({
+            code,
+            name: DEFAULT_BUSINESS_ROLE_NAMES[code] ?? code,
+            businessId: business.id,
+            description: null,
+            isSystem: false,
+          }),
+        );
+        roles = [...roles, created];
+      }
+      found = new Set(roles.map((role) => role.code));
+      missing = unique.filter((code) => !found.has(code));
+    }
+
     if (!roles.length) {
       return { added: [], missing };
     }

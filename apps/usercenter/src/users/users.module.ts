@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   AccountEntity,
   AccountRoleEntity,
+  BusinessEntity,
   RoleEntity,
   UserEntity,
 } from '../entities';
@@ -17,6 +18,7 @@ import { UsersService } from './users.service';
       AccountEntity,
       AccountRoleEntity,
       RoleEntity,
+      BusinessEntity,
     ]),
   ],
   controllers: [UsersController],

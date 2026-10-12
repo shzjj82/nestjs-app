@@ -11,7 +11,7 @@ import { timeout } from 'rxjs/operators';
 import type { Actor } from '../domain';
 import {
   isAdmin,
-  isCustomerOnly,
+  isStaffRole,
   RECYCLE_IDENTITY,
   RECYCLE_IDENTITY_LABELS,
   recycleMemberIdentities,
@@ -31,17 +31,16 @@ export interface RecycleIdentityView {
     type: string;
   } | null;
   /**
-   * 回收业务成员身份（粗粒度）：
+   * 回收业务成员身份（粗粒度），来自账户**实时角色**（不读过期会话 roles）：
    * customer=客户 / staff=业务员 / admin=超管。
-   * 一人可同时有客户+业务员，前端用不同接口拉数据。
    */
   identities: Array<{ code: string; label: string }>;
   primaryIdentity: string;
   primaryIdentityLabel: string;
-  /** 非纯客户：可走业务员接口 */
+  /** 账户实时角色含业务员 / 超管 */
   isStaff: boolean;
   isAdmin: boolean;
-  /** 当前账户绑定的门店（含本店别名） */
+  /** 当前账户绑定的门店（含本店别名）；绑定本身不是身份，须伴随 agent 角色 */
   stores: Array<{
     id: string;
     name: string;
@@ -66,12 +65,14 @@ export class IdentityService {
   ) {}
 
   async me(actor: Actor, bizCode: string): Promise<RecycleIdentityView> {
-    const identities = recycleMemberIdentities(actor.roles).map((code) => ({
+    const account = await this.loadAccount(actor.accountId);
+    // 身份以 usercenter 实时角色为准，避免绑店赋角色后旧 token 仍显示客户
+    const liveRoles = account?.roles?.length ? account.roles : actor.roles;
+    const identities = recycleMemberIdentities(liveRoles).map((code) => ({
       code,
       label: RECYCLE_IDENTITY_LABELS[code] ?? code,
     }));
     const primaryIdentity = pickPrimary(identities.map((item) => item.code));
-    const account = await this.loadAccount(actor.accountId);
     const stores = await this.stores.boundStores(actor, bizCode);
 
     return {
@@ -97,8 +98,8 @@ export class IdentityService {
       primaryIdentity,
       primaryIdentityLabel:
         RECYCLE_IDENTITY_LABELS[primaryIdentity] ?? primaryIdentity,
-      isStaff: !isCustomerOnly(actor),
-      isAdmin: isAdmin(actor),
+      isStaff: isStaffRole(liveRoles),
+      isAdmin: isAdmin({ ...actor, roles: liveRoles }),
       stores: stores.map((store) => ({
         id: store.id,
         name: store.name,

@@ -57,7 +57,7 @@ export function recycleIdentities(roles: string[]): string[] {
 
 /**
  * 对外成员身份：客户 / 业务员 / 超管（去重）。
- * 同时挂「验收员+客户」时会返回 customer + staff 两条，供前端切换入口。
+ * 只认账户上的业务角色；门店绑定必须伴随 agent 等角色，不在这里用 stores 冒充。
  */
 export function recycleMemberIdentities(roles: string[]): RecycleIdentity[] {
   const assigned = roles.filter((role) => RECYCLE_ROLE_VALUES.includes(role));

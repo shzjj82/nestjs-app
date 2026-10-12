@@ -534,20 +534,26 @@ export class StoresService {
             accountId,
             bizCode,
             codes: [RECYCLE_ROLES.AGENT],
+            /** 业务下没有 agent 时自动建角色，避免绑店留下「有门店无业务员」脏数据 */
+            createMissing: true,
           })
           .pipe(timeout(8000)),
       );
       const result = unwrapData<{ added?: string[]; missing?: string[] }>(raw);
       if (result?.missing?.length) {
-        this.logger.warn(
-          `业务 ${bizCode} 未配置角色 ${result.missing.join(',')}，绑定账号 ${accountId} 未自动赋业务员`,
+        rpcFail(
+          500,
+          `绑定成功但未能赋予业务员角色（缺少 ${result.missing.join(',')}）`,
         );
       }
     } catch (err) {
-      this.logger.warn(
-        `绑定后赋业务员失败（${accountId}）：${
-          err instanceof Error ? err.message : String(err)
-        }`,
+      const status = (err as { status?: number }).status;
+      if (typeof status === 'number' && status >= 400) {
+        throw err;
+      }
+      rpcFail(
+        502,
+        `绑定后赋业务员失败：${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }
