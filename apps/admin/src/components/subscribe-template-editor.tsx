@@ -1,17 +1,11 @@
 'use client';
 
-import { Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   emptyTemplateRow,
   SUGGESTED_SUBSCRIBE_SCENES,
@@ -20,19 +14,11 @@ import {
   type SubscribeTemplateRow,
 } from '@/lib/wechat-apps';
 
-const SEMANTIC_OPTIONS = SUBSCRIBE_SEMANTICS.map((name) => ({
-  value: name,
-  label: `${name}（${SUBSCRIBE_SEMANTIC_LABELS[name]}）`,
-}));
-
 /**
  * 订阅消息模板编辑器。
  *
- * 模板 ID 与字段名都只有小程序后台才有，所以这里按「场景 → 模板 ID + 字段映射」
- * 手填。字段映射的取值被限制在 `SUBSCRIBE_SEMANTICS` 内 —— 后端只上报这几个
- * 语义值，映射到别的名字微信不报错但会渲染成空串。
- *
- * 用户点开消息会进顾客订单详情（scope=mine）。
+ * 性能注意：字段映射默认折叠，避免弹层打开时挂载大量自定义 Select
+ * （4 场景 × 5 字段在 Base UI Select + backdrop-blur 下会明显卡顿）。
  */
 export function SubscribeTemplateEditor({
   rows,
@@ -41,6 +27,7 @@ export function SubscribeTemplateEditor({
   rows: SubscribeTemplateRow[];
   onChange: (rows: SubscribeTemplateRow[]) => void;
 }) {
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const used = new Set(rows.map((row) => row.scene.trim()));
   const suggestions = SUGGESTED_SUBSCRIBE_SCENES.filter(
     (item) => !used.has(item.scene),
@@ -75,8 +62,7 @@ export function SubscribeTemplateEditor({
         <div className="space-y-1">
           <Label>订阅消息模板（点开进顾客订单详情）</Label>
           <p className="text-xs text-muted-foreground">
-            在微信公众平台「订阅消息」按关键词选用模板，把模板 ID
-            粘到下方；字段名以所选模板为准（与预填不一致时改左侧字段名）。未配置的场景不会发送。
+            粘贴公众平台模板 ID；字段映射默认收起，需要时再展开改。
           </p>
         </div>
         <Button
@@ -120,114 +106,138 @@ export function SubscribeTemplateEditor({
         </p>
       ) : null}
 
-      <div className="space-y-3">
-        {rows.map((row, index) => (
-          <div key={index} className="space-y-2 rounded-lg border p-3">
-            <div className="flex items-center gap-2">
-              <Input
-                value={row.scene}
-                onChange={(e) => patch(index, { scene: e.target.value })}
-                placeholder="场景名，如 PRICE_OFFERED"
-                className="font-mono text-xs"
-                aria-label="场景名"
-              />
-              <Input
-                value={row.templateId}
-                onChange={(e) => patch(index, { templateId: e.target.value })}
-                placeholder="微信模板 ID"
-                className="font-mono text-xs"
-                aria-label="模板 ID"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="删除该场景"
-                onClick={() =>
-                  onChange(rows.filter((_, i) => i !== index))
-                }
-              >
-                <Trash2 />
-              </Button>
-            </div>
-            {(() => {
-              const hint = SUGGESTED_SUBSCRIBE_SCENES.find(
-                (item) => item.scene === row.scene.trim(),
-              );
-              return hint ? (
+      <div className="space-y-2">
+        {rows.map((row, index) => {
+          const hint = SUGGESTED_SUBSCRIBE_SCENES.find(
+            (item) => item.scene === row.scene.trim(),
+          );
+          const open = !!expanded[index];
+          return (
+            <div key={index} className="space-y-2 rounded-lg border p-3">
+              <div className="flex items-center gap-2">
+                <Input
+                  value={row.scene}
+                  onChange={(e) => patch(index, { scene: e.target.value })}
+                  placeholder="场景名，如 PRICE_OFFERED"
+                  className="font-mono text-xs"
+                  aria-label="场景名"
+                />
+                <Input
+                  value={row.templateId}
+                  onChange={(e) =>
+                    patch(index, { templateId: e.target.value })
+                  }
+                  placeholder="微信模板 ID"
+                  className="font-mono text-xs"
+                  aria-label="模板 ID"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="删除该场景"
+                  onClick={() =>
+                    onChange(rows.filter((_, i) => i !== index))
+                  }
+                >
+                  <Trash2 />
+                </Button>
+              </div>
+              {hint ? (
                 <p className="text-[11px] text-muted-foreground">
-                  {hint.label} · 搜「{hint.keywordHint}」· {hint.titleHint}
+                  {hint.label} · 搜「{hint.keywordHint}」
                 </p>
-              ) : null;
-            })()}
+              ) : null}
 
-            <div className="space-y-1.5 pl-1">
-              <span className="text-xs text-muted-foreground">
-                字段映射（微信字段名 ← 业务语义；须与所选模板字段一致）
-              </span>
-              {row.fields.map((pair, fieldIndex) => (
-                <div key={fieldIndex} className="flex items-center gap-2">
-                  <Input
-                    value={pair.field}
-                    onChange={(e) =>
-                      patchField(index, fieldIndex, { field: e.target.value })
-                    }
-                    placeholder="模板字段 thing1"
-                    className="h-7 w-32 font-mono text-xs"
-                    aria-label="模板字段名"
-                  />
-                  <span className="text-xs text-muted-foreground">←</span>
-                  <Select
-                    items={SEMANTIC_OPTIONS}
-                    value={pair.semantic}
-                    onValueChange={(next) => {
-                      if (typeof next === 'string') {
-                        patchField(index, fieldIndex, { semantic: next });
-                      }
-                    }}
-                  >
-                    <SelectTrigger size="sm" className="font-mono text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SEMANTIC_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="删除该字段"
-                    onClick={() =>
-                      patch(index, {
-                        fields: row.fields.filter((_, j) => j !== fieldIndex),
-                      })
-                    }
-                  >
-                    <Trash2 />
-                  </Button>
-                </div>
-              ))}
               <Button
                 type="button"
                 variant="ghost"
                 size="xs"
+                className="h-7 px-1 text-muted-foreground"
                 onClick={() =>
-                  patch(index, {
-                    fields: [...row.fields, { field: '', semantic: 'orderCode' }],
-                  })
+                  setExpanded((prev) => ({ ...prev, [index]: !prev[index] }))
                 }
               >
-                <Plus />
-                字段
+                <ChevronDown
+                  className={`size-3.5 transition-transform ${open ? 'rotate-180' : ''}`}
+                />
+                字段映射（{row.fields.length}）
               </Button>
+
+              {open ? (
+                <div className="space-y-1.5 pl-1">
+                  <span className="text-xs text-muted-foreground">
+                    微信字段名 ← 业务语义（须与所选模板字段一致）
+                  </span>
+                  {row.fields.map((pair, fieldIndex) => (
+                    <div key={fieldIndex} className="flex items-center gap-2">
+                      <Input
+                        value={pair.field}
+                        onChange={(e) =>
+                          patchField(index, fieldIndex, {
+                            field: e.target.value,
+                          })
+                        }
+                        placeholder="模板字段 thing1"
+                        className="h-7 w-36 font-mono text-xs"
+                        aria-label="模板字段名"
+                      />
+                      <span className="text-xs text-muted-foreground">←</span>
+                      {/* 原生 select：比 Base UI Select 轻一个数量级，避免弹层卡顿 */}
+                      <select
+                        value={pair.semantic}
+                        onChange={(e) =>
+                          patchField(index, fieldIndex, {
+                            semantic: e.target.value,
+                          })
+                        }
+                        className="h-7 min-w-[9rem] flex-1 rounded-md border border-input bg-transparent px-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                        aria-label="业务语义"
+                      >
+                        {SUBSCRIBE_SEMANTICS.map((name) => (
+                          <option key={name} value={name}>
+                            {name}（{SUBSCRIBE_SEMANTIC_LABELS[name]}）
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="删除该字段"
+                        onClick={() =>
+                          patch(index, {
+                            fields: row.fields.filter(
+                              (_, j) => j !== fieldIndex,
+                            ),
+                          })
+                        }
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={() =>
+                      patch(index, {
+                        fields: [
+                          ...row.fields,
+                          { field: '', semantic: 'orderCode' },
+                        ],
+                      })
+                    }
+                  >
+                    <Plus />
+                    字段
+                  </Button>
+                </div>
+              ) : null}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

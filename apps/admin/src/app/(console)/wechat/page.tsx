@@ -126,17 +126,18 @@ export default function WechatPage() {
 
   function openEdit(row: WechatRow) {
     const business = businesses.find((item) => item.code === row.appCode);
+    // 尚未配置时预填回收四场景，方便登记后直接粘贴微信模板 ID
+    const templates =
+      row.sceneCount > 0
+        ? toTemplateRows(row.subscribeTemplates)
+        : suggestedSubscribeTemplateRows();
+    // 合并更新，避免连续三次 setState 触发整页（含 DataTable）连刷
     setEditForm({
       businessId: business?.id ?? UNSELECTED,
       appId: row.appId,
       secret: '',
     });
-    // 尚未配置时预填回收四场景，方便登记后直接粘贴微信模板 ID
-    setEditTemplates(
-      row.sceneCount > 0
-        ? toTemplateRows(row.subscribeTemplates)
-        : suggestedSubscribeTemplateRows(),
-    );
+    setEditTemplates(templates);
     setEditing(row);
   }
 
@@ -432,6 +433,7 @@ export default function WechatPage() {
               ID；用户点通知会打开顾客订单详情。
             </DialogDescription>
           </DialogHeader>
+          {editing ? (
           <form id="wechat-edit" className="space-y-4" onSubmit={saveEdit}>
             <SelectField
               label="业务"
@@ -470,6 +472,7 @@ export default function WechatPage() {
             <Separator />
             <SubscribeTemplateEditor rows={editTemplates} onChange={setEditTemplates} />
           </form>
+          ) : null}
           <DialogFooter>
             <Button type="button" variant="outline" disabled={busy} onClick={() => setEditing(null)}>
               取消

@@ -40,13 +40,11 @@ export const SUGGESTED_SUBSCRIBE_SCENES: {
     label: '验收报价完成',
     keywordHint: '订单状态 / 报价结果',
     titleHint: '您的回收单已完成验收报价，请打开确认',
-    // 常见「订单状态通知」：编号 / 状态 / 金额 / 时间 / 备注
+    // 默认只预填常用 3 项，减少编辑弹层 DOM；需要时可再展开加字段
     fields: {
       character_string1: 'orderCode',
       phrase2: 'statusLabel',
       amount3: 'amount',
-      time4: 'at',
-      thing5: 'title',
     },
   },
   {
@@ -58,8 +56,6 @@ export const SUGGESTED_SUBSCRIBE_SCENES: {
       character_string1: 'orderCode',
       phrase2: 'statusLabel',
       amount3: 'amount',
-      time4: 'at',
-      thing5: 'title',
     },
   },
   {
@@ -71,8 +67,6 @@ export const SUGGESTED_SUBSCRIBE_SCENES: {
       character_string1: 'orderCode',
       amount2: 'amount',
       phrase3: 'statusLabel',
-      time4: 'at',
-      thing5: 'title',
     },
   },
   {
@@ -83,8 +77,7 @@ export const SUGGESTED_SUBSCRIBE_SCENES: {
     fields: {
       character_string1: 'orderCode',
       phrase2: 'statusLabel',
-      time3: 'at',
-      thing4: 'title',
+      thing3: 'title',
     },
   },
 ];
