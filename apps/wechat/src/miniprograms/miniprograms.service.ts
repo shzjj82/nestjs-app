@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { WechatMiniProgram } from '@app/common';
+import { asRecord, type WechatMiniProgram } from '@app/common';
 import { FindOptionsWhere, Repository } from 'typeorm';
 import { optionalString, requiredString, rpcFail } from '../common/rpc';
 import { MiniProgramEntity } from '../entities';
@@ -19,9 +19,12 @@ export class MiniProgramsService {
   }
 
   async requireEnabled(payload: Record<string, unknown>): Promise<MiniProgramEntity> {
+    const session = asRecord(payload._session);
     const id = optionalString(payload.id);
     const code = optionalString(payload.code) ?? optionalString(payload.mpCode);
-    const appId = optionalString(payload.appId);
+    // 小程序登录会话带 wechatAppId：订阅模板清单 / 发消息可不显式传 appId
+    const appId =
+      optionalString(payload.appId) ?? optionalString(session.wechatAppId);
     if (!id && !code && !appId) {
       rpcFail(400, 'id、code 或 appId 必填其一');
     }

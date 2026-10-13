@@ -633,7 +633,8 @@ export class OrdersService {
         appId: order.wechatAppId,
         touser: order.ownerOpenid,
         scene,
-        page: `pages/order/detail?id=${order.id}`,
+        // 顾客视角订单详情；scope=mine 避免双身份账号落到业务员视角
+        page: `pages/order-detail/index?id=${order.id}&scope=mine`,
         values: {
           orderCode: order.code,
           title: ACTION_TITLES[action],

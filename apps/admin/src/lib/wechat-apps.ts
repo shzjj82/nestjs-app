@@ -18,41 +18,86 @@ export interface RegisteredWechatApp {
 }
 
 /**
- * 回收业务上报的订阅消息场景，仅作为控制台的「快捷添加」建议。
+ * 回收业务订阅消息场景（控制台「快捷添加」+ 新建后预填）。
  *
- * 场景名由业务侧定义（后端 wechat 服务不认识回收），这里只是替人手输，
- * 所以**不作为校验**：填别的场景名后端一样接受。
+ * 点开消息会进入顾客订单详情（后端 page =
+ * `pages/order-detail/index?id=…&scope=mine`）。
+ *
+ * 微信公众平台申请模板时，可按「建议关键词」搜索类目模板；字段名以你选中的
+ * 模板为准，选完后把微信后台的字段编号改到下面 fields 的 key 上即可。
  */
 export const SUGGESTED_SUBSCRIBE_SCENES: {
   scene: string;
   label: string;
+  /** 公众平台搜模板用的关键词提示 */
+  keywordHint: string;
+  /** 推荐标题（便于运营对照） */
+  titleHint: string;
   fields: Record<string, string>;
 }[] = [
   {
     scene: 'PRICE_OFFERED',
     label: '验收报价完成',
-    fields: { thing1: 'orderCode', amount2: 'amount', thing3: 'statusLabel' },
+    keywordHint: '订单状态 / 报价结果',
+    titleHint: '您的回收单已完成验收报价，请打开确认',
+    // 常见「订单状态通知」：编号 / 状态 / 金额 / 时间 / 备注
+    fields: {
+      character_string1: 'orderCode',
+      phrase2: 'statusLabel',
+      amount3: 'amount',
+      time4: 'at',
+      thing5: 'title',
+    },
   },
   {
     scene: 'NEGOTIATE_RESULT',
     label: '协商定价结果',
-    fields: { thing1: 'orderCode', amount2: 'amount', thing3: 'statusLabel' },
+    keywordHint: '订单状态 / 审核结果',
+    titleHint: '协商结果已出，请打开查看',
+    fields: {
+      character_string1: 'orderCode',
+      phrase2: 'statusLabel',
+      amount3: 'amount',
+      time4: 'at',
+      thing5: 'title',
+    },
   },
   {
     scene: 'PAID',
     label: '回收款已到账',
-    fields: { thing1: 'orderCode', amount2: 'amount', thing3: 'statusLabel' },
+    keywordHint: '到账提醒 / 收款成功',
+    titleHint: '回收款已到账，可打开订单查看',
+    fields: {
+      character_string1: 'orderCode',
+      amount2: 'amount',
+      phrase3: 'statusLabel',
+      time4: 'at',
+      thing5: 'title',
+    },
   },
   {
     scene: 'RETURN',
     label: '退货完成',
-    fields: { thing1: 'orderCode', thing2: 'statusLabel' },
+    keywordHint: '订单状态 / 退货完成',
+    titleHint: '退货已完成，请打开查看',
+    fields: {
+      character_string1: 'orderCode',
+      phrase2: 'statusLabel',
+      time3: 'at',
+      thing4: 'title',
+    },
   },
 ];
 
 /**
  * 可映射的语义字段名，与后端 `SUBSCRIBE_SEMANTICS` 保持一致：
  * 后端上报订阅消息时只带这几个语义值，映射到别的名字会渲染成空串。
+ *
+ * - orderCode   订单号
+ * - title       动作标题（如「已完成验收评估」）
+ * - statusLabel 状态中文（如「已评估」）
+ * - amount      金额（元，字符串）
+ * - at          时间
  */
 export const SUBSCRIBE_SEMANTICS = [
   'orderCode',
@@ -61,6 +106,17 @@ export const SUBSCRIBE_SEMANTICS = [
   'amount',
   'at',
 ] as const;
+
+export const SUBSCRIBE_SEMANTIC_LABELS: Record<
+  (typeof SUBSCRIBE_SEMANTICS)[number],
+  string
+> = {
+  orderCode: '订单号',
+  title: '标题/说明',
+  statusLabel: '订单状态',
+  amount: '金额(元)',
+  at: '时间',
+};
 
 /** 编辑器里的一行场景配置；字段映射拆成数组才能稳定地编辑中间项 */
 export interface SubscribeTemplateRow {
@@ -79,6 +135,13 @@ export function emptyTemplateRow(
     templateId,
     fields: Object.entries(fields).map(([field, semantic]) => ({ field, semantic })),
   };
+}
+
+/** 新建小程序后预填的回收业务四场景（模板 ID 待粘贴） */
+export function suggestedSubscribeTemplateRows(): SubscribeTemplateRow[] {
+  return SUGGESTED_SUBSCRIBE_SCENES.map((item) =>
+    emptyTemplateRow(item.scene, '', item.fields),
+  );
 }
 
 /** 后端配置 → 编辑器行 */

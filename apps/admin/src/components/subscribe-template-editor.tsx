@@ -15,13 +15,14 @@ import {
 import {
   emptyTemplateRow,
   SUGGESTED_SUBSCRIBE_SCENES,
+  SUBSCRIBE_SEMANTIC_LABELS,
   SUBSCRIBE_SEMANTICS,
   type SubscribeTemplateRow,
 } from '@/lib/wechat-apps';
 
 const SEMANTIC_OPTIONS = SUBSCRIBE_SEMANTICS.map((name) => ({
   value: name,
-  label: name,
+  label: `${name}（${SUBSCRIBE_SEMANTIC_LABELS[name]}）`,
 }));
 
 /**
@@ -30,6 +31,8 @@ const SEMANTIC_OPTIONS = SUBSCRIBE_SEMANTICS.map((name) => ({
  * 模板 ID 与字段名都只有小程序后台才有，所以这里按「场景 → 模板 ID + 字段映射」
  * 手填。字段映射的取值被限制在 `SUBSCRIBE_SEMANTICS` 内 —— 后端只上报这几个
  * 语义值，映射到别的名字微信不报错但会渲染成空串。
+ *
+ * 用户点开消息会进顾客订单详情（scope=mine）。
  */
 export function SubscribeTemplateEditor({
   rows,
@@ -70,9 +73,10 @@ export function SubscribeTemplateEditor({
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <Label>订阅消息模板</Label>
+          <Label>订阅消息模板（点开进顾客订单详情）</Label>
           <p className="text-xs text-muted-foreground">
-            场景名由业务侧上报，模板 ID 与字段名取自小程序后台；没配的场景不会发送
+            在微信公众平台「订阅消息」按关键词选用模板，把模板 ID
+            粘到下方；字段名以所选模板为准（与预填不一致时改左侧字段名）。未配置的场景不会发送。
           </p>
         </div>
         <Button
@@ -95,6 +99,7 @@ export function SubscribeTemplateEditor({
               type="button"
               variant="ghost"
               size="xs"
+              title={`${item.titleHint}；搜「${item.keywordHint}」`}
               onClick={() =>
                 onChange([
                   ...rows,
@@ -103,7 +108,7 @@ export function SubscribeTemplateEditor({
               }
             >
               <Plus />
-              {item.scene}
+              {item.label}
             </Button>
           ))}
         </div>
@@ -129,7 +134,7 @@ export function SubscribeTemplateEditor({
               <Input
                 value={row.templateId}
                 onChange={(e) => patch(index, { templateId: e.target.value })}
-                placeholder="模板 ID"
+                placeholder="微信模板 ID"
                 className="font-mono text-xs"
                 aria-label="模板 ID"
               />
@@ -145,10 +150,20 @@ export function SubscribeTemplateEditor({
                 <Trash2 />
               </Button>
             </div>
+            {(() => {
+              const hint = SUGGESTED_SUBSCRIBE_SCENES.find(
+                (item) => item.scene === row.scene.trim(),
+              );
+              return hint ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {hint.label} · 搜「{hint.keywordHint}」· {hint.titleHint}
+                </p>
+              ) : null;
+            })()}
 
             <div className="space-y-1.5 pl-1">
               <span className="text-xs text-muted-foreground">
-                字段映射（留空则默认填 thing1 = 订单号）
+                字段映射（微信字段名 ← 业务语义；须与所选模板字段一致）
               </span>
               {row.fields.map((pair, fieldIndex) => (
                 <div key={fieldIndex} className="flex items-center gap-2">

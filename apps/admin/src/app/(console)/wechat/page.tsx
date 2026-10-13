@@ -31,7 +31,11 @@ import type {
   RegisteredWechatApp,
   SubscribeTemplateRow,
 } from '@/lib/wechat-apps';
-import { collectTemplates, toTemplateRows } from '@/lib/wechat-apps';
+import {
+  collectTemplates,
+  suggestedSubscribeTemplateRows,
+  toTemplateRows,
+} from '@/lib/wechat-apps';
 
 interface WechatRow {
   id: string;
@@ -127,7 +131,12 @@ export default function WechatPage() {
       appId: row.appId,
       secret: '',
     });
-    setEditTemplates(toTemplateRows(row.subscribeTemplates));
+    // 尚未配置时预填回收四场景，方便登记后直接粘贴微信模板 ID
+    setEditTemplates(
+      row.sceneCount > 0
+        ? toTemplateRows(row.subscribeTemplates)
+        : suggestedSubscribeTemplateRows(),
+    );
     setEditing(row);
   }
 
@@ -175,23 +184,38 @@ export default function WechatPage() {
       toast.error('请填写 appId 和 appSecret');
       return;
     }
+    setBusy(true);
     try {
-      await adminFetch('/wechat/miniprograms', {
-        method: 'POST',
-        body: JSON.stringify({
-          code: business.code,
-          name: business.name,
-          appId,
-          secret,
-        }),
-      });
+      const created = await adminFetch<RegisteredWechatApp>(
+        '/wechat/miniprograms',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            code: business.code,
+            name: business.name,
+            appId,
+            secret,
+          }),
+        },
+      );
       await ensureClient(business, appId);
-      toast.success('已添加');
+      toast.success('已添加，请粘贴订阅消息模板 ID');
       setForm(EMPTY_FORM);
       setCreateOpen(false);
       await load();
+      // 登记完成后立刻打开编辑，预填四场景（点开消息进顾客订单详情）
+      openEdit({
+        id: created.id,
+        businessName: business.name,
+        appCode: created.code,
+        appId: created.appId,
+        sceneCount: Object.keys(created.subscribeTemplates ?? {}).length,
+        subscribeTemplates: created.subscribeTemplates ?? {},
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '添加失败');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -326,7 +350,7 @@ export default function WechatPage() {
     <>
       <PageHeader
         title="微信小程序"
-        description="一个业务 code 只登记一条。需要时再添加 appId 和 appSecret，列表不显示密钥"
+        description="一个业务 code 只登记一条。登记后配置订阅消息：用户点通知会打开顾客视角订单详情"
         actions={
           <Button onClick={openCreate}>
             <Plus />
@@ -403,7 +427,10 @@ export default function WechatPage() {
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>编辑微信小程序</DialogTitle>
-            <DialogDescription>appSecret 留空则保持原密钥，列表不会显示密钥</DialogDescription>
+            <DialogDescription>
+              appSecret 留空则保持原密钥。下方订阅消息：粘贴公众平台模板
+              ID；用户点通知会打开顾客订单详情。
+            </DialogDescription>
           </DialogHeader>
           <form id="wechat-edit" className="space-y-4" onSubmit={saveEdit}>
             <SelectField
