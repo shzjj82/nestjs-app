@@ -239,11 +239,20 @@ export interface RoleInfo {
 
 export interface PermissionInfo {
   id: string;
+  /**
+   * platform（角色权限）：在角色页勾选，控制管理后台；
+   * business（开通模块）：在业务页开通，控制租户接口白名单。
+   */
+  scope: 'platform' | 'business';
   module: string;
   code: string;
   name: string;
   description: string | null;
   sort: number;
+  /** 绑定的网关接口键，如 `GET /users`；一功能点可对应多个接口 */
+  apis: string[];
+  /** 仅超级管理员；列表不展示、不可分配给其他角色 */
+  adminOnly: boolean;
 }
 
 /**
@@ -337,19 +346,51 @@ export interface BusinessMemberInfo {
 }
 
 export const PERMISSIONS = {
-  BUSINESS_MANAGE: 'business.manage',
   USER_QUERY: 'user.query',
   USER_CREATE: 'user.create',
   USER_UPDATE: 'user.update',
   USER_ASSIGN_ROLE: 'user.assignRole',
+
+  BUSINESS_QUERY: 'business.query',
+  BUSINESS_MANAGE: 'business.manage',
+
+  CLIENT_QUERY: 'client.query',
   CLIENT_MANAGE: 'client.manage',
+
+  ROLE_QUERY: 'role.query',
   ROLE_MANAGE: 'role.manage',
+
+  PERMISSION_QUERY: 'permission.query',
   PERMISSION_MANAGE: 'permission.manage',
   PERMISSION_IMPORT: 'permission.import',
   PERMISSION_EXPORT: 'permission.export',
+
+  WECHAT_QUERY: 'wechat.query',
   WECHAT_MANAGE: 'wechat.manage',
   WECHAT_QRCODE: 'wechat.qrcode',
 } as const;
+
+/** 功能点目录分类展示顺序（含业务模块） */
+export const PERMISSION_MODULE_ORDER = [
+  '用户中心',
+  '业务租户',
+  '接入端',
+  '角色权限',
+  '功能点目录',
+  '微信小程序',
+  '认证',
+  '团队',
+  '通用订单',
+  '文档',
+  '上传',
+  '微信业务',
+  '回收·基础',
+  '回收·目录',
+  '回收·门店',
+  '回收·订单',
+  '回收·审批',
+  '智能助手',
+] as const;
 
 export type AgentChatRole = 'user' | 'assistant';
 

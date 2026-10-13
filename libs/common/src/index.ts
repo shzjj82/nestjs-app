@@ -1,5 +1,6 @@
 export * from './api-docs';
 export * from './env';
+export * from './feature-catalog';
 export * from './gateway-routes';
 export * from './handle-log.interceptor';
 export * from './http';

@@ -1,8 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { PERMISSIONS, PLATFORM_BIZ_CODE } from '@app/common';
+import { DEFAULT_FEATURE_CATALOG, PERMISSIONS, PLATFORM_BIZ_CODE } from '@app/common';
 import { hash } from 'bcrypt';
-import { IsNull, Not, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import type { ClientType } from '../entities';
 import {
   AccountEntity,
@@ -15,27 +15,6 @@ import {
   RolePermissionEntity,
   UserEntity,
 } from '../entities';
-
-const DEFAULT_PERMISSIONS: Array<{
-  module: string;
-  code: string;
-  name: string;
-  description: string;
-  sort: number;
-}> = [
-  { module: '用户', code: PERMISSIONS.USER_QUERY, name: '查询用户', description: '查看用户列表与详情', sort: 10 },
-  { module: '用户', code: PERMISSIONS.USER_CREATE, name: '创建用户', description: '后台创建用户', sort: 20 },
-  { module: '用户', code: PERMISSIONS.USER_UPDATE, name: '更新用户', description: '编辑用户资料', sort: 30 },
-  { module: '用户', code: PERMISSIONS.USER_ASSIGN_ROLE, name: '分配角色', description: '给账户勾选角色组', sort: 50 },
-  { module: '业务', code: PERMISSIONS.BUSINESS_MANAGE, name: '管理业务', description: '维护业务、成员与业务能力包', sort: 55 },
-  { module: '接入端', code: PERMISSIONS.CLIENT_MANAGE, name: '管理接入端', description: '维护 Web / 微信 / 支付宝小程序', sort: 60 },
-  { module: '角色', code: PERMISSIONS.ROLE_MANAGE, name: '管理角色', description: '维护平台与业务角色组并勾选功能点', sort: 70 },
-  { module: '权限', code: PERMISSIONS.PERMISSION_MANAGE, name: '管理功能点', description: '维护全局功能点目录', sort: 80 },
-  { module: '权限', code: PERMISSIONS.PERMISSION_IMPORT, name: '导入权限', description: 'Excel 导入功能点与角色勾选', sort: 90 },
-  { module: '权限', code: PERMISSIONS.PERMISSION_EXPORT, name: '导出权限', description: 'Excel 导出功能点与角色勾选', sort: 100 },
-  { module: '微信', code: PERMISSIONS.WECHAT_MANAGE, name: '管理小程序', description: '登记多套微信小程序 appId / secret', sort: 110 },
-  { module: '微信', code: PERMISSIONS.WECHAT_QRCODE, name: '生成小程序码', description: '按小程序生成 QR 码', sort: 120 },
-];
 
 @Injectable()
 export class SeedService implements OnModuleInit {
@@ -79,9 +58,74 @@ export class SeedService implements OnModuleInit {
     });
     await this.ensureRbac(platform);
     await this.ensureAdmin(platform);
+    await this.ensureRecycleCustomerDefault();
     this.logger.log(
       `已就绪，平台业务 ${PLATFORM_BIZ_CODE}，默认管理员 ${process.env.SEED_ADMIN_USERNAME ?? 'admin'}`,
     );
+  }
+
+  /**
+   * 回收业务：C 端默认身份是 customer（客户），与「普通用户」重复。
+   * 启动时把 defaultRole 切到客户，并把旧 user 角色持有者迁过去后删除。
+   */
+  private async ensureRecycleCustomerDefault() {
+    const recycle = await this.businesses.findOne({ where: { code: 'recycle' } });
+    if (!recycle) return;
+
+    let customer = await this.roles.findOne({
+      where: { businessId: recycle.id, code: 'customer' },
+    });
+    if (!customer) {
+      customer = await this.roles.save(
+        this.roles.create({
+          code: 'customer',
+          name: '客户',
+          description: '回收 C 端默认身份（下单、报价、收款）',
+          isSystem: true,
+          businessId: recycle.id,
+        }),
+      );
+    } else {
+      let dirty = false;
+      if (customer.name !== '客户') {
+        customer.name = '客户';
+        dirty = true;
+      }
+      if (!customer.description) {
+        customer.description = '回收 C 端默认身份（下单、报价、收款）';
+        dirty = true;
+      }
+      if (!customer.isSystem) {
+        customer.isSystem = true;
+        dirty = true;
+      }
+      if (dirty) await this.roles.save(customer);
+    }
+
+    if (recycle.defaultRoleId !== customer.id) {
+      recycle.defaultRoleId = customer.id;
+      await this.businesses.save(recycle);
+    }
+
+    const legacyUser = await this.roles.findOne({
+      where: { businessId: recycle.id, code: 'user' },
+    });
+    if (!legacyUser) return;
+
+    const links = await this.accountRoles.find({ where: { roleId: legacyUser.id } });
+    for (const link of links) {
+      const hasCustomer = await this.accountRoles.findOne({
+        where: { accountId: link.accountId, roleId: customer.id },
+      });
+      if (!hasCustomer) {
+        await this.accountRoles.save(
+          this.accountRoles.create({ accountId: link.accountId, roleId: customer.id }),
+        );
+      }
+      await this.accountRoles.remove(link);
+    }
+    await this.roles.remove(legacyUser);
+    this.logger.log('recycle：默认身份已合并为「客户」，已移除重复的「普通用户」');
   }
 
   private async ensurePlatform(): Promise<BusinessEntity> {
@@ -133,12 +177,49 @@ export class SeedService implements OnModuleInit {
   }
 
   private async ensureRbac(platform: BusinessEntity) {
-    for (const item of DEFAULT_PERMISSIONS) {
-      if (!(await this.permissions.findOne({ where: { code: item.code } }))) {
-        await this.permissions.save(this.permissions.create(item));
+    for (const item of DEFAULT_FEATURE_CATALOG) {
+      const existing = await this.permissions.findOne({ where: { code: item.code } });
+      if (!existing) {
+        await this.permissions.save(
+          this.permissions.create({
+            scope: item.scope,
+            module: item.module,
+            code: item.code,
+            name: item.name,
+            description: item.description,
+            sort: item.sort,
+            apis: item.apis,
+            adminOnly: item.adminOnly === true,
+          }),
+        );
+        continue;
+      }
+      // 同步分类 / 文案 / 接口绑定，保证后台与 Excel 目录一致
+      const nextApis = JSON.stringify([...(item.apis ?? [])].sort());
+      const prevApis = JSON.stringify([...(existing.apis ?? [])].sort());
+      const adminOnly = item.adminOnly === true;
+      if (
+        existing.scope !== item.scope ||
+        existing.module !== item.module ||
+        existing.name !== item.name ||
+        existing.description !== item.description ||
+        existing.sort !== item.sort ||
+        existing.adminOnly !== adminOnly ||
+        nextApis !== prevApis
+      ) {
+        existing.scope = item.scope;
+        existing.module = item.module;
+        existing.name = item.name;
+        existing.description = item.description;
+        existing.sort = item.sort;
+        existing.apis = item.apis;
+        existing.adminOnly = adminOnly;
+        await this.permissions.save(existing);
       }
     }
     const allPermissions = await this.permissions.find();
+    const platformPermissions = allPermissions.filter((item) => item.scope !== 'business');
+    const assignablePermissions = platformPermissions.filter((item) => !item.adminOnly);
 
     const admin =
       (await this.roles.findOne({ where: { code: 'admin', businessId: IsNull() } })) ??
@@ -173,11 +254,26 @@ export class SeedService implements OnModuleInit {
         }),
       ));
 
-    for (const permission of allPermissions) {
+    // 超管拥有全部平台功能点（含仅超管）
+    for (const permission of platformPermissions) {
       await this.link(this.rolePermissions, { roleId: admin.id, permissionId: permission.id });
     }
 
-    const userView = allPermissions.find((item) => item.code === PERMISSIONS.USER_QUERY);
+    // 仅超管功能点不得挂在其他角色上
+    const adminOnlyIds = platformPermissions
+      .filter((item) => item.adminOnly)
+      .map((item) => item.id);
+    if (adminOnlyIds.length) {
+      const leaked = await this.rolePermissions.find({
+        where: { permissionId: In(adminOnlyIds) },
+      });
+      const stale = leaked.filter((link) => link.roleId !== admin.id);
+      if (stale.length) {
+        await this.rolePermissions.remove(stale);
+      }
+    }
+
+    const userView = assignablePermissions.find((item) => item.code === PERMISSIONS.USER_QUERY);
     if (userView) {
       await this.link(this.rolePermissions, { roleId: user.id, permissionId: userView.id });
     }

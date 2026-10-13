@@ -38,6 +38,11 @@ export class PermissionsController {
     return this.excel.exportWorkbook(payload);
   }
 
+  @MessagePattern(ucPattern(MQTT_PATTERNS.PERMISSION_TEMPLATE))
+  templateWorkbook(payload: Record<string, unknown>) {
+    return this.excel.templateWorkbook(payload);
+  }
+
   @MessagePattern(ucPattern(MQTT_PATTERNS.PERMISSION_IMPORT))
   importWorkbook(payload: Record<string, unknown>) {
     return this.excel.importWorkbook(payload);

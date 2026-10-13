@@ -23,6 +23,22 @@ import {
 import { normalizeAppCode } from '../apps/wechat-app-code';
 import { optionalString, requiredString, rpcFail } from '../rpc';
 
+/** 新建业务时的默认身份角色：回收用客户，其它业务用普通用户 */
+function defaultIdentityRole(bizCode: string, bizName: string) {
+  if (bizCode === 'recycle') {
+    return {
+      code: 'customer',
+      name: '客户',
+      description: '回收 C 端默认身份（下单、报价、收款）',
+    };
+  }
+  return {
+    code: 'user',
+    name: '普通用户',
+    description: `${bizName} 默认角色`,
+  };
+}
+
 @Injectable()
 export class BusinessesService implements OnApplicationBootstrap {
   private readonly logger = new Logger('UsercenterBusinesses');
@@ -106,11 +122,12 @@ export class BusinessesService implements OnApplicationBootstrap {
         isSystem: false,
       }),
     );
+    const identity = defaultIdentityRole(code, business.name);
     const role = await this.roles.save(
       this.roles.create({
-        code: 'user',
-        name: '普通用户',
-        description: `${business.name} 默认角色`,
+        code: identity.code,
+        name: identity.name,
+        description: identity.description,
         isSystem: true,
         businessId: business.id,
       }),

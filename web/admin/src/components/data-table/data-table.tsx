@@ -39,17 +39,18 @@ export function DataTable<TData extends RowData>({
 }: DataTableProps<TData>) {
   return (
     <div
-      className={cn("flex w-full flex-col gap-2.5 overflow-auto", className)}
+      data-slot="data-table"
+      className={cn("flex min-h-0 w-full flex-1 flex-col gap-2.5", className)}
       {...props}
     >
-      {children}
-      <div className="overflow-hidden rounded-md border">
-        <Table>
+      {children ? <div className="shrink-0">{children}</div> : null}
+      <div className="min-h-0 flex-1 overflow-auto rounded-md border">
+        <Table containerClassName="overflow-visible">
           <DataTableHeader table={table} />
           <DataTableBody table={table} />
         </Table>
       </div>
-      <div className="flex flex-col gap-2.5">
+      <div className="flex shrink-0 flex-col gap-2.5">
         <DataTablePagination table={table} />
         {actionBar ? (
           <DataTableActionBar table={table} actionBar={actionBar} />
@@ -77,14 +78,15 @@ function DataTableHeader<TData extends RowData>({
       })}
     >
       {() => (
-        <TableHeader>
+        <TableHeader className="sticky top-0 z-10 bg-background shadow-[inset_0_-1px_0_0_var(--border)]">
           {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
+            <TableRow key={headerGroup.id} className="hover:bg-transparent">
               {headerGroup.headers.map((header) => (
                 <TableHead
                   key={header.id}
                   colSpan={header.colSpan}
                   style={getColumnPinningStyle({ column: header.column })}
+                  className="bg-background"
                 >
                   {header.isPlaceholder ? null : <FlexRender header={header} />}
                 </TableHead>

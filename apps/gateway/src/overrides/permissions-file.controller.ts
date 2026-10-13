@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Get,
   Post,
+  Query,
   Req,
   Res,
   UploadedFile,
@@ -40,18 +41,30 @@ export class PermissionsFileController {
     if (!this.auth.hasAnyPermission(user, [PERMISSIONS.PERMISSION_EXPORT])) {
       throw new ForbiddenException('缺少权限: permission.export');
     }
-    const file = unwrapData<{
-      filename: string;
-      mime: string;
-      base64: string;
-    }>(await this.clients.send(USER_CLIENT, MQTT_PATTERNS.PERMISSION_EXPORT, {}));
-    const buffer = Buffer.from(file.base64, 'base64');
-    res.setHeader('Content-Type', file.mime);
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${file.filename}"`,
-    );
-    res.send(buffer);
+    await this.sendWorkbook(res, MQTT_PATTERNS.PERMISSION_EXPORT, {});
+  }
+
+  @Get('template')
+  @UseGuards(JwtAuthGuard)
+  async template(
+    @Req() req: Request,
+    @CurrentUser() user: GatewayUser,
+    @Query('filled') filled: string | undefined,
+    @Res() res: Response,
+  ) {
+    await this.biz.checkRequest(req, user);
+    if (
+      !this.auth.hasAnyPermission(user, [
+        PERMISSIONS.PERMISSION_EXPORT,
+        PERMISSIONS.PERMISSION_IMPORT,
+        PERMISSIONS.PERMISSION_MANAGE,
+      ])
+    ) {
+      throw new ForbiddenException('缺少权限: permission.export / import / manage');
+    }
+    await this.sendWorkbook(res, MQTT_PATTERNS.PERMISSION_TEMPLATE, {
+      filled: filled === '1' || filled === 'true',
+    });
   }
 
   @Post('import')
@@ -72,5 +85,24 @@ export class PermissionsFileController {
     return this.clients.send(USER_CLIENT, MQTT_PATTERNS.PERMISSION_IMPORT, {
       base64: file.buffer.toString('base64'),
     });
+  }
+
+  private async sendWorkbook(
+    res: Response,
+    pattern: string,
+    payload: Record<string, unknown>,
+  ) {
+    const file = unwrapData<{
+      filename: string;
+      mime: string;
+      base64: string;
+    }>(await this.clients.send(USER_CLIENT, pattern, payload));
+    const buffer = Buffer.from(file.base64, 'base64');
+    res.setHeader('Content-Type', file.mime);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
+    );
+    res.send(buffer);
   }
 }

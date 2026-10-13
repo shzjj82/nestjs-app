@@ -1,4 +1,4 @@
-import { Controller, ForbiddenException, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, ForbiddenException, Get, Query, Req, UseGuards } from '@nestjs/common';
 import {
   GATEWAY_ROUTES,
   PERMISSIONS,
@@ -25,20 +25,43 @@ export class BizModulesController {
     private readonly clients: ClientHub,
   ) {}
 
-  /** 按微服务列出业务可开通的接口；名称与描述来自各服务处理函数上的 @ApiDoc */
+  /**
+   * 按微服务列出接口目录；名称与描述来自各服务 @ApiDoc。
+   * scope=business（默认）| platform | all
+   */
   @Get()
   @UseGuards(JwtAuthGuard)
-  async list(@Req() req: Request, @CurrentUser() user: GatewayUser): Promise<BizServiceCatalogItem[]> {
+  async list(
+    @Req() req: Request,
+    @CurrentUser() user: GatewayUser,
+    @Query('scope') scopeRaw?: string,
+  ): Promise<BizServiceCatalogItem[]> {
     await this.biz.check({ scope: 'platform' }, req, user);
-    if (!this.auth.hasAnyPermission(user, [PERMISSIONS.BUSINESS_MANAGE])) {
-      throw new ForbiddenException('缺少权限: business.manage');
+    if (
+      !this.auth.hasAnyPermission(user, [
+        PERMISSIONS.BUSINESS_MANAGE,
+        PERMISSIONS.BUSINESS_QUERY,
+        PERMISSIONS.PERMISSION_QUERY,
+        PERMISSIONS.PERMISSION_MANAGE,
+        PERMISSIONS.ROLE_QUERY,
+        PERMISSIONS.ROLE_MANAGE,
+      ])
+    ) {
+      throw new ForbiddenException('缺少权限查看接口目录');
     }
+
+    const scope = (scopeRaw ?? 'business').toLowerCase();
+    const allowBusiness = scope === 'business' || scope === 'all';
+    const allowPlatform = scope === 'platform' || scope === 'all';
 
     const catalog = await Promise.all(
       SERVICE_API_DOCS.map(async ({ client, service, pattern }) => {
-        const routes = GATEWAY_ROUTES.filter(
-          (route) => route.scope === 'business' && route.client === client,
-        );
+        const routes = GATEWAY_ROUTES.filter((route) => {
+          if (route.client !== client) return false;
+          if (route.scope === 'business') return allowBusiness;
+          if (route.scope === 'platform') return allowPlatform;
+          return false;
+        });
         if (!routes.length) return null;
         const docs = await this.fetchDocs(client, pattern);
         const byPattern = new Map((docs?.apis ?? []).map((api) => [api.pattern, api]));

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ConsolePage } from '@/components/console-page';
 import { PageHeader } from '@/components/page-header';
 import { adminFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -105,7 +106,7 @@ export default function UploadPage() {
   }
 
   return (
-    <>
+    <ConsolePage className="overflow-y-auto">
       <PageHeader
         title="上传管理"
         description="同步/异步上传与按 key 删除（无对象列表接口）"
@@ -191,6 +192,6 @@ export default function UploadPage() {
           </Card>
         </div>
       </div>
-    </>
+    </ConsolePage>
   );
 }

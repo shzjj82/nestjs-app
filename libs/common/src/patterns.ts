@@ -72,6 +72,7 @@ export const MQTT_PATTERNS = {
   PERMISSION_DELETE: 'permission.delete',
   PERMISSION_EXPORT: 'permission.export',
   PERMISSION_IMPORT: 'permission.import',
+  PERMISSION_TEMPLATE: 'permission.template',
   ORDER_HEALTH: 'order.health',
   ORDER_API_DOCS: 'order.apiDocs',
   ORDER_FIND_ALL: 'order.findAll',

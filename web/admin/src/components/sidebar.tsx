@@ -52,7 +52,7 @@ export function AppSidebar() {
                       <SidebarMenuButton
                         isActive={isActive(pathname, item.href)}
                         tooltip={item.label}
-                        render={<Link href={item.href} />}
+                        render={<Link href={item.href} prefetch />}
                       >
                         <ItemIcon />
                         <span>{item.label}</span>

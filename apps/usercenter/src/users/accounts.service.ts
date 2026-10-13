@@ -23,6 +23,7 @@ const DEFAULT_BUSINESS_ROLE_NAMES: Record<string, string> = {
   approver: '业务员',
   finance: '业务员',
   admin: '超管',
+  user: '普通用户',
 };
 
 @Injectable()

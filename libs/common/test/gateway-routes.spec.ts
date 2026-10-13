@@ -188,6 +188,7 @@ describe('matchRoute', () => {
 
   it('protects wechat miniprogram admin and qrcode override', () => {
     expect(matchRoute('GET', '/wechat/miniprograms')?.permissions).toEqual([
+      'wechat.query',
       'wechat.manage',
     ]);
     expect(matchRoute('DELETE', '/wechat/miniprograms/mp-1')?.pattern).toBe(

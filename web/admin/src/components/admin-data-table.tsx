@@ -3,44 +3,54 @@
 import {
   type PaginationState,
   type RowData,
+  Subscribe,
+  type Table as TanstackTable,
   type Updater,
   useTable,
 } from '@tanstack/react-table';
 import * as React from 'react';
 
 import { DataTable as TablecnDataTable } from '@/components/data-table/data-table';
+import { DataTableBulkBar } from '@/components/data-table-bulk-bar';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 import { DataTableSortList } from '@/components/data-table/data-table-sort-list';
 import { DataTableViewOptions } from '@/components/data-table/data-table-view-options';
 import { FilterBar, type FilterField, type FilterValues, filterRows } from '@/components/filter-bar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useDebouncedCallback } from '@/hooks/use-debounced-callback';
-import { dataTableFeatures } from '@/lib/data-table-features';
 import type { AdminColumnDef } from '@/lib/admin-table-types';
+import { dataTableFeatures, type DataTableFeatures } from '@/lib/data-table-features';
 
 function selectColumn<TData extends RowData>(): AdminColumnDef<TData> {
   return {
     id: 'select',
     header: ({ table }) => (
-      <Checkbox
-        aria-label="全选"
-        checked={table.getIsAllPageRowsSelected()}
-        indeterminate={!table.getIsAllPageRowsSelected() && table.getIsSomePageRowsSelected()}
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(value)}
-        className="translate-y-0.5"
-      />
+      <div className="flex items-center justify-center">
+        <Checkbox
+          aria-label="全选"
+          checked={table.getIsAllPageRowsSelected()}
+          indeterminate={
+            !table.getIsAllPageRowsSelected() && table.getIsSomePageRowsSelected()
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        />
+      </div>
     ),
     cell: ({ row }) => (
-      <Checkbox
-        aria-label="选择行"
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(value)}
-        className="translate-y-0.5"
-      />
+      <div className="flex items-center justify-center">
+        <Checkbox
+          aria-label="选择行"
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+        />
+      </div>
     ),
     enableSorting: false,
     enableHiding: false,
-    size: 40,
+    size: 36,
+    minSize: 36,
+    maxSize: 36,
+    meta: { label: '选择' },
   };
 }
 
@@ -70,6 +80,12 @@ export type AdminDataTablePagination =
       onChange: (next: { page: number; pageSize: number }) => void;
     };
 
+export type DataTableBulkActionsContext<TData> = {
+  rows: TData[];
+  selectedCount: number;
+  clearSelection: () => void;
+};
+
 export type AdminDataTableProps<TData extends RowData> = {
   columns: AdminColumnDef<TData>[];
   data: TData[];
@@ -85,9 +101,40 @@ export type AdminDataTableProps<TData extends RowData> = {
   /** 工具栏右侧追加的操作 */
   toolbarActions?: React.ReactNode;
   initialColumnVisibility?: Record<string, boolean>;
-  /** 首列勾选框（tablecn 默认样式），默认开启 */
+  /** 首列勾选框，默认开启 */
   enableRowSelection?: boolean;
+  /** 勾选后底部浮层中的批量操作 */
+  bulkActions?: (ctx: DataTableBulkActionsContext<TData>) => React.ReactNode;
 };
+
+function BulkActionsPortal<TData extends RowData>({
+  table,
+  bulkActions,
+}: {
+  table: TanstackTable<DataTableFeatures, TData>;
+  bulkActions: (ctx: DataTableBulkActionsContext<TData>) => React.ReactNode;
+}) {
+  return (
+    <Subscribe
+      source={table.atoms.rowSelection}
+      selector={() => table.getSelectedRowModel().rows.map((row) => row.original)}
+    >
+      {(rows) => {
+        if (!rows.length) return null;
+        const clearSelection = () => table.resetRowSelection();
+        return (
+          <DataTableBulkBar count={rows.length} onClear={clearSelection}>
+            {bulkActions({
+              rows,
+              selectedCount: rows.length,
+              clearSelection,
+            })}
+          </DataTableBulkBar>
+        );
+      }}
+    </Subscribe>
+  );
+}
 
 export function AdminDataTable<TData extends RowData>({
   columns,
@@ -100,6 +147,7 @@ export function AdminDataTable<TData extends RowData>({
   toolbarActions,
   initialColumnVisibility,
   enableRowSelection = true,
+  bulkActions,
 }: AdminDataTableProps<TData>) {
   const tableColumns = React.useMemo(
     () => [
@@ -198,19 +246,24 @@ export function AdminDataTable<TData extends RowData>({
   );
 
   return (
-    <TablecnDataTable table={table} className={className}>
-      <FilterBar
-        fields={filters}
-        value={filterValues}
-        onChange={handleFilterChange}
-        actions={
-          <>
-            {toolbarActions}
-            <DataTableSortList table={table} />
-            <DataTableViewOptions table={table} align="end" />
-          </>
-        }
-      />
-    </TablecnDataTable>
+    <>
+      <TablecnDataTable table={table} className={className}>
+        <FilterBar
+          fields={filters}
+          value={filterValues}
+          onChange={handleFilterChange}
+          actions={
+            <>
+              {toolbarActions}
+              <DataTableSortList table={table} />
+              <DataTableViewOptions table={table} align="end" />
+            </>
+          }
+        />
+      </TablecnDataTable>
+      {enableRowSelection && bulkActions ? (
+        <BulkActionsPortal table={table} bulkActions={bulkActions} />
+      ) : null}
+    </>
   );
 }

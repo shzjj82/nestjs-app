@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { ACCESS_COOKIE, BIZ_HEADER, adminBizCode, gatewayUrl, parseApiResponse } from './api';
 
@@ -46,13 +47,14 @@ export async function gatewayFetch<T>(
   return parseApiResponse<T>(res);
 }
 
-export async function fetchMe(token?: string | null): Promise<AdminUser | null> {
+/** 同一 RSC 请求内去重，避免 layout 与页面重复打 /auth/me */
+export const fetchMe = cache(async (token?: string | null): Promise<AdminUser | null> => {
   try {
     return await gatewayFetch<AdminUser>('/auth/me', {}, token);
   } catch {
     return null;
   }
-}
+});
 
 export const cookieOptions = {
   httpOnly: true,

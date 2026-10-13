@@ -14,10 +14,11 @@ function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
 }
 
 function DropdownMenuTrigger({
-  asChild: _asChild,
+  asChild,
   ...props
 }: MenuPrimitive.Trigger.Props & { asChild?: boolean }) {
   // Base UI 无 Radix asChild；传入时忽略，避免与内层 <button> 叠成非法嵌套
+  void asChild;
   return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
 }
 

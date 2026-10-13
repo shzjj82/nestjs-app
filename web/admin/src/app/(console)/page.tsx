@@ -1,5 +1,6 @@
 import { expectedAppVersion } from '@/lib/api';
 import { gatewayFetch } from '@/lib/auth';
+import { ConsolePage } from '@/components/console-page';
 import { PageHeader } from '@/components/page-header';
 import { HealthServicesDataTable } from '@/components/tables/health-services-table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -43,7 +44,7 @@ export default async function OverviewPage() {
   const onlineCount = entries.filter(([, s]) => s.status === 'up' || s.status === 'ok').length;
 
   return (
-    <>
+    <ConsolePage>
       <PageHeader
         title="运维总览"
         description={`各微服务状态与版本；期望版本 ${expected}`}
@@ -84,6 +85,6 @@ export default async function OverviewPage() {
           <HealthServicesDataTable rows={serviceRows} />
         </>
       )}
-    </>
+    </ConsolePage>
   );
 }

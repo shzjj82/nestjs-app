@@ -26,6 +26,7 @@
     "start:recycle": "nest start recycle --watch",
     "start:admin": "npm --prefix web/admin run dev",
     "build:admin": "npm --prefix web/admin run build",
+    "preview:admin": "npm --prefix web/admin run start",
     "start:dev": "concurrently -k -n gateway,usercenter,order,docs,upload,wechat,agents,recycle -c cyan,green,yellow,magenta,blue,white,red,gray \"npm run start:gateway\" \"npm run start:usercenter\" \"npm run start:order\" \"npm run start:docs\" \"npm run start:upload\" \"npm run start:wechat\" \"npm run start:agents\" \"npm run start:recycle\"",
     "start:debug": "nest start gateway --debug --watch",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

@@ -103,6 +103,9 @@ export function getColumnPinningStyle<TData extends RowData>({
   const isFirstRightPinnedColumn =
     isPinned === "end" && column.getIsFirstColumn("end");
 
+  const size = column.getSize();
+  const isSelect = column.id === "select";
+
   return {
     boxShadow: withBorder
       ? isLastLeftPinnedColumn
@@ -116,7 +119,10 @@ export function getColumnPinningStyle<TData extends RowData>({
     opacity: isPinned ? 0.97 : 1,
     position: isPinned ? "sticky" : "relative",
     background: isPinned ? "var(--background)" : "var(--background)",
-    width: column.getSize(),
+    // 勾选列固定窄宽；其它列不写死 width，避免首列被撑出大片空白
+    width: isSelect || isPinned ? size : undefined,
+    minWidth: isSelect ? size : undefined,
+    maxWidth: isSelect ? size : undefined,
     zIndex: isPinned ? 1 : undefined,
   };
 }
