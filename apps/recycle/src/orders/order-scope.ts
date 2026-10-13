@@ -1,7 +1,8 @@
 import { optionalString } from '@app/common';
 import type { FindOptionsWhere } from 'typeorm';
-import { Actor, isStaffRole, RECYCLE_ROLES } from '../domain';
+import { Actor, isStaffRole, RECYCLE_ROLES, RECYCLE_STAFF_ROLES } from '../domain';
 import type { RecycleOrderEntity } from '../entities';
+import { isOrderAction, TRANSITIONS } from '../policy/transitions';
 
 /** 行级数据范围判断需要的字段 */
 type ScopedFields = Pick<
@@ -87,6 +88,42 @@ export function resolveOrderView(
   requested: unknown,
 ): OrderView {
   return parseOrderView(requested) ?? inferOrderView(actor, bizCode, order);
+}
+
+/**
+ * 执行动作时选视角。
+ *
+ * 显式 view（/mine|/staff）优先；未传时按动作角色推断——
+ * 避免旧路径 `POST /orders/:id/actions/receive` 在「本人也是业务员」时
+ * 被 infer 成 customer，裁掉业务员身份后 403。
+ */
+export function resolveOrderViewForAction(
+  actor: Actor,
+  bizCode: string,
+  order: ScopedFields,
+  action: string,
+  requested: unknown,
+): OrderView {
+  const explicit = parseOrderView(requested);
+  if (explicit) {
+    return explicit;
+  }
+  if (isOrderAction(action)) {
+    const roles = TRANSITIONS[action].roles;
+    const staffOnly = roles.every(
+      (role) =>
+        RECYCLE_STAFF_ROLES.includes(role) || role === RECYCLE_ROLES.ADMIN,
+    );
+    const customerOnly =
+      roles.length === 1 && roles[0] === RECYCLE_ROLES.CUSTOMER;
+    if (staffOnly && isStaffRole(actor.roles)) {
+      return 'staff';
+    }
+    if (customerOnly) {
+      return 'customer';
+    }
+  }
+  return inferOrderView(actor, bizCode, order);
 }
 
 export function canAccessOrder(

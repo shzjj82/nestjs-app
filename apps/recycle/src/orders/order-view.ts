@@ -9,7 +9,18 @@ import type { OrderAction } from '../policy/transitions';
 
 export interface OrderPaymentView {
   billNo: string | null;
+  wxBillNo: string | null;
+  state: string | null;
   paidAt: string | null;
+}
+
+/** 小程序 wx.requestMerchantTransfer 所需参数 */
+export interface MerchantTransferView {
+  mchId: string;
+  appId: string;
+  package: string;
+  outBillNo: string;
+  state: string | null;
 }
 
 export interface OrderView {
@@ -37,8 +48,13 @@ export interface OrderView {
   bEvalNote: string | null;
   /** 内部备注，仅作业人员可见 */
   internalNote?: string | null;
-  /** 打款信息，仅财务可见 */
+  /** 打款信息，业务员视角可见 */
   payment?: OrderPaymentView;
+  /**
+   * 用户确认收款参数；订单本人在待确认收款时可拿去调
+   * wx.requestMerchantTransfer（package 来自微信发起转账接口）。
+   */
+  merchantTransfer?: MerchantTransferView | null;
   /** 当前调用者在该订单上可执行的动作 */
   availableActions: OrderAction[];
   /** 本次接口视角：customer=顾客权限，staff=业务员权限 */
@@ -55,11 +71,13 @@ export interface OrderView {
  */
 export function toOrderView(
   order: RecycleOrderEntity,
-  _actor: Actor,
+  actor: Actor,
   availableActions: OrderAction[],
   accessView: 'customer' | 'staff' = 'customer',
+  extras?: { mchId?: string | null },
 ): OrderView {
   const showStaffFields = accessView === 'staff';
+  const isOwner = actor.userId === order.ownerId;
 
   const view: OrderView = {
     id: order.id,
@@ -92,7 +110,24 @@ export function toOrderView(
     view.internalNote = order.internalNote;
     view.payment = {
       billNo: order.transferBillNo,
+      wxBillNo: order.transferWxBillNo,
+      state: order.transferState,
       paidAt: order.paidAt ? order.paidAt.toISOString() : null,
+    };
+  }
+  if (
+    isOwner &&
+    order.transferPackageInfo &&
+    order.transferBillNo &&
+    order.wechatAppId &&
+    extras?.mchId
+  ) {
+    view.merchantTransfer = {
+      mchId: extras.mchId,
+      appId: order.wechatAppId,
+      package: order.transferPackageInfo,
+      outBillNo: order.transferBillNo,
+      state: order.transferState,
     };
   }
 

@@ -183,6 +183,8 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'GET', path: '/recycle/orders/staff/:id', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_FIND_STAFF_ONE, auth: ['jwt'] }),
   business({ method: 'GET', path: '/recycle/orders/:id', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_FIND_ONE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/recycle/orders/:id/actions/:action', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_ACTION, auth: ['jwt'] }),
+  /** 订单本人拉取确认收款参数（mchId/appId/package），供 wx.requestMerchantTransfer */
+  business({ method: 'GET', path: '/recycle/orders/:id/merchant-transfer', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_MERCHANT_TRANSFER, auth: ['jwt'] }),
   business({ method: 'GET', path: '/recycle/orders/:id/timeline', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_TIMELINE, auth: ['jwt'] }),
   business({ method: 'GET', path: '/recycle/orders/:id/audit', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_ORDER_AUDIT, auth: ['jwt'] }),
 

@@ -140,7 +140,7 @@ export class RecycleOrderEntity {
   })
   returnLogisticsNo: string | null;
 
-  /** 打款流水；仅财务可写 */
+  /** 商户转账单号 out_bill_no；仅财务可写 */
   @Column({
     name: 'transfer_bill_no',
     type: 'varchar',
@@ -148,6 +148,31 @@ export class RecycleOrderEntity {
     nullable: true,
   })
   transferBillNo: string | null;
+
+  /** 微信转账单号 transfer_bill_no */
+  @Column({
+    name: 'transfer_wx_bill_no',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+  })
+  transferWxBillNo: string | null;
+
+  /**
+   * 跳转确认收款页的 package_info。
+   * 仅 WAIT_USER_CONFIRM 时有值；给小程序 wx.requestMerchantTransfer 用。
+   */
+  @Column({ name: 'transfer_package_info', type: 'text', nullable: true })
+  transferPackageInfo: string | null;
+
+  /** 微信转账单据状态：WAIT_USER_CONFIRM / SUCCESS / FAIL … */
+  @Column({
+    name: 'transfer_state',
+    type: 'varchar',
+    length: 32,
+    nullable: true,
+  })
+  transferState: string | null;
 
   @Column({ name: 'paid_at', type: 'timestamptz', nullable: true })
   paidAt: Date | null;

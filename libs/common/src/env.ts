@@ -213,3 +213,95 @@ export function redisUrl(): string {
 export function wechatQrcodeCheckPath(): boolean {
   return process.env.WECHAT_QRCODE_CHECK_PATH === 'true';
 }
+
+export interface WechatPayMerchantConfig {
+  mchId: string;
+  serialNo: string;
+  privateKeyPem: string;
+  /** 微信支付公钥 ID（加密敏感字段 / 验签用，可选） */
+  publicKeyId: string | null;
+  publicKeyPem: string | null;
+  /** APIv3 密钥（回调解密用，可选） */
+  apiV3Key: string | null;
+  transferSceneId: string;
+  transferNotifyUrl: string | null;
+  transferReportInfos: Array<{ info_type: string; info_content: string }>;
+  userRecvPerception: string | null;
+}
+
+/**
+ * 微信支付商户配置（商家转账）。
+ * 私钥可用 PEM 原文，或 `file:/path/to/apiclient_key.pem`。
+ */
+export function wechatPayMerchantConfig(): WechatPayMerchantConfig | null {
+  const mchId = process.env.WECHAT_PAY_MCH_ID?.trim();
+  const serialNo = process.env.WECHAT_PAY_SERIAL_NO?.trim();
+  const privateKeyPem = readPemEnv('WECHAT_PAY_PRIVATE_KEY');
+  const transferSceneId = process.env.WECHAT_TRANSFER_SCENE_ID?.trim();
+  if (!mchId || !serialNo || !privateKeyPem || !transferSceneId) {
+    return null;
+  }
+  return {
+    mchId,
+    serialNo,
+    privateKeyPem,
+    publicKeyId: process.env.WECHAT_PAY_PUBLIC_KEY_ID?.trim() || null,
+    publicKeyPem: readPemEnv('WECHAT_PAY_PUBLIC_KEY'),
+    apiV3Key: process.env.WECHAT_PAY_API_V3_KEY?.trim() || null,
+    transferSceneId,
+    transferNotifyUrl: process.env.WECHAT_TRANSFER_NOTIFY_URL?.trim() || null,
+    transferReportInfos: parseTransferReportInfos(
+      process.env.WECHAT_TRANSFER_REPORT_INFOS,
+    ),
+    userRecvPerception:
+      process.env.WECHAT_TRANSFER_USER_RECV_PERCEPTION?.trim() || null,
+  };
+}
+
+function readPemEnv(name: string): string | null {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return null;
+  }
+  if (raw.startsWith('file:')) {
+    try {
+      // 延迟 require，避免浏览器/edge 打包扫到 fs
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('fs') as typeof import('fs');
+      return fs.readFileSync(raw.slice('file:'.length), 'utf8');
+    } catch {
+      return null;
+    }
+  }
+  return raw.includes('\\n') ? raw.replace(/\\n/g, '\n') : raw;
+}
+
+function parseTransferReportInfos(
+  raw: string | undefined,
+): Array<{ info_type: string; info_content: string }> {
+  if (!raw?.trim()) {
+    // 默认按「二手回收」常见报备字段；具体场景 ID 仍以 WECHAT_TRANSFER_SCENE_ID 为准
+    return [
+      { info_type: '回收商品', info_content: '空墨盒空硒鼓' },
+      { info_type: '回收说明', info_content: '耗材回收款' },
+    ];
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map((row) => {
+        const item = row as Record<string, unknown>;
+        const info_type = String(item.info_type ?? item.infoType ?? '').trim();
+        const info_content = String(
+          item.info_content ?? item.infoContent ?? '',
+        ).trim();
+        return { info_type, info_content };
+      })
+      .filter((row) => row.info_type && row.info_content);
+  } catch {
+    return [];
+  }
+}

@@ -7,9 +7,12 @@ import {
   requiredString,
   RECYCLE_CLIENT,
   rpcFail,
+  unwrapData,
+  wechatPayMerchantConfig,
   WECHAT_CLIENT,
 } from '@app/common';
-import { catchError, of } from 'rxjs';
+import { catchError, lastValueFrom, of } from 'rxjs';
+import { timeout } from 'rxjs/operators';
 import { DataSource, Repository } from 'typeorm';
 import {
   Actor,
@@ -39,6 +42,7 @@ import {
   canAccessOrder,
   customerScope,
   resolveOrderView,
+  resolveOrderViewForAction,
   staffScope,
   type OrderScope,
   type OrderView,
@@ -56,7 +60,8 @@ const ACTION_TITLES: Record<OrderAction, string> = {
   negotiate: '已发起协商定价',
   accept: '已同意报价',
   reject_offer: '已拒绝报价',
-  transfer: '回收款已转出',
+  transfer: '已发起收款，待微信确认',
+  sync_transfer: '回收款已到账',
   return: '退货已完成',
   decide: '审批已决策',
 };
@@ -64,13 +69,24 @@ const ACTION_TITLES: Record<OrderAction, string> = {
 /**
  * 动作 → 订阅消息场景。
  * 只通知「用户需要被动知晓」的节点；用户自己点的动作（quote / submit / negotiate）不发。
+ * PAID 在用户确认收款成功（sync_transfer）后再发。
  */
 const NOTICE_SCENES: Partial<Record<OrderAction, string>> = {
   evaluate: 'PRICE_OFFERED',
   decide: 'NEGOTIATE_RESULT',
-  transfer: 'PAID',
+  sync_transfer: 'PAID',
   return: 'RETURN',
 };
+
+interface WxTransferResult {
+  mchId: string;
+  appId: string;
+  outBillNo: string;
+  transferBillNo: string | null;
+  state: string;
+  packageInfo: string | null;
+  failReason: string | null;
+}
 
 /** 各场景要展示的金额字段 */
 const NOTICE_AMOUNT_FIELD: Record<string, keyof RecycleOrderEntity> = {
@@ -87,6 +103,7 @@ const RESERVED_PAYLOAD_KEYS = [
   '_bizCode',
   '_internal',
   '_docsPrivileged',
+  '_wxTransfer',
 ];
 
 function sanitizePayload(
@@ -137,18 +154,20 @@ function genOrderCode(): string {
 }
 
 /**
- * 转账流水号：服务端生成，不接受客户端传值。
- * 等接入微信商家转账后，这里应换成微信返回的批次号 / 微信明细单号；
- * 在那之前先由服务端出号，避免前端随便填一个。
+ * 商户转账单号 out_bill_no：仅数字字母，≤32。
+ * 客户端传的 billNo 不采信。
  */
-function genBillNo(): string {
+function genOutBillNo(): string {
   const now = new Date();
   const stamp = [
     now.getFullYear(),
     String(now.getMonth() + 1).padStart(2, '0'),
     String(now.getDate()).padStart(2, '0'),
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+    String(now.getSeconds()).padStart(2, '0'),
   ].join('');
-  return `TB${stamp}${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
+  return `TB${stamp}${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
 
 function actionTitle(
@@ -425,6 +444,7 @@ export class OrdersService {
    * 执行订单动作。
    *
    * 授权 = 策略引擎（角色 ∩ 状态 ∩ 业务规则），并发控制靠 version 条件更新。
+   * 微信商家转账在事务外调用，避免长事务锁单。
    */
   async perform(
     actor: Actor,
@@ -435,64 +455,142 @@ export class OrdersService {
     options: { internal?: boolean } = {},
   ) {
     actor = await this.liveRoles.hydrate(actor);
+
+    const order = await this.orders.findOne({ where: { id, bizCode } });
+    if (!order) {
+      rpcFail(404, '订单不存在');
+    }
+    const view: OrderView = options.internal
+      ? 'staff'
+      : resolveOrderViewForAction(
+          actor,
+          bizCode,
+          order,
+          action,
+          payload.view,
+        );
+    if (!canAccessOrder(actor, bizCode, order, view)) {
+      rpcFail(404, '订单不存在');
+    }
+
+    const lens = actorForOrderView(actor, view);
+    const authorized = this.policy.authorize(
+      action,
+      {
+        actor: lens,
+        order: toOrderSnapshot(order),
+        payload,
+      },
+      options,
+    );
+
+    // 微信商家转账在事务外调用，避免长事务锁单
+    let workPayload = payload;
+    let targetStatus = authorized.to;
+    let noticeAction = authorized.action;
+    if (authorized.action === 'transfer') {
+      // 历史单可能因网关未透传 openid 而缺字段；本人微信会话下可回填
+      await this.ensureOwnerWechatIdentity(order, actor);
+      const wx = await this.claimWxTransfer(order);
+      workPayload = { ...payload, _wxTransfer: wx };
+      if (wx.state === 'SUCCESS') {
+        targetStatus = OrderStatus.PAID;
+        noticeAction = 'sync_transfer';
+      }
+      // 已有待确认单且未改库字段时，直接返回（避免无意义 bump version）
+      if (
+        order.status === OrderStatus.PAYING &&
+        wx.outBillNo === order.transferBillNo &&
+        wx.packageInfo === order.transferPackageInfo &&
+        wx.state !== 'SUCCESS'
+      ) {
+        return this.toView(order, actor, view);
+      }
+    } else if (authorized.action === 'sync_transfer') {
+      const wx = await this.queryWxTransfer(order);
+      if (wx.state !== 'SUCCESS') {
+        await this.orders.update(
+          { id: order.id, version: order.version },
+          {
+            transferState: wx.state,
+            transferPackageInfo: wx.packageInfo ?? order.transferPackageInfo,
+            transferWxBillNo: wx.transferBillNo ?? order.transferWxBillNo,
+            version: order.version + 1,
+          },
+        );
+        const latest = await this.orders.findOneOrFail({
+          where: { id: order.id },
+        });
+        if (wx.state === 'FAIL' || wx.state === 'CANCELLED') {
+          rpcFail(
+            409,
+            `微信转账未成功（${wx.state}${wx.failReason ? `: ${wx.failReason}` : ''}），请重新发起收款`,
+          );
+        }
+        return this.toView(latest, actor, view);
+      }
+      workPayload = { ...payload, _wxTransfer: wx };
+    }
+
     return this.dataSource.transaction(async (manager) => {
-      const order = await manager.findOne(RecycleOrderEntity, {
+      const locked = await manager.findOne(RecycleOrderEntity, {
         where: { id, bizCode },
       });
-      if (!order) {
+      if (!locked) {
         rpcFail(404, '订单不存在');
       }
-      const view: OrderView = options.internal
-        ? 'staff'
-        : this.viewOf(actor, bizCode, order, payload);
-      if (!canAccessOrder(actor, bizCode, order, view)) {
-        // 越统一返回 404，避免用错误码探测订单是否存在
-        rpcFail(404, '订单不存在');
+      if (
+        locked.version !== order.version &&
+        (authorized.action === 'transfer' ||
+          authorized.action === 'sync_transfer')
+      ) {
+        rpcFail(409, '订单已被其他人更新，请刷新后重试');
       }
 
-      const authorized = this.policy.authorize(
-        action,
-        {
-          actor: actorForOrderView(actor, view),
-          order: toOrderSnapshot(order),
-          payload,
-        },
-        options,
+      const patch = this.buildPatch(
+        authorized.action,
+        locked,
+        workPayload,
+        lens,
       );
-
-      const patch = this.buildPatch(authorized.action, order, payload, actor);
 
       const result = await manager
         .createQueryBuilder()
         .update(RecycleOrderEntity)
-        // QueryBuilder.update 不会触发 @UpdateDateColumn，需显式写库时间
         .set({
           ...patch,
-          status: authorized.to,
-          version: order.version + 1,
+          status: targetStatus,
+          version: locked.version + 1,
           updatedAt: () => 'CURRENT_TIMESTAMP',
         })
-        .where('id = :id', { id: order.id })
-        .andWhere('version = :version', { version: order.version })
+        .where('id = :id', { id: locked.id })
+        .andWhere('version = :version', { version: locked.version })
         .execute();
       if (!result.affected) {
         rpcFail(409, '订单已被其他人更新，请刷新后重试');
       }
 
       const saved = await manager.findOneOrFail(RecycleOrderEntity, {
-        where: { id: order.id },
+        where: { id: locked.id },
       });
-      await this.persistSideEffects(manager, saved, authorized.action, payload);
+      await this.persistSideEffects(
+        manager,
+        saved,
+        authorized.action,
+        workPayload,
+      );
       await this.writeEvent(
         manager,
         saved,
         authorized.action,
         actor,
         authorized.from,
-        authorized.to,
-        actionTitle(authorized.action, payload),
-        optionalString(payload.note) ?? optionalString(payload.reason) ?? null,
-        sanitizePayload(payload),
+        targetStatus,
+        actionTitle(authorized.action, workPayload),
+        optionalString(workPayload.note) ??
+          optionalString(workPayload.reason) ??
+          null,
+        sanitizePayload(workPayload),
       );
 
       if (authorized.approval) {
@@ -501,11 +599,11 @@ export class OrdersService {
           bizCode,
           saved,
           authorized.approval,
-          payload,
+          workPayload,
         );
       }
 
-      this.publishNotice(saved, authorized.action);
+      this.publishNotice(saved, noticeAction);
 
       return this.toView(saved, actor, view);
     });
@@ -558,6 +656,76 @@ export class OrdersService {
       .subscribe();
   }
 
+  /**
+   * 订单本人拉取确认收款参数。
+   * 若仍为 WAIT_USER_CONFIRM，会顺带查微信刷新 package。
+   */
+  async merchantTransfer(actor: Actor, bizCode: string, id: string) {
+    const order = await this.loadVisible(actor, bizCode, id);
+    if (actor.userId !== order.ownerId) {
+      rpcFail(404, '订单不存在');
+    }
+    if (order.status !== OrderStatus.PAYING) {
+      rpcFail(409, '订单当前不在待确认收款状态');
+    }
+    if (!order.transferPackageInfo || !order.transferBillNo) {
+      rpcFail(409, '尚未发起微信转账或 package 已失效');
+    }
+    const mchId = wechatPayMerchantConfig()?.mchId;
+    if (!mchId || !order.wechatAppId) {
+      rpcFail(503, '未配置微信支付商户或订单缺少 appId');
+    }
+
+    // 查单刷新：仍待确认则沿用/更新 package；已成功则提示走 sync
+    try {
+      const wx = await this.queryWxTransfer(order);
+      if (wx.state === 'SUCCESS') {
+        rpcFail(409, '转账已到账，请调用 sync_transfer 完结订单');
+      }
+      if (wx.state === 'FAIL' || wx.state === 'CANCELLED') {
+        rpcFail(
+          409,
+          `微信转账已失败（${wx.state}），请重新发起收款`,
+        );
+      }
+      if (wx.packageInfo && wx.packageInfo !== order.transferPackageInfo) {
+        await this.orders.update(
+          { id: order.id },
+          {
+            transferPackageInfo: wx.packageInfo,
+            transferState: wx.state,
+            transferWxBillNo: wx.transferBillNo ?? order.transferWxBillNo,
+          },
+        );
+        return {
+          mchId,
+          appId: order.wechatAppId,
+          package: wx.packageInfo,
+          outBillNo: order.transferBillNo,
+          state: wx.state,
+        };
+      }
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if (status === 409 || status === 503) {
+        throw err;
+      }
+      this.logger.warn(
+        `刷新转账 package 失败，返回缓存：${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+
+    return {
+      mchId,
+      appId: order.wechatAppId,
+      package: order.transferPackageInfo,
+      outBillNo: order.transferBillNo,
+      state: order.transferState,
+    };
+  }
+
   /** 内部事件：审批结论回来后推进订单状态 */
   async applyDecision(payload: Record<string, unknown>) {
     requireInternal(payload);
@@ -608,6 +776,174 @@ export class OrdersService {
       lens,
       this.policy.availableActions(lens, toOrderSnapshot(order)),
       view,
+      { mchId: wechatPayMerchantConfig()?.mchId ?? null },
+    );
+  }
+
+  /**
+   * 确保订单上有收款用的 openid / appId。
+   * 只允许订单本人用当前微信会话回填（网关曾漏传 openid 的历史单）。
+   */
+  private async ensureOwnerWechatIdentity(
+    order: RecycleOrderEntity,
+    actor: Actor,
+  ): Promise<void> {
+    if (order.ownerOpenid && order.wechatAppId) {
+      return;
+    }
+    if (actor.userId !== order.ownerId) {
+      rpcFail(409, '订单缺少收款 openid（非小程序下单无法商家转账）');
+    }
+    if (!actor.openid || !actor.wechatAppId) {
+      rpcFail(
+        409,
+        '当前登录会话没有微信 openid，请用微信小程序重新登录后再收款',
+      );
+    }
+    await this.orders.update(
+      { id: order.id },
+      { ownerOpenid: actor.openid, wechatAppId: actor.wechatAppId },
+    );
+    order.ownerOpenid = actor.openid;
+    order.wechatAppId = actor.wechatAppId;
+  }
+
+  /**
+   * 客户发起收款：向微信创建商家转账单，拿 package_info。
+   * 已有未完成单据则查单复用，避免重复转账。
+   */
+  private async claimWxTransfer(
+    order: RecycleOrderEntity,
+  ): Promise<WxTransferResult> {
+    if (!order.ownerOpenid || !order.wechatAppId) {
+      rpcFail(409, '订单缺少收款 openid（非小程序下单无法商家转账）');
+    }
+    // 本地先拦一层：避免 wechat 未配商户时只冒出英文 Internal server error
+    if (!wechatPayMerchantConfig()) {
+      rpcFail(
+        503,
+        '未配置微信支付商户（WECHAT_PAY_MCH_ID / SERIAL_NO / PRIVATE_KEY / TRANSFER_SCENE_ID）',
+      );
+    }
+    const amount = Number(order.finalPrice);
+    if (!Number.isInteger(amount) || amount <= 0) {
+      rpcFail(409, '成交价无效，无法发起收款');
+    }
+
+    if (order.transferBillNo) {
+      try {
+        const existing = await this.queryWxTransfer(order);
+        if (
+          existing.state === 'WAIT_USER_CONFIRM' ||
+          existing.state === 'TRANSFERING' ||
+          existing.state === 'SUCCESS'
+        ) {
+          return {
+            ...existing,
+            packageInfo: existing.packageInfo ?? order.transferPackageInfo,
+            outBillNo: existing.outBillNo || order.transferBillNo,
+          };
+        }
+        // FAIL / CANCELLED → 换新单号重开
+      } catch (err) {
+        this.logger.warn(
+          `查原转账单失败，将重新发起：${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    const outBillNo = genOutBillNo();
+    try {
+      const raw = await lastValueFrom(
+        this.wechat
+          .send(MQTT_PATTERNS.WECHAT_TRANSFER_CREATE, {
+            appId: order.wechatAppId,
+            openid: order.ownerOpenid,
+            outBillNo,
+            transferAmount: amount,
+            transferRemark: `回收款 ${order.code}`,
+          })
+          .pipe(timeout(15000)),
+      );
+      const wx = unwrapData<WxTransferResult>(raw);
+      if (!wx?.packageInfo && wx?.state === 'WAIT_USER_CONFIRM') {
+        rpcFail(502, '微信未返回 package_info，无法拉起确认收款');
+      }
+      if (
+        wx.state !== 'WAIT_USER_CONFIRM' &&
+        wx.state !== 'TRANSFERING' &&
+        wx.state !== 'SUCCESS'
+      ) {
+        rpcFail(
+          502,
+          `微信转账未进入待确认（${wx.state}${wx.failReason ? `: ${wx.failReason}` : ''}）`,
+        );
+      }
+      return { ...wx, outBillNo: wx.outBillNo || outBillNo };
+    } catch (err) {
+      this.throwWxTransferError(err, '发起微信转账失败');
+    }
+  }
+
+  private async queryWxTransfer(
+    order: RecycleOrderEntity,
+  ): Promise<WxTransferResult> {
+    if (!order.transferBillNo || !order.wechatAppId) {
+      rpcFail(409, '订单尚未发起微信转账');
+    }
+    try {
+      const raw = await lastValueFrom(
+        this.wechat
+          .send(MQTT_PATTERNS.WECHAT_TRANSFER_QUERY, {
+            appId: order.wechatAppId,
+            outBillNo: order.transferBillNo,
+          })
+          .pipe(timeout(12000)),
+      );
+      return unwrapData<WxTransferResult>(raw);
+    } catch (err) {
+      this.throwWxTransferError(err, '查询微信转账失败');
+    }
+  }
+
+  /** 把 MQTT / Nest 各种错误形态收成可读 rpcFail */
+  private throwWxTransferError(err: unknown, fallback: string): never {
+    if (err && typeof err === 'object') {
+      const rec = err as {
+        status?: number | string;
+        message?: unknown;
+        error?: { status?: number; message?: unknown };
+      };
+      const nested = rec.error;
+      if (typeof nested?.status === 'number' && nested.message != null) {
+        rpcFail(nested.status, String(nested.message));
+      }
+      if (typeof rec.status === 'number' && rec.status >= 400 && rec.message) {
+        rpcFail(rec.status, String(rec.message));
+      }
+      // Nest 有时把 RpcException payload 序列化进 message
+      if (typeof rec.message === 'string') {
+        try {
+          const parsed = JSON.parse(rec.message) as {
+            status?: number;
+            message?: unknown;
+          };
+          if (typeof parsed.status === 'number' && parsed.message != null) {
+            rpcFail(parsed.status, String(parsed.message));
+          }
+        } catch {
+          /* not json */
+        }
+        if (rec.message !== 'Internal server error') {
+          rpcFail(502, `${fallback}：${rec.message}`);
+        }
+      }
+    }
+    rpcFail(
+      502,
+      `${fallback}：${err instanceof Error ? err.message : String(err)}`,
     );
   }
 
@@ -663,12 +999,28 @@ export class OrdersService {
         return { negotiatePrice: Number(payload.price) };
       case 'accept':
         return { finalPrice: order.bOfferPrice };
-      case 'transfer':
+      case 'transfer': {
+        const wx = payload._wxTransfer as WxTransferResult | undefined;
+        if (!wx) {
+          rpcFail(500, '缺少微信转账结果');
+        }
         return {
-          // 流水号服务端出；客户端传的 billNo 不用
-          transferBillNo: genBillNo(),
+          transferBillNo: wx.outBillNo,
+          transferWxBillNo: wx.transferBillNo,
+          transferPackageInfo: wx.packageInfo,
+          transferState: wx.state,
+          paidAt: wx.state === 'SUCCESS' ? new Date() : null,
+        };
+      }
+      case 'sync_transfer': {
+        const wx = payload._wxTransfer as WxTransferResult | undefined;
+        return {
+          transferState: wx?.state ?? 'SUCCESS',
+          transferWxBillNo: wx?.transferBillNo ?? order.transferWxBillNo,
+          transferPackageInfo: null,
           paidAt: new Date(),
         };
+      }
       case 'return':
         return {
           returnLogisticsNo: requiredString(

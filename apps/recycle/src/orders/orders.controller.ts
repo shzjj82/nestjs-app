@@ -126,6 +126,10 @@ export class OrdersController {
   @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_ACTION_MINE),
   )
+  @ApiDoc({
+    name: '我的订单-执行动作',
+    description: '客户视角：接受/拒绝报价、协商等',
+  })
   actionMine(payload: Record<string, unknown>) {
     return this.action({ ...payload, view: 'mine' });
   }
@@ -133,8 +137,32 @@ export class OrdersController {
   @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_ACTION_STAFF),
   )
+  @ApiDoc({
+    name: '工作台订单-执行动作',
+    description: '业务员视角：收货、验收、打款、退货等',
+  })
   actionStaff(payload: Record<string, unknown>) {
     return this.action({ ...payload, view: 'staff' });
+  }
+
+  @MessagePattern(
+    sharePattern(
+      MQTT_GROUPS.RECYCLE,
+      MQTT_PATTERNS.RECYCLE_ORDER_MERCHANT_TRANSFER,
+    ),
+  )
+  @ApiDoc({
+    name: '商家转账确认收款参数',
+    description:
+      '订单本人拉取 mchId/appId/package，供小程序 wx.requestMerchantTransfer',
+  })
+  merchantTransfer(payload: Record<string, unknown>) {
+    const actor = requireActor(payload);
+    return this.orders.merchantTransfer(
+      actor,
+      bizCodeOf(payload, actor),
+      requiredString(payload.id, 'id'),
+    );
   }
 
   @MessagePattern(
@@ -154,6 +182,7 @@ export class OrdersController {
   @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_TIMELINE_MINE),
   )
+  @ApiDoc({ name: '我的订单-时间轴', description: '客户视角订单流转记录' })
   timelineMine(payload: Record<string, unknown>) {
     return this.timeline({ ...payload, view: 'mine' });
   }
@@ -161,6 +190,7 @@ export class OrdersController {
   @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_TIMELINE_STAFF),
   )
+  @ApiDoc({ name: '工作台订单-时间轴', description: '业务员视角订单流转记录' })
   timelineStaff(payload: Record<string, unknown>) {
     return this.timeline({ ...payload, view: 'staff' });
   }
@@ -182,6 +212,7 @@ export class OrdersController {
   @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_AUDIT_MINE),
   )
+  @ApiDoc({ name: '我的订单-验收报告', description: '客户视角验收报告' })
   auditMine(payload: Record<string, unknown>) {
     return this.audit({ ...payload, view: 'mine' });
   }
@@ -189,6 +220,7 @@ export class OrdersController {
   @MessagePattern(
     sharePattern(MQTT_GROUPS.RECYCLE, MQTT_PATTERNS.RECYCLE_ORDER_AUDIT_STAFF),
   )
+  @ApiDoc({ name: '工作台订单-验收报告', description: '业务员视角验收报告' })
   auditStaff(payload: Record<string, unknown>) {
     return this.audit({ ...payload, view: 'staff' });
   }

@@ -4,6 +4,7 @@ import {
   ApprovalDecision,
   ApprovalType,
   AuditItemInput,
+  hasAnyRole,
   OrderSnapshot,
   OrderStatus,
   readCents,
@@ -27,6 +28,7 @@ export type OrderAction =
   | 'accept'
   | 'reject_offer'
   | 'transfer'
+  | 'sync_transfer'
   | 'return'
   | 'decide';
 
@@ -40,6 +42,7 @@ export const ORDER_ACTIONS: OrderAction[] = [
   'accept',
   'reject_offer',
   'transfer',
+  'sync_transfer',
   'return',
 ];
 
@@ -154,15 +157,30 @@ function guardAccept(ctx: ActionContext): void {
   }
 }
 
-/** 打款：金额不得超过最终成交价 */
+/**
+ * 客户发起收款：必须是订单本人，成交价已定。
+ * 金额一律用 finalPrice，不采信客户端传的 amount。
+ */
 function guardTransfer(ctx: ActionContext): void {
-  const amount = readCents(ctx.payload, 'amount');
-  if (ctx.order.finalPrice === null) {
+  const actor = requireActor(ctx);
+  if (actor.userId !== ctx.order.ownerId) {
+    rpcFail(403, '仅订单本人可发起收款');
+  }
+  if (ctx.order.finalPrice === null || ctx.order.finalPrice <= 0) {
     rpcFail(409, '订单尚未确定成交价');
   }
-  if (amount > ctx.order.finalPrice) {
-    rpcFail(400, '打款金额不得超过成交价');
+}
+
+/** 同步收款结果：仅订单本人（微信确认后回写）；业务员可补查 */
+function guardSyncTransfer(ctx: ActionContext): void {
+  const actor = requireActor(ctx);
+  if (actor.userId === ctx.order.ownerId) {
+    return;
   }
+  if (hasAnyRole(actor, [...RECYCLE_STAFF_ROLES, RECYCLE_ROLES.ADMIN])) {
+    return;
+  }
+  rpcFail(403, '仅订单本人或业务员可同步收款状态');
 }
 
 /** 退货：需回填退货物流单号 */
@@ -273,13 +291,26 @@ export const TRANSITIONS: Record<OrderAction, Transition> = {
     roles: [RECYCLE_ROLES.CUSTOMER],
   },
 
-  // 涉及资金：超管不绕过，业务员可打款
+  /**
+   * 客户发起收款（非后台打款）：
+   * 服务端向微信创建转账单 → 返回 package_info → 小程序 wx.requestMerchantTransfer。
+   * paying 可重入：复用未完成的单或失败后重开。
+   */
   transfer: {
-    from: [OrderStatus.ACCEPTED],
-    to: OrderStatus.PAID,
-    roles: RECYCLE_STAFF_ROLES,
+    from: [OrderStatus.ACCEPTED, OrderStatus.PAYING],
+    to: OrderStatus.PAYING,
+    roles: [RECYCLE_ROLES.CUSTOMER],
     allowAdmin: false,
     guard: guardTransfer,
+  },
+
+  /** 查微信单并在 SUCCESS 时落 paid；客户确认收款后回写 */
+  sync_transfer: {
+    from: [OrderStatus.PAYING],
+    to: OrderStatus.PAID,
+    roles: [RECYCLE_ROLES.CUSTOMER, ...RECYCLE_STAFF_ROLES, RECYCLE_ROLES.ADMIN],
+    allowAdmin: true,
+    guard: guardSyncTransfer,
   },
 
   return: {

@@ -178,15 +178,59 @@ describe('OrderPolicyService', () => {
     expect(ok.to).toBe(OrderStatus.EVALUATED);
   });
 
-  it('打款不允许超管绕过角色限制', () => {
-    const status = expectStatus(() =>
-      policy.authorize('transfer', {
-        actor: actor(['admin']),
-        order: order({ status: OrderStatus.ACCEPTED, finalPrice: 2000 }),
-        payload: { amount: 2000 },
+  it('收款不允许超管 / 业务员发起，须订单本人', () => {
+    expect(
+      expectStatus(() =>
+        policy.authorize('transfer', {
+          actor: actor(['admin']),
+          order: order({
+            status: OrderStatus.ACCEPTED,
+            ownerId: 'u-1',
+            finalPrice: 2000,
+          }),
+          payload: {},
+        }),
+      ),
+    ).toBe(403);
+    expect(
+      expectStatus(() =>
+        policy.authorize('transfer', {
+          actor: actor(['agent'], 'u-2'),
+          order: order({
+            status: OrderStatus.ACCEPTED,
+            ownerId: 'u-1',
+            finalPrice: 2000,
+          }),
+          payload: {},
+        }),
+      ),
+    ).toBe(403);
+  });
+
+  it('订单本人发起收款进入 paying', () => {
+    const ok = policy.authorize('transfer', {
+      actor: actor(['customer'], 'u-1'),
+      order: order({
+        status: OrderStatus.ACCEPTED,
+        ownerId: 'u-1',
+        finalPrice: 2000,
       }),
-    );
-    expect(status).toBe(403);
+      payload: {},
+    });
+    expect(ok.to).toBe(OrderStatus.PAYING);
+  });
+
+  it('订单本人可同步确认收款', () => {
+    const ok = policy.authorize('sync_transfer', {
+      actor: actor(['customer'], 'u-1'),
+      order: order({
+        status: OrderStatus.PAYING,
+        ownerId: 'u-1',
+        finalPrice: 2000,
+      }),
+      payload: {},
+    });
+    expect(ok.to).toBe(OrderStatus.PAID);
   });
 
   it('availableActions 按身份与状态返回可执行动作', () => {
@@ -195,6 +239,26 @@ describe('OrderPolicyService', () => {
       order({ status: OrderStatus.EVALUATED, bOfferPrice: 2000 }),
     );
     expect(customer).toEqual(['negotiate', 'accept', 'reject_offer']);
+
+    const customerOnAccepted = policy.availableActions(
+      actor(['customer'], 'u-1'),
+      order({
+        status: OrderStatus.ACCEPTED,
+        ownerId: 'u-1',
+        finalPrice: 2000,
+      }),
+    );
+    expect(customerOnAccepted).toEqual(['transfer']);
+
+    const customerOnPaying = policy.availableActions(
+      actor(['customer'], 'u-1'),
+      order({
+        status: OrderStatus.PAYING,
+        ownerId: 'u-1',
+        finalPrice: 2000,
+      }),
+    );
+    expect(customerOnPaying).toEqual(['transfer', 'sync_transfer']);
 
     const agentOnQuoted = policy.availableActions(
       actor(['agent']),
@@ -212,10 +276,10 @@ describe('OrderPolicyService', () => {
       actor(['agent']),
       order({ status: OrderStatus.ACCEPTED }),
     );
-    expect(agentOnAccepted).toEqual(['transfer']);
+    expect(agentOnAccepted).toEqual([]);
   });
 
-  it('业务员可以评估、打款、退货', () => {
+  it('业务员可以评估、退货；收款由客户发起', () => {
     expect(
       policy.authorize('evaluate', {
         actor: actor(['agent']),
@@ -225,12 +289,18 @@ describe('OrderPolicyService', () => {
     ).toBe(OrderStatus.EVALUATED);
 
     expect(
-      policy.authorize('transfer', {
-        actor: actor(['agent']),
-        order: order({ status: OrderStatus.ACCEPTED, finalPrice: 2000 }),
-        payload: { amount: 2000 },
-      }).to,
-    ).toBe(OrderStatus.PAID);
+      expectStatus(() =>
+        policy.authorize('transfer', {
+          actor: actor(['agent']),
+          order: order({
+            status: OrderStatus.ACCEPTED,
+            ownerId: 'u-1',
+            finalPrice: 2000,
+          }),
+          payload: {},
+        }),
+      ),
+    ).toBe(403);
 
     expect(
       policy.authorize('return', {

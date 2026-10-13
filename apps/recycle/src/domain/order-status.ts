@@ -10,8 +10,9 @@
  *   inspecting   业务员已收货，验收评估中
  *   evaluated    已验收并给出报价
  *   negotiating  客户发起协商定价，等待审批员决策
- *   accepted     客户同意报价，待收款
- *   paid         回收款已转出
+ *   accepted     客户同意报价，待客户发起收款
+ *   paying       客户已发起商家转账，待微信确认收款
+ *   paid         回收款已到账（微信转账 SUCCESS）
  *   rejected     已拒绝（验收不通过 / 客户拒绝报价 / 审批拒绝协商）
  *   returned     退货完成
  */
@@ -23,6 +24,7 @@ export enum OrderStatus {
   EVALUATED = 'evaluated',
   NEGOTIATING = 'negotiating',
   ACCEPTED = 'accepted',
+  PAYING = 'paying',
   PAID = 'paid',
   REJECTED = 'rejected',
   RETURNED = 'returned',
@@ -46,8 +48,9 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   [OrderStatus.INSPECTING]: '验收中',
   [OrderStatus.EVALUATED]: '已评估',
   [OrderStatus.NEGOTIATING]: '协商中',
-  [OrderStatus.ACCEPTED]: '待打款',
-  [OrderStatus.PAID]: '已打款',
+  [OrderStatus.ACCEPTED]: '待收款',
+  [OrderStatus.PAYING]: '确认收款中',
+  [OrderStatus.PAID]: '已收款',
   [OrderStatus.REJECTED]: '已拒绝',
   [OrderStatus.RETURNED]: '已退货',
 };

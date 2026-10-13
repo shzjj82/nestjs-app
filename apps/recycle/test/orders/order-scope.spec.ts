@@ -4,6 +4,7 @@ import {
   inferOrderView,
   parseOrderView,
   resolveOrderView,
+  resolveOrderViewForAction,
 } from '../../src/orders/order-scope';
 
 function actor(roles: string[], userId = 'u-1'): Actor {
@@ -55,5 +56,26 @@ describe('order view lens', () => {
     expect(
       resolveOrderView(actor(['customer', 'agent']), 'recycle', own, 'staff'),
     ).toBe('staff');
+  });
+
+  it('legacy receive on own order still uses staff lens when actor is staff', () => {
+    expect(
+      resolveOrderViewForAction(
+        actor(['agent']),
+        'recycle',
+        own,
+        'receive',
+        undefined,
+      ),
+    ).toBe('staff');
+    expect(
+      resolveOrderViewForAction(
+        actor(['customer', 'agent']),
+        'recycle',
+        own,
+        'receive',
+        'mine',
+      ),
+    ).toBe('customer');
   });
 });

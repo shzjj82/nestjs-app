@@ -111,6 +111,10 @@ export const MQTT_PATTERNS = {
   WECHAT_SUBSCRIBE_TEMPLATES: 'wechat.subscribe.templates',
   /** 发送订阅消息；由业务服务内部调用，不走网关 */
   WECHAT_SUBSCRIBE_SEND: 'wechat.subscribe.send',
+  /** 发起商家转账（用户确认收款），返回 package_info */
+  WECHAT_TRANSFER_CREATE: 'wechat.transfer.create',
+  /** 按商户单号查询商家转账单 */
+  WECHAT_TRANSFER_QUERY: 'wechat.transfer.query',
   AGENTS_HEALTH: 'agents.health',
   AGENTS_API_DOCS: 'agents.apiDocs',
   AGENTS_CHAT: 'agents.chat',
@@ -159,6 +163,8 @@ export const MQTT_PATTERNS = {
   RECYCLE_ORDER_ACTION: 'recycle.order.action',
   RECYCLE_ORDER_ACTION_MINE: 'recycle.order.actionMine',
   RECYCLE_ORDER_ACTION_STAFF: 'recycle.order.actionStaff',
+  /** 订单本人：商家转账确认收款参数（package_info） */
+  RECYCLE_ORDER_MERCHANT_TRANSFER: 'recycle.order.merchantTransfer',
   RECYCLE_ORDER_TIMELINE: 'recycle.order.timeline',
   RECYCLE_ORDER_TIMELINE_MINE: 'recycle.order.timelineMine',
   RECYCLE_ORDER_TIMELINE_STAFF: 'recycle.order.timelineStaff',
