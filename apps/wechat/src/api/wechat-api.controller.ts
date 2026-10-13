@@ -14,6 +14,7 @@ export class WechatApiController {
     return this.api.code2session(payload);
   }
 
+  @ApiDoc({ name: '生成小程序码', description: '按小程序生成场景码图片' })
   @MessagePattern(wechatPattern(MQTT_PATTERNS.WECHAT_QRCODE))
   qrcode(payload: Record<string, unknown>) {
     return this.api.qrcode(payload);
