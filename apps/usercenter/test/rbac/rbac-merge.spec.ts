@@ -10,13 +10,13 @@ describe('mergeBusinessRbac', () => {
     expect(result.permissions.sort()).toEqual(['role.manage', 'user.query']);
   });
 
-  it('treats business roles as identities without permissions', () => {
+  it('keeps permissions granted to business identity roles', () => {
     const result = mergeBusinessRbac({
       platformRoles: [],
       businessRoles: [{ code: 'customer', permissions: ['recycle.order.create'] }],
     });
     expect(result.roles).toEqual(['customer']);
-    expect(result.permissions).toEqual([]);
+    expect(result.permissions).toEqual(['recycle.order.create']);
   });
 
   it('dedupes roles across sources', () => {
@@ -28,6 +28,6 @@ describe('mergeBusinessRbac', () => {
       ],
     });
     expect(result.roles.sort()).toEqual(['admin', 'user']);
-    expect(result.permissions).toEqual(['doc.write']);
+    expect(result.permissions.sort()).toEqual(['doc.read', 'doc.write']);
   });
 });

@@ -222,16 +222,10 @@ export function RolesPageClient({
       {
         id: 'permissions',
         header: '功能点',
-        accessorFn: (row) =>
-          roleKind(row) === 'identity' ? -1 : (row.permissionCodes?.length ?? 0),
+        accessorFn: (row) => row.permissionCodes?.length ?? 0,
         meta: { label: '功能点' },
         cell: ({ row }) => {
           const role = row.original;
-          if (roleKind(role) === 'identity') {
-            return (
-              <span className="text-xs text-muted-foreground">仅表示身份，不可配权限</span>
-            );
-          }
           if (role.code === 'admin' && role.businessId === null) {
             return <span className="text-xs text-muted-foreground">系统托管（全部能力）</span>;
           }
@@ -252,7 +246,7 @@ export function RolesPageClient({
     <ConsolePage>
       <PageHeader
         title="角色权限组"
-        description="业务角色表示身份；平台级角色可配置后台功能点。"
+        description="平台级角色与业务身份角色都可以配置功能点。超级管理员由系统托管。"
         actions={
           <>
             {businesses.length > 0 ? (
@@ -282,7 +276,7 @@ export function RolesPageClient({
         bulkActions={({ rows, clearSelection }) => {
           const platformRoles = rows.filter((role) => roleKind(role) === 'platform');
           const identityRoles = rows.filter((role) => roleKind(role) === 'identity');
-          const assignable = platformRoles.filter(
+          const assignable = rows.filter(
             (role) => !(role.code === 'admin' && role.businessId === null),
           );
           return (
@@ -293,12 +287,12 @@ export function RolesPageClient({
                 variant="secondary"
                 disabled={assignable.length !== 1}
                 onClick={() => {
-                  if (platformRoles.some((role) => role.code === 'admin' && role.businessId === null)) {
+                  if (rows.some((role) => role.code === 'admin' && role.businessId === null)) {
                     toast.error('超级管理员权限由系统维护，不可配置');
                     return;
                   }
                   if (assignable.length !== 1) {
-                    toast.error('请只选择一个平台级角色以配置权限');
+                    toast.error('请只选择一个角色以配置权限');
                     return;
                   }
                   openPermDialog(assignable[0]);
@@ -349,7 +343,7 @@ export function RolesPageClient({
               <span className="font-medium text-foreground">
                 {business?.name}（{business?.code}）
               </span>{' '}
-              下。业务角色默认是「业务身份」，不绑定功能点；编码在业务内唯一。
+              下。创建后可在列表里配置功能点；编码在业务内唯一。
             </DialogDescription>
           </DialogHeader>
           <form id="role-create" className="space-y-4" onSubmit={createRole}>
@@ -442,10 +436,10 @@ export function RolesPageClient({
             <DialogDescription>
               {selected ? (
                 <>
-                  为平台级角色{' '}
+                  为角色{' '}
                   <span className="font-medium text-foreground">{selected.name}</span>{' '}
                   <span className="font-mono text-xs">({selected.code})</span>{' '}
-                  勾选后台能力。保存后相关用户需重新登录生效。
+                  勾选功能点。保存后相关用户需重新登录生效。
                 </>
               ) : null}
             </DialogDescription>

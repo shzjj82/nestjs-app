@@ -50,6 +50,21 @@ describe('parsePermissionWorkbook', () => {
     ]);
   });
 
+  it('does not import the reference sheet', async () => {
+    const workbook = new Workbook();
+    const sheet = workbook.addWorksheet('功能点');
+    sheet.addRow(['用途', '模块', '功能编码', '功能名称', '描述', '排序']);
+    sheet.addRow(['角色权限', '用户', 'user.query', '查询用户', '查看列表', 10]);
+
+    const reference = workbook.addWorksheet('参考功能点');
+    reference.addRow(['用途', '模块', '功能编码', '功能名称', '描述', '排序', '绑定接口']);
+    reference.addRow(['开通模块', '认证', 'auth.account', '账号登录', '登录会话', 20, 'POST /auth/login']);
+
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const parsed = await parsePermissionWorkbook(buffer);
+    expect(parsed.permissions.map((item) => item.code)).toEqual(['user.query']);
+  });
+
   it('keeps legacy sheet without scope column', async () => {
     const workbook = new Workbook();
     const sheet = workbook.addWorksheet('功能点');

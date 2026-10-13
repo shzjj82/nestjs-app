@@ -18,65 +18,48 @@ const SCOPE_LABEL: Record<'platform' | 'business', string> = {
 export class ExcelService {
   constructor(private readonly rbac: RbacService) {}
 
-  /** 空模版：说明 + 表头 + 示例行（含默认目录可选用更新模版） */
-  async templateWorkbook(payload: Record<string, unknown> = {}) {
-    const filled = payload.filled === true || payload.filled === '1' || payload.filled === 1;
+  /**
+   * 下载模版：第 1 张表留给填写后上传；第 2 张表是当前全量功能点，只作参考，导入时不读。
+   */
+  async templateWorkbook(_payload: Record<string, unknown> = {}) {
+    const live = await this.rbac.listPermissions();
+    const reference = live.length
+      ? live
+      : DEFAULT_FEATURE_CATALOG.filter((item) => !item.adminOnly);
+
     const workbook = new Workbook();
-    this.addGuideSheet(workbook);
 
     const features = workbook.addWorksheet('功能点');
     features.addRow([...FEATURE_HEADERS]);
-    const apis = workbook.addWorksheet('接口绑定');
-    apis.addRow([...API_HEADERS]);
 
-    const rows = (filled ? DEFAULT_FEATURE_CATALOG : [
-          {
-            scope: 'platform' as const,
-            module: '用户中心',
-            code: 'user.query',
-            name: '查询用户',
-            description: '示例：角色权限，一个功能点绑定多个接口',
-            sort: 10,
-            apis: ['GET /users', 'GET /users/:id'],
-            adminOnly: false,
-          },
-          {
-            scope: 'business' as const,
-            module: '认证',
-            code: 'auth.account',
-            name: '账号登录会话',
-            description: '示例：开通模块，租户开通后可调用绑定接口',
-            sort: 10,
-            apis: ['POST /auth/login', 'GET /auth/me'],
-            adminOnly: false,
-          },
-        ]).filter((item) => !item.adminOnly);
-
-    for (const item of rows) {
-      features.addRow([
-        SCOPE_LABEL[item.scope],
+    const catalog = workbook.addWorksheet('参考功能点');
+    catalog.addRow([...FEATURE_HEADERS, '绑定接口']);
+    for (const item of reference) {
+      const apiCell = catalog.addRow([
+        SCOPE_LABEL[item.scope] ?? '角色权限',
         item.module,
         item.code,
         item.name,
         item.description ?? '',
         item.sort,
-      ]);
-      for (const key of item.apis) {
-        const parsed = parseApiKey(key);
-        if (!parsed) continue;
-        apis.addRow([item.code, parsed.method, parsed.path, '']);
-      }
+        (item.apis ?? []).join('\n'),
+      ]).getCell(7);
+      apiCell.alignment = { wrapText: true, vertical: 'top' };
     }
 
-    const matrix = workbook.addWorksheet('角色勾选');
-    matrix.addRow(['功能编码', '功能名称', 'admin', 'user']);
-    matrix.addRow(['user.query', '查询用户', '是', '是']);
+    const apis = workbook.addWorksheet('接口绑定');
+    apis.addRow([...API_HEADERS]);
 
+    const matrix = workbook.addWorksheet('角色勾选');
+    matrix.addRow(['功能编码', '功能名称']);
+
+    this.addGuideSheet(workbook);
     this.autosize(features);
+    this.autosize(catalog);
     this.autosize(apis);
     this.autosize(matrix);
 
-    return this.toFile(workbook, filled ? 'permissions-catalog.xlsx' : 'permissions-template.xlsx');
+    return this.toFile(workbook, 'permissions-template.xlsx');
   }
 
   async exportWorkbook(_payload: Record<string, unknown> = {}) {
@@ -157,14 +140,15 @@ export class ExcelService {
       ['功能点 Excel 格式说明'],
       [''],
       ['工作表', '用途'],
-      ['功能点', '定义功能点本身：用途 / 模块 / 编码 / 名称 / 描述 / 排序'],
-      ['接口绑定', '一个功能编码可对应多行接口（方法 + 路径）'],
-      ['角色勾选', '仅「角色权限」用途：按角色填写「是/否」'],
+      ['功能点', '第 1 张表。填写后上传；只导入这张表里的行'],
+      ['参考功能点', '第 2 张表。当前全量功能点，只作对照，上传时不读取'],
+      ['接口绑定', '可选。一个功能编码可对应多行接口（方法 + 路径）'],
+      ['角色勾选', '可选。仅「角色权限」用途：从第 3 列起按角色填写「是/否」'],
       [''],
       ['用途取值', '角色权限 = 在「角色」页勾选；开通模块 = 在「业务」页开通'],
       ['接口键', '写入库后为「METHOD 路径」，如 GET /users'],
-      ['更新方式', '下载模版填写 → 导入；或导出当前目录修改后再导入'],
-      ['注意', '角色勾选不含超级管理员列；仅超管功能点不导出、不可分配'],
+      ['更新方式', '下载模版，在「功能点」表填写要新增或修改的行，再上传'],
+      ['注意', '不要把「参考功能点」整表复制进去，除非确实要按那些行更新'],
       ['仅超管', '功能点目录的查询/管理/导入/导出仅超级管理员拥有，界面不展示'],
     ];
     for (const row of lines) {

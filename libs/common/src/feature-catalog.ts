@@ -34,7 +34,7 @@ const platformMeta: Array<Omit<FeatureCatalogItem, 'scope' | 'apis'>> = [
   { module: '接入端', code: PERMISSIONS.CLIENT_QUERY, name: '查询接入端', description: '查看 Web / 小程序接入端登记', sort: 70 },
   { module: '接入端', code: PERMISSIONS.CLIENT_MANAGE, name: '管理接入端', description: '维护 Web / 微信 / 支付宝接入端', sort: 80 },
   { module: '角色权限', code: PERMISSIONS.ROLE_QUERY, name: '查询角色', description: '查看平台级与业务身份角色', sort: 90 },
-  { module: '角色权限', code: PERMISSIONS.ROLE_MANAGE, name: '管理角色', description: '新建/删除业务角色，配置平台级功能点', sort: 100 },
+  { module: '角色权限', code: PERMISSIONS.ROLE_MANAGE, name: '管理角色', description: '新建/删除业务角色，为平台级与业务身份角色配置功能点', sort: 100 },
   {
     module: '功能点目录',
     code: PERMISSIONS.PERMISSION_QUERY,
