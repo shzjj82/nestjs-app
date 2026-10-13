@@ -313,14 +313,14 @@ Excel「功能点」表头：`模块 / 功能编码 / 功能名称 / 描述 / �
 
 ## 管理后台
 
-独立 Next.js 应用 [`apps/admin`](apps/admin)（Tailwind + shadcn 风格），端口 **3100**，经 gateway 管理用户/角色/功能点/业务/微信小程序/文档/上传与运维状态。
+独立 Next.js 应用 [`web/admin`](web/admin)（Tailwind + shadcn 风格），端口 **3100**，经 gateway 管理用户/角色/功能点/业务/微信小程序/文档/上传与运维状态。与 `apps/` 下的 Nest 微服务分离存放；环境变量共用仓库根目录 `.env`（`GATEWAY_URL`、`ADMIN_BIZ_CODE` 等，见 `.env.example`）。
 
 ```bash
 npm run start:admin
 # 默认账号 admin / admin123（usercenter 种子）
 ```
 
-详见 [`apps/admin/README.md`](apps/admin/README.md)。
+详见 [`web/admin/README.md`](web/admin/README.md)。
 - `POST /orders` — 需要登录，并注入 `operatorId`
 
 ```bash

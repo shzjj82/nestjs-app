@@ -17,12 +17,12 @@ npm run start:dev
 ```bash
 npm run start:admin
 # 或
-cd apps/admin && npm run dev
+cd web/admin && npm run dev
 ```
 
 打开 http://localhost:3100 ，用超级管理员账号登录。
 
-环境变量：复制 `.env.example` 为 `.env.local`，`GATEWAY_URL` 指向网关（本地 `http://127.0.0.1:3000`，或线上 `https://api.championsea.online`）。`ADMIN_BIZ_CODE` 是后台登录所在的业务，默认 `platform`。
+环境变量与微服务共用**仓库根目录**的 `.env` / `.env.local`（见根目录 `.env.example`）：`GATEWAY_URL` 指向网关（本地 `http://127.0.0.1:3000`，或线上地址），`ADMIN_BIZ_CODE` 为后台登录业务，默认 `platform`。不要在 `web/admin` 下再放一份 `.env*`。
 
 ## 业务
 
@@ -37,7 +37,7 @@ cd apps/admin && npm run dev
 整个后台（不只是表格）统一用 shadcn 组件 + Tailwind 工具类，图标用 `lucide-react`。组件**只允许通过 shadcn CLI 安装**，不要手抄 registry 文件到 `src/components/ui/`，也不要新增自定义 `.css` 文件。
 
 ```bash
-cd apps/admin
+cd web/admin
 
 # 官方 UI 组件
 npx shadcn@latest add button card field select sidebar breadcrumb -y
