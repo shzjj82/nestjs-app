@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Download, FileUp, Plus } from 'lucide-react';
+import { Download, FileDown, FileUp, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { ConsolePage } from '@/components/console-page';
@@ -169,7 +169,7 @@ export function PermissionsPageClient({ initialItems }: { initialItems: Permissi
       : '在「业务」页开通，控制某个租户能调用哪些接口。';
 
   return (
-    <ConsolePage>
+    <ConsolePage className="overflow-y-auto">
       <PageHeader
         title="功能点"
         description="一个功能点绑定多条接口。按用途分开维护：角色权限给后台角色；开通模块给租户白名单。"
@@ -186,9 +186,31 @@ export function PermissionsPageClient({ initialItems }: { initialItems: Permissi
               <Download />
               下载模版
             </Button>
+            <Button
+              variant="outline"
+              onClick={() =>
+                downloadProxy('/permissions/template?filled=1', 'permissions-catalog.xlsx').catch(
+                  (err) => toast.error(err instanceof Error ? err.message : '下载失败'),
+                )
+              }
+            >
+              <Download />
+              更新模版
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() =>
+                downloadProxy('/permissions/export', 'permissions.xlsx').catch((err) =>
+                  toast.error(err instanceof Error ? err.message : '导出失败'),
+                )
+              }
+            >
+              <FileDown />
+              导出
+            </Button>
             <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-muted/50">
               <FileUp className="size-4" />
-              上传模版
+              导入
               <input
                 type="file"
                 accept=".xlsx,.xls"

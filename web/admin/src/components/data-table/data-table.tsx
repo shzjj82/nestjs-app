@@ -40,11 +40,11 @@ export function DataTable<TData extends RowData>({
   return (
     <div
       data-slot="data-table"
-      className={cn("flex w-full flex-col gap-2.5", className)}
+      className={cn("flex min-h-0 w-full flex-1 flex-col gap-2.5", className)}
       {...props}
     >
-      {children ? <div>{children}</div> : null}
-      <div className="overflow-x-auto rounded-md border">
+      {children ? <div className="shrink-0">{children}</div> : null}
+      <div className="min-h-0 flex-1 overflow-auto rounded-md border">
         <Table containerClassName="overflow-visible">
           <DataTableHeader table={table} />
           <DataTableBody table={table} />

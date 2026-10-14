@@ -106,7 +106,7 @@ export default function UploadPage() {
   }
 
   return (
-    <ConsolePage>
+    <ConsolePage className="overflow-y-auto">
       <PageHeader
         title="上传管理"
         description="同步/异步上传与按 key 删除（无对象列表接口）"

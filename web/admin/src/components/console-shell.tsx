@@ -1,7 +1,5 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { usePathname } from 'next/navigation';
 import { ConsoleTopbar } from '@/components/console-topbar';
 import { PrefetchConsoleRoutes } from '@/components/prefetch-console-routes';
 import { AppSidebar } from '@/components/sidebar';
@@ -17,23 +15,14 @@ export function ConsoleShell({
   defaultSidebarOpen: boolean;
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const scrollerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    scrollerRef.current?.scrollTo({ top: 0 });
-  }, [pathname]);
-
   return (
     <SidebarProvider defaultOpen={defaultSidebarOpen} className="h-svh overflow-hidden">
       <PrefetchConsoleRoutes />
       <AppSidebar />
       <SidebarInset className="min-h-0 overflow-hidden">
         <ConsoleTopbar user={user} />
-        <div ref={scrollerRef} className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
-            {children}
-          </div>
+        <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-6 overflow-hidden p-4 md:p-6">
+          {children}
         </div>
       </SidebarInset>
     </SidebarProvider>

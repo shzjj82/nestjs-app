@@ -33,8 +33,8 @@ export class RbacService {
   ) {}
 
   /**
-   * 会话：平台级角色与当前业务的身份角色都带功能点。
-   * 业务角色的 code 仍表示该业务下的身份。
+   * 会话：平台级角色带功能点（admin 控制台）；
+   * 业务角色只带身份 code，功能点由该业务开通的接口决定。
    */
   async loadAccountRbac(accountId: string, businessId: string) {
     const account = await this.accounts.findOne({ where: { id: accountId } });
@@ -53,22 +53,22 @@ export class RbacService {
       .filter((row) => row.role?.businessId === businessId)
       .map((row) => row.role);
 
-    const roleIds = [...platformRoles, ...businessRoles].map((role) => role.id);
-    const links = roleIds.length
+    const platformIds = platformRoles.map((role) => role.id);
+    const links = platformIds.length
       ? await this.rolePermissions.find({
-          where: { roleId: In(roleIds) },
+          where: { roleId: In(platformIds) },
           relations: ['permission'],
         })
       : [];
     const grant = (role: RoleEntity): RoleGrant => ({
       code: role.code,
       permissions: links
-        .filter((link) => link.roleId === role.id && link.permission)
+        .filter((link) => link.roleId === role.id)
         .map((link) => link.permission.code),
     });
     return mergeBusinessRbac({
       platformRoles: platformRoles.map(grant),
-      businessRoles: businessRoles.map(grant),
+      businessRoles: businessRoles.map((role) => ({ code: role.code, permissions: [] })),
     });
   }
 
@@ -130,6 +130,9 @@ export class RbacService {
 
   async setRolePermissions(payload: Record<string, unknown>): Promise<RoleInfo> {
     const role = await this.requireRole(requiredString(payload.id, 'id'));
+    if (role.businessId) {
+      rpcFail(400, '业务角色只表示身份，不配置功能点');
+    }
     if (role.code === 'admin' && role.businessId === null) {
       rpcFail(400, '超级管理员权限由系统维护，不可修改');
     }
