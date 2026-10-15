@@ -42,7 +42,15 @@ export class AgentsOverrideController {
     @Res() res: Response,
   ) {
     const bizCode = await this.biz.checkRequest(req, user);
-    const payload = { ...sanitizeBody(body), _bizCode: bizCode };
+    const payload = {
+      ...sanitizeBody(body),
+      _bizCode: bizCode,
+      _session: {
+        accountId: user.accountId,
+        appId: user.appId,
+        bizCode: user.bizCode ?? bizCode ?? '',
+      },
+    };
     if (body?.sync === false) {
       await this.pipeStream(res, payload);
       return;

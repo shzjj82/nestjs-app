@@ -4,10 +4,14 @@ import { asRecord, requiredString, rpcFail } from '../common/rpc';
 import { readIncomingFile } from '../common/file-payload';
 import { objectKey } from '../common/object-key';
 import { StorageService } from '../storage/storage.service';
+import { RagNotify } from './rag-notify';
 
 @Injectable()
 export class ObjectsService {
-  constructor(private readonly storage: StorageService) {}
+  constructor(
+    private readonly storage: StorageService,
+    private readonly rag: RagNotify,
+  ) {}
 
   async put(payload: unknown) {
     const file = readIncomingFile(payload);
@@ -24,6 +28,8 @@ export class ObjectsService {
     if (!keyInBiz(requireBizCode(data), key)) {
       rpcFail(403, '对象不属于当前业务');
     }
-    return this.storage.remove(key);
+    const result = await this.storage.remove(key);
+    this.rag.removeSource(key);
+    return result;
   }
 }

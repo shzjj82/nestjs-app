@@ -388,6 +388,15 @@ const businessFeatures: FeatureCatalogItem[] = [
   {
     scope: 'business',
     module: '智能助手',
+    code: 'agents.rag',
+    name: '文档检索',
+    description: '按账号可见文档做向量检索（RAG）',
+    sort: 245,
+    apis: ['POST /agents/rag/search'],
+  },
+  {
+    scope: 'business',
+    module: '智能助手',
     code: 'agents.vision',
     name: '视觉解析',
     description: '图片识别解析',

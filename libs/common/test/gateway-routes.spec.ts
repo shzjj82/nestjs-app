@@ -133,6 +133,8 @@ describe('matchRoute', () => {
     expect(matchRoute('GET', '/agents/chat/status')?.auth).toEqual(['jwt']);
     expect(matchRoute('POST', '/agents/chat')?.override).toBe(true);
     expect(matchRoute('POST', '/agents/chat')?.pattern).toBe(MQTT_PATTERNS.AGENTS_CHAT);
+    expect(matchRoute('POST', '/agents/rag/search')?.auth).toEqual(['jwt']);
+    expect(matchRoute('POST', '/agents/rag/search')?.pattern).toBe(MQTT_PATTERNS.AGENTS_RAG_SEARCH);
     expect(matchRoute('POST', '/agents/vision')?.override).toBe(true);
     expect(matchRoute('POST', '/agents/vision')?.auth).toEqual(['jwt']);
     expect(matchRoute('POST', '/agents/vision')?.pattern).toBe(MQTT_PATTERNS.AGENTS_VISION_PARSE);

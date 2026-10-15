@@ -121,6 +121,14 @@ export const MQTT_PATTERNS = {
   AGENTS_CHAT: 'agents.chat',
   AGENTS_CHAT_STATUS: 'agents.chat.status',
   AGENTS_VISION_PARSE: 'agents.vision.parse',
+  /** 内部：docs 保存后索引文档（不注册网关） */
+  AGENTS_RAG_INDEX: 'agents.rag.index',
+  /** 内部：docs 删除后清索引（不注册网关） */
+  AGENTS_RAG_DELETE: 'agents.rag.delete',
+  /** 内部：附件 / OSS 对象删除后按 source_key 清向量（不注册网关） */
+  AGENTS_RAG_DELETE_BY_SOURCE: 'agents.rag.deleteBySource',
+  /** 按账号可见范围做向量检索 */
+  AGENTS_RAG_SEARCH: 'agents.rag.search',
   RECYCLE_HEALTH: 'recycle.health',
   RECYCLE_API_DOCS: 'recycle.apiDocs',
   /** 当前登录用户在回收业务下的身份（会话用户 + 账户角色 + 门店绑定） */

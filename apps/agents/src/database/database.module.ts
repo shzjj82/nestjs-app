@@ -6,6 +6,7 @@ import { InitAgentsSchema1760000003000 } from './migrations/1760000003000-init-a
 import { VisionJobs1760000003100 } from './migrations/1760000003100-vision-jobs';
 import { VisionAccountId1760000003200 } from './migrations/1760000003200-vision-account-id';
 import { AgentsCreatedUpdatedAt1760000003300 } from './migrations/1760000003300-created-updated-at';
+import { RagChunks1760000003400 } from './migrations/1760000003400-rag-chunks';
 
 const sync = process.env.TYPEORM_SYNC === 'true';
 
@@ -22,6 +23,7 @@ const sync = process.env.TYPEORM_SYNC === 'true';
         VisionJobs1760000003100,
         VisionAccountId1760000003200,
         AgentsCreatedUpdatedAt1760000003300,
+        RagChunks1760000003400,
       ],
       logging: process.env.TYPEORM_LOGGING === 'true',
     }),

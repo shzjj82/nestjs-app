@@ -404,10 +404,37 @@ export interface AgentChatInput {
   system?: string;
   /** true（默认）一次返回完整 reply；false 上游 stream，网关 SSE 转给前端 */
   sync?: boolean;
+  /** true 时用当前业务下账号可见文档做 RAG 增强；未配 embedding 时忽略 */
+  rag?: boolean;
+  /** RAG 取回片段数，默认 6 */
+  ragTopK?: number;
+}
+
+export interface AgentRagSource {
+  docId: string;
+  title: string;
+  slug: string;
+  chunkIndex: number;
+  content: string;
+  score: number;
+  sourceType: string;
 }
 
 export interface AgentChatResult {
   reply: string;
+  /** rag=true 且命中时返回引用片段 */
+  sources?: AgentRagSource[];
+}
+
+export interface AgentRagSearchInput {
+  query: string;
+  topK?: number;
+  /** 仅搜本人文档；默认 false 按 feed 可见（公开 + 本人 + 团队） */
+  mineOnly?: boolean;
+}
+
+export interface AgentRagSearchResult {
+  items: AgentRagSource[];
 }
 
 export type AgentChatStreamEvent =

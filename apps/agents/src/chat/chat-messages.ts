@@ -5,7 +5,10 @@ export const DEFAULT_SYSTEM = `你是中文写作搭档。
 可以给大纲、草稿片段、修改建议；回复可用 Markdown（标题、列表、加粗、代码块等）方便阅读。
 语气轻松、克制，像朋友一起写，不要广告腔。
 如果用户上传了图片或文本附件，请结合它们讨论。
-如果用户消息里带有「划选原文」，请紧扣那段文字回答（改写、扩写、纠错、解释等）。`;
+如果用户消息里带有「划选原文」，请紧扣那段文字回答（改写、扩写、纠错、解释等）。
+若提供了「参考资料」，请优先依据资料回答，并在相关处简要标明来自哪篇文档；资料不足时再说明无法从资料确认。`;
+
+export const RAG_SYSTEM_APPENDIX = `回答时优先使用下方参考资料中的事实；不要编造资料未出现的内容。`;
 
 export type ChatContent =
   | { type: 'text'; text: string }
@@ -59,6 +62,19 @@ export function contextAppendix(attachments: AgentChatAttachment[]): string {
   ]
     .filter(Boolean)
     .join('\n\n');
+}
+
+export function ragContextAppendix(
+  sources: Array<{ title: string; slug: string; content: string; sourceType: string }>,
+): string {
+  if (!sources.length) {
+    return '';
+  }
+  const blocks = sources.map((item, index) => {
+    const label = item.title || item.slug || `文档${index + 1}`;
+    return `### [${index + 1}] ${label}（${item.sourceType}）\n${item.content}`;
+  });
+  return `【参考资料】\n${blocks.join('\n\n')}`;
 }
 
 export function buildHistoryMessages(

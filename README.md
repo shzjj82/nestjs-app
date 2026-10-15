@@ -223,9 +223,9 @@ curl -X POST http://localhost:3000/wechat/phone \
   -d '{"mpCode":"mall","phoneCode":"the-phone-code"}'
 ```
 
-### 智能体（OpenAI 兼容 chat）
+### 智能体（OpenAI 兼容 chat + RAG）
 
-独立进程 `agents`。密钥只放在该服务：`AI_API_BASE` / `AI_API_KEY` / `AI_MODEL` / `AI_TIMEOUT_MS`。其它业务（含博客）走网关，带 `X-Biz-Code` 和登录 JWT。
+独立进程 `agents`。密钥只放在该服务：`AI_API_BASE` / `AI_API_KEY` / `AI_MODEL` / `AI_EMBEDDING_MODEL` / `AI_TIMEOUT_MS`。其它业务走网关，带 `X-Biz-Code` 和登录 JWT。Postgres 需 **pgvector**（`npm run infra:up` 已用 `pgvector/pgvector:pg16`）。
 
 ```bash
 # 同步：等完整 reply（网关对该 RPC 默认 90s）
@@ -235,12 +235,19 @@ curl -X POST http://localhost:3000/agents/chat \
   -H 'Content-Type: application/json' \
   -d '{"messages":[{"role":"user","content":"写一句开场白"}]}'
 
-# 流式：sync=false，SSE 逐段返回 delta
-curl -N -X POST http://localhost:3000/agents/chat \
+# RAG：按当前账号可见文档检索后回答
+curl -X POST http://localhost:3000/agents/chat \
   -H 'X-Biz-Code: blog' \
   -H "Authorization: Bearer <token>" \
   -H 'Content-Type: application/json' \
-  -d '{"sync":false,"messages":[{"role":"user","content":"写一句开场白"}]}'
+  -d '{"rag":true,"messages":[{"role":"user","content":"根据我的文档总结要点"}]}'
+
+# 仅检索
+curl -X POST http://localhost:3000/agents/rag/search \
+  -H 'X-Biz-Code: blog' \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"合同付款","topK":5}'
 ```
 
 未配 `AI_API_KEY` 时 `GET /agents/chat/status` 为 `{ enabled: false, model }`，chat 返回 503 `AI_NOT_CONFIGURED`。

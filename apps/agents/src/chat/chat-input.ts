@@ -11,11 +11,17 @@ export function parseChatInput(payload: unknown): AgentChatInput {
   if (messages.length === 0 || messages[messages.length - 1]?.role !== 'user') {
     rpcFail(400, 'AI_EMPTY');
   }
+  const ragTopK = Number(data.ragTopK);
   return {
     messages,
     attachments: parseAttachments(data.attachments),
     system: optionalString(data.system),
     sync: data.sync !== false,
+    rag: data.rag === true,
+    ragTopK:
+      Number.isFinite(ragTopK) && ragTopK > 0
+        ? Math.min(20, Math.floor(ragTopK))
+        : undefined,
   };
 }
 

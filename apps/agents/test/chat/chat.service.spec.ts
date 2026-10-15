@@ -1,5 +1,18 @@
 import { RpcException } from '@nestjs/microservices';
 import { ChatService } from '../../src/chat/chat.service';
+import type { RagPort } from '../../src/rag/rag-port';
+
+function makeChat() {
+  const rag = {
+    status: () => ({
+      enabled: false,
+      embeddingModel: 'text-embedding-3-small',
+      embeddingDim: 1536,
+    }),
+    searchForChat: jest.fn().mockResolvedValue([]),
+  } as unknown as RagPort;
+  return new ChatService(rag);
+}
 
 describe('ChatService', () => {
   const originalKey = process.env.AI_API_KEY;
@@ -16,7 +29,7 @@ describe('ChatService', () => {
 
   it('status hides secrets and reports disabled without a key', () => {
     delete process.env.AI_API_KEY;
-    const status = new ChatService().status();
+    const status = makeChat().status();
     expect(status.enabled).toBe(false);
     expect(status).not.toHaveProperty('base');
     expect(status).not.toHaveProperty('key');
@@ -25,7 +38,7 @@ describe('ChatService', () => {
   it('rejects chat when the key is missing', async () => {
     delete process.env.AI_API_KEY;
     await expect(
-      new ChatService().complete({ messages: [{ role: 'user', content: 'hi' }] }),
+      makeChat().complete({ messages: [{ role: 'user', content: 'hi' }] }),
     ).rejects.toBeInstanceOf(RpcException);
   });
 
@@ -36,7 +49,7 @@ describe('ChatService', () => {
       json: async () => ({ choices: [{ message: { content: '  你好  ' } }] }),
     }) as unknown as typeof fetch;
 
-    const result = await new ChatService().complete({
+    const result = await makeChat().complete({
       messages: [{ role: 'user', content: '写一句开场白' }],
     });
     expect(result).toEqual({ reply: '你好' });
@@ -66,7 +79,7 @@ describe('ChatService', () => {
       });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const result = await new ChatService().complete({
+    const result = await makeChat().complete({
       messages: [{ role: 'user', content: '看图' }],
       attachments: [{ kind: 'image', name: 'a.png', url: 'https://cdn.example/a.png' }],
     });
@@ -83,7 +96,7 @@ describe('ChatService', () => {
     }) as unknown as typeof fetch;
 
     await expect(
-      new ChatService().complete({ messages: [{ role: 'user', content: 'hi' }] }),
+      makeChat().complete({ messages: [{ role: 'user', content: 'hi' }] }),
     ).rejects.toMatchObject({
       error: { status: 502, message: 'AI_UPSTREAM_429' },
     });

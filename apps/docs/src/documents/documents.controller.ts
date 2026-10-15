@@ -13,10 +13,13 @@ import { isDocKind } from '../common/doc-kinds';
 import {
   isEditorJsDocument,
   normalizeTags,
+  type DocPost,
   type EditorJsDocument,
   type DocKind,
 } from '../common/shared';
+import { removedAttachmentKeys } from './attachment-keys';
 import { DocumentsService } from './documents.service';
+import { RagNotify } from './rag-notify';
 import { TeamAccess } from './team-access';
 import {
   isTreeView,
@@ -31,6 +34,7 @@ export class DocumentsController {
   constructor(
     private readonly posts: DocumentsService,
     private readonly teamAccess: TeamAccess,
+    private readonly rag: RagNotify,
   ) {}
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_FIND_ALL))
@@ -167,13 +171,15 @@ export class DocumentsController {
     const input = this.parseWrite(payload);
     const grants = await this.grants(payload);
     this.assertAssignableTeam(payload, input.teamId, grants.writable);
-    return { post: await this.posts.create(input) };
+    const post = await this.posts.create(input);
+    this.rag.index(post);
+    return { post };
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_UPDATE))
   @ApiDoc({ name: '更新文档' })
   async update(payload: Record<string, unknown>) {
-    await this.requireInBiz(payload);
+    const before = await this.requireInBiz(payload);
     const input = this.parseWrite(payload);
     const grants = await this.grants(payload);
     this.assertAssignableTeam(payload, input.teamId, grants.writable);
@@ -185,23 +191,22 @@ export class DocumentsController {
     if (!post) {
       rpcFail(404, 'NOT_FOUND');
     }
+    // 正文里去掉的附件：先按 source 清向量，再全量重建
+    this.rag.removeSources(removedAttachmentKeys(before.body, post.body));
+    this.rag.index(post);
     return { post };
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_DELETE))
   @ApiDoc({ name: '删除文档' })
   async remove(payload: Record<string, unknown>) {
+    const id = requiredString(payload.id, 'id');
     await this.requireInBiz(payload);
     const grants = await this.grants(payload);
-    if (
-      !(await this.posts.remove(
-        requiredString(payload.id, 'id'),
-        authorAccountId(payload),
-        grants.writable,
-      ))
-    ) {
+    if (!(await this.posts.remove(id, authorAccountId(payload), grants.writable))) {
       rpcFail(404, 'NOT_FOUND');
     }
+    this.rag.remove(id);
     return null;
   }
 
@@ -210,11 +215,14 @@ export class DocumentsController {
   async createChild(payload: Record<string, unknown>) {
     await this.requireInBiz(payload);
     const grants = await this.grants(payload);
-    return this.posts.createLinkedChild(
+    const result = await this.posts.createLinkedChild(
       requiredString(payload.id, 'id'),
       authorAccountId(payload),
       grants.writable,
     );
+    this.rag.index(result.post as DocPost);
+    this.rag.index(result.parent as DocPost);
+    return result;
   }
 
   @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_REPARENT))

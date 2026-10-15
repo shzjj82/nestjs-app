@@ -1,14 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import type { AgentChatInput, AgentChatResult, AgentChatStreamEvent } from '@app/common';
+import type {
+  AgentChatInput,
+  AgentChatResult,
+  AgentChatStreamEvent,
+  AgentRagSource,
+} from '@app/common';
+import { asRecord } from '../common/rpc';
 import { rpcFail } from '../common/rpc';
+import { RagPort } from '../rag/rag-port';
 import { aiApiBase, aiApiKey, aiConfigured, aiModel, aiTimeoutMs } from './chat-env';
 import { parseChatInput } from './chat-input';
 import {
   DEFAULT_SYSTEM,
+  RAG_SYSTEM_APPENDIX,
   buildHistoryMessages,
   contextAppendix,
   describeAttachments,
+  ragContextAppendix,
   type UpstreamMessage,
 } from './chat-messages';
 import { contentFromUpstreamData, splitSseBlocks } from './chat-stream';
@@ -17,22 +26,27 @@ import { contentFromUpstreamData, splitSseBlocks } from './chat-stream';
 export class ChatService {
   private readonly logger = new Logger('AgentsChat');
 
+  constructor(private readonly rag: RagPort) {}
+
   status() {
+    const rag = this.rag.status();
     return {
       enabled: aiConfigured(),
       model: aiModel(),
+      rag: rag.enabled,
+      embeddingModel: rag.embeddingModel,
     };
   }
 
   async complete(payload: unknown): Promise<AgentChatResult> {
     this.assertConfigured();
-    return this.run(parseChatInput(payload));
+    return this.run(parseChatInput(payload), payload);
   }
 
   async *streamEvents(payload: unknown): AsyncGenerator<AgentChatStreamEvent> {
     this.assertConfigured();
     const input = parseChatInput(payload);
-    const prepared = this.prepare(input);
+    const prepared = await this.prepare(input, payload);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), aiTimeoutMs());
     try {
@@ -69,9 +83,9 @@ export class ChatService {
     }
   }
 
-  async run(input: AgentChatInput): Promise<AgentChatResult> {
+  async run(input: AgentChatInput, rawPayload?: unknown): Promise<AgentChatResult> {
     this.assertConfigured();
-    const prepared = this.prepare(input);
+    const prepared = await this.prepare(input, rawPayload ?? input);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), aiTimeoutMs());
     try {
@@ -92,7 +106,11 @@ export class ChatService {
       if (!reply) {
         rpcFail(502, 'AI_EMPTY');
       }
-      return { reply: reply.slice(0, 12000) };
+      const result: AgentChatResult = { reply: reply.slice(0, 12000) };
+      if (prepared.sources.length) {
+        result.sources = prepared.sources;
+      }
+      return result;
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         rpcFail(504, 'AI_TIMEOUT');
@@ -109,13 +127,33 @@ export class ChatService {
     }
   }
 
-  private prepare(input: AgentChatInput) {
+  private async prepare(input: AgentChatInput, rawPayload: unknown) {
     const attachments = input.attachments ?? [];
     const { imageUrls } = describeAttachments(attachments);
-    const appendix = contextAppendix(attachments);
-    const system = input.system?.trim() || DEFAULT_SYSTEM;
+    let appendix = contextAppendix(attachments);
+    let system = input.system?.trim() || DEFAULT_SYSTEM;
+    let sources: AgentRagSource[] = [];
+
+    if (input.rag === true) {
+      const lastUser = [...input.messages].reverse().find((item) => item.role === 'user');
+      const query = lastUser?.content?.trim() ?? '';
+      if (query) {
+        sources = await this.rag.searchForChat({
+          payload: asRecord(rawPayload),
+          query,
+          topK: input.ragTopK,
+        });
+        const ragAppendix = ragContextAppendix(sources);
+        if (ragAppendix) {
+          system = `${system}\n\n${RAG_SYSTEM_APPENDIX}`;
+          appendix = [appendix, ragAppendix].filter(Boolean).join('\n\n');
+        }
+      }
+    }
+
     return {
       imageUrls,
+      sources,
       withVision: buildHistoryMessages(system, input.messages, appendix, imageUrls, true),
       textOnly: buildHistoryMessages(system, input.messages, appendix, imageUrls, false),
     };
