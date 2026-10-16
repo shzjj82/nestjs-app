@@ -13,8 +13,8 @@ set -euo pipefail
 #   REDIS_URL=redis://127.0.0.1:6379
 #   PORT=3000
 #   USERCENTER_REPLICAS=1
-#   DOCS_REPLICAS=3
-#   AGENTS_REPLICAS=3
+#   DOCS_REPLICAS=1
+#   AGENTS_REPLICAS=1
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -25,8 +25,8 @@ DATABASE_URL="${DATABASE_URL:-postgres://nestjs:nestjs@127.0.0.1:5432/nestjs}"
 REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 PORT="${PORT:-3000}"
 USERCENTER_REPLICAS="${USERCENTER_REPLICAS:-1}"
-DOCS_REPLICAS="${DOCS_REPLICAS:-3}"
-AGENTS_REPLICAS="${AGENTS_REPLICAS:-3}"
+DOCS_REPLICAS="${DOCS_REPLICAS:-1}"
+AGENTS_REPLICAS="${AGENTS_REPLICAS:-1}"
 export MQTT_URL DATABASE_URL REDIS_URL PORT USERCENTER_REPLICAS DOCS_REPLICAS AGENTS_REPLICAS
 
 if [[ "${SKIP_INFRA:-0}" != "1" ]]; then
@@ -94,11 +94,11 @@ case "${SCOPE}" in
       const list = [
         ...names('usercenter', 'USERCENTER_REPLICAS', 1),
         'order',
-        ...names('docs', 'DOCS_REPLICAS', 3),
+        ...names('docs', 'DOCS_REPLICAS', 1),
         'upload',
         'wechat',
         'recycle',
-        ...names('agents', 'AGENTS_REPLICAS', 3),
+        ...names('agents', 'AGENTS_REPLICAS', 1),
       ];
       process.stdout.write(list.join(','));
     ")"

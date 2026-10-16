@@ -11,7 +11,7 @@ export function gatewayUrl(): string {
   return (
     process.env.GATEWAY_URL ??
     process.env.NEXT_PUBLIC_GATEWAY_URL ??
-    'http://127.0.0.1:3000'
+    'https://api.championsea.online'
   );
 }
 

@@ -7,8 +7,8 @@ function replicaCount(name, fallback) {
 }
 
 const usercenterReplicas = replicaCount('USERCENTER_REPLICAS', 1);
-const docsReplicas = replicaCount('DOCS_REPLICAS', 3);
-const agentsReplicas = replicaCount('AGENTS_REPLICAS', 3);
+const docsReplicas = replicaCount('DOCS_REPLICAS', 1);
+const agentsReplicas = replicaCount('AGENTS_REPLICAS', 1);
 const agentsHttpPort = Number(process.env.AGENTS_HTTP_PORT ?? 3006);
 const appVersion = process.env.APP_VERSION ?? '0.0.1';
 const expectedAppVersion = process.env.EXPECTED_APP_VERSION ?? appVersion;
