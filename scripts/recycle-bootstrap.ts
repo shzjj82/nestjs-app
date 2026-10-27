@@ -7,8 +7,9 @@
  *   1. 登记 recycle 业务，并开通它的接口白名单（apis）
  *      —— business.create 会顺带建好 customer 身份角色、回填 defaultRoleId、
  *         并把 biz:registry 写进 Redis，网关才能放行 X-Biz-Code: recycle；
- *   2. 补齐业务员 / 超管等业务身份角色（customer 由第 1 步自动产生，不用管）；
- *   3. 登记微信小程序（appId / secret）并写入订阅消息模板（4 个回收场景）。
+ *   2. 登记 wechat_mp 接入端（uc_clients）—— /auth/wechat 靠它定位小程序；
+ *   3. 补齐业务员 / 超管等业务身份角色（customer 由第 1 步自动产生，不用管）；
+ *   4. 登记微信小程序（appId / secret）并写入订阅消息模板（4 个回收场景）。
  *
  * 设计约束（很重要）：
  *   - **不改动任何业务代码**：本脚本只经 MQTT 调用已有的 @MessagePattern，
@@ -22,7 +23,7 @@
  * 环境变量（见 .env.recycle.example）：
  *   必填
  *     MQTT_URL                      MQTT 地址，如 mqtt://127.0.0.1:1883
- *     WECHAT_APP_ID                 小程序 appId
+ *     WECHAT_APP_ID                 小程序 appId（同时写进接入端的 wechatAppId）
  *     WECHAT_SECRET                 小程序 secret
  *   可选
  *     RECYCLE_BIZ_CODE              业务 code，默认 recycle
@@ -30,6 +31,7 @@
  *     WECHAT_MP_CODE                小程序登记 code，默认与业务 code 相同（两者 1:1）
  *     WECHAT_MP_NAME                小程序名称，默认 墨盒回收
  *     RECYCLE_ROLES                 要额外创建的身份角色，逗号分隔，默认 agent,admin
+ *     RECYCLE_CLIENT_CODE           接入端 code，默认与业务 code 相同
  *     RECYCLE_SUBSCRIBE_TEMPLATES   订阅模板 JSON，见下方 SCENE_DEFAULT_FIELDS 说明
  *     RECYCLE_EXTRA_APIS            额外追加开通的接口，逗号分隔（`POST /xxx` 形式）
  *     RECYCLE_BOOTSTRAP_TIMEOUT_MS  单次 MQTT 调用超时，默认 15000
@@ -58,6 +60,14 @@ type BusinessRow = {
   defaultRoleId: string | null;
 };
 type MiniProgramRow = { id: string; code: string; appId: string; subscribeTemplates: unknown };
+type ClientRow = {
+  id: string;
+  appCode: string;
+  businessId: string;
+  type: string;
+  wechatAppId: string | null;
+  status: number;
+};
 
 /** 4 个回收订阅场景的默认字段映射；键必须与 SUBSCRIBE_SEMANTICS 白名单一致 */
 const SCENE_DEFAULT_FIELDS: Record<string, Record<string, string>> = {
@@ -237,7 +247,57 @@ async function main() {
       businessId = created.id;
     }
 
-    // ---------- 2. 身份角色 ----------
+    // ---------- 2. 接入端（wechat_mp） ----------
+    // 业务登记**不会**顺带建接入端，而 /auth/wechat 是按「业务 + type=wechat_mp」
+    // 找接入端的（clients.service.requireForBusiness），找不到就直接 404
+    // 「当前业务未配置 wechat_mp 接入端」。所以这一步必须单独做，否则微信小程序
+    // 登录永远进不来 —— 光登记 wx_miniprograms（第 4 步）是不够的，那是另一张表。
+    const clientCode = env('RECYCLE_CLIENT_CODE', bizCode)!;
+    const wechatAppId = env('WECHAT_APP_ID');
+    const clients = await call<ClientRow[]>(
+      client,
+      MQTT_PATTERNS.CLIENT_FIND_ALL,
+      { businessId },
+      timeoutMs,
+    );
+    const existingClient = clients.find((row) => row.appCode === clientCode);
+    if (existingClient) {
+      const payload: Record<string, unknown> = { id: existingClient.id };
+      let changed = false;
+      if (existingClient.type !== 'wechat_mp') {
+        payload.type = 'wechat_mp';
+        changed = true;
+      }
+      if (existingClient.status !== 1) {
+        payload.status = 1;
+        changed = true;
+      }
+      if (wechatAppId && existingClient.wechatAppId !== wechatAppId) {
+        payload.wechatAppId = wechatAppId;
+        changed = true;
+      }
+      if (changed) {
+        await call(client, MQTT_PATTERNS.CLIENT_UPDATE, payload, timeoutMs);
+        console.log(`[接入端] ${clientCode} 已存在，校正为 wechat_mp 并写入 appId`);
+      } else {
+        console.log(`[接入端] ${clientCode} 已存在且配置正确，无需变更`);
+      }
+    } else {
+      await call(client, MQTT_PATTERNS.CLIENT_CREATE, {
+        clientCode,
+        name: bizName,
+        businessId,
+        type: 'wechat_mp',
+        wechatAppId: wechatAppId ?? null,
+      }, timeoutMs);
+      console.log(`[接入端] 已创建 ${clientCode}（type=wechat_mp, appId=${wechatAppId ?? '-'}）`);
+    }
+    if (!wechatAppId) {
+      console.log('[接入端] 未提供 WECHAT_APP_ID，wechatAppId 为空 —— /auth/wechat 会报');
+      console.log('         「接入端 xxx 未配置 wechatAppId」，补上 appId 后重跑本脚本即可');
+    }
+
+    // ---------- 3. 身份角色 ----------
     // customer 由 business.create 自动创建，这里只补业务侧角色
     const roles = await call<RoleRow[]>(
       client,
@@ -276,7 +336,7 @@ async function main() {
       }
     }
 
-    // ---------- 3. 微信小程序 ----------
+    // ---------- 4. 微信小程序 ----------
     const appId = env('WECHAT_APP_ID');
     const secret = env('WECHAT_SECRET');
     if (!appId || !secret) {

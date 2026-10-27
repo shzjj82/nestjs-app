@@ -24,6 +24,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# 见 pm2-reload-recycle.sh 的说明：进程清单固定在项目专用目录
+export PM2_HOME="${PM2_HOME:-$HOME/.pm2-nestjs}"
+
 ENV_FILE="${ENV_FILE:-.env.recycle}"
 
 if [[ -f "$ENV_FILE" ]]; then
@@ -139,8 +142,14 @@ done
 
 echo
 echo "=== 拉起服务 ==="
-pm2 delete all >/dev/null 2>&1 || true
-pm2 start ecosystem.recycle.cjs
+# 只重建这 5 个服务，不用 `pm2 delete all`
+# —— 后者会把同一台机器上其它项目的 pm2 进程一起删掉
+for service in "${SERVICES[@]}"; do
+  pm2 delete "$service" >/dev/null 2>&1 || true
+done
+# 文件名必须含 .config.：pm2 只把这样的文件当配置文件解析，
+# 否则会把它当成普通脚本启动，结果只起 1 个名为文件名的进程
+pm2 start ecosystem.recycle.config.cjs
 pm2 save
 
 echo
@@ -159,8 +168,26 @@ fi
 
 echo
 echo "=== 健康检查 ==="
-health=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "http://127.0.0.1:${PORT}/health" || echo "000")
-echo "  GET /health -> HTTP $health"
+# 两点注意：
+#   1. 网关没有裸的 /health 路由，只有 /recycle/health 这类带前缀的；
+#      打 /health 会一直挂到超时，看起来像"服务没起来"，实际是路由不存在
+#   2. 用 node 发请求而不是 curl：本机若设了 HTTP_PROXY，curl 会走代理，
+#      拿到代理的 502 "upstream connect failed"，同样会误判
+node -e '
+const http = require("http");
+const port = Number(process.argv[1]);
+const paths = ["/recycle/health", "/wechat/health", "/upload/health"];
+const get = (p) => new Promise((res) => {
+  const req = http.get({ host: "127.0.0.1", port, path: p, timeout: 8000 }, (r) => {
+    let d = ""; r.on("data", (c) => (d += c)); r.on("end", () => res(r.statusCode));
+  });
+  req.on("error", () => res("ERR"));
+  req.on("timeout", () => { req.destroy(); res("TIMEOUT"); });
+});
+(async () => {
+  for (const p of paths) console.log("  " + p.padEnd(18) + "-> HTTP " + (await get(p)));
+})();
+' "$PORT"
 
 echo
 pm2 status
