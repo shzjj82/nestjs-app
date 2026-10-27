@@ -16,8 +16,11 @@
  *
  * ⚠️ 注意：本文件是「新增」，没有改动 ecosystem.config.cjs。
  *    两份配置共用同一套 dist 产物，切换方式：
- *      pm2 delete all
- *      pm2 start ecosystem.recycle.cjs
+ *      pm2 start ecosystem.recycle.config.cjs
+ *
+ * ⚠️ 文件名里的 .config. 不能省：pm2 只在文件名含 .config. 时才把文件当作
+ *    配置解析，否则会把它当普通脚本执行 —— 那样只会起 1 个以文件名命名的
+ *    进程，表面看是 online，实际 5 个服务一个都没跑。
  *
  * 环境变量与 ecosystem.config.cjs 完全一致，见 .env.recycle.example。
  * 副本数：USERCENTER_REPLICAS 默认 1，可用环境变量调。
