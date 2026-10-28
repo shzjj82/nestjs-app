@@ -41,16 +41,16 @@ npm run start:admin
 适合 1 核小机器，进程比 Docker 更省内存。Linux 用 `sudo`，macOS 直接跑。
 
 ```bash
-chmod +x scripts/*.sh
+chmod +x scripts/infra/*.sh scripts/pm2/*.sh scripts/recycle/*.sh
 
 # 1. 安装 PostgreSQL + Redis
-sudo ./scripts/install-db.sh
+sudo ./scripts/infra/install-db.sh
 # 或分别安装：
-# sudo ./scripts/install-postgres.sh
-# sudo ./scripts/install-redis.sh
+# sudo ./scripts/infra/install-postgres.sh
+# sudo ./scripts/infra/install-redis.sh
 
 # 2. 安装并启动 MQTT
-sudo ./scripts/install-mosquitto.sh
+sudo ./scripts/infra/install-mosquitto.sh
 
 # 3. 启动全部服务：gateway + usercenter + order + 3 个 docs + upload + wechat + 3 个 agents
 npm run pm2:start
@@ -65,8 +65,8 @@ MQTT_URL=mqtt://127.0.0.1:1883 PORT=3000 npm run pm2:start:gateway
 脚本默认只监听本机。如需远程连接：
 
 ```bash
-sudo PG_BIND=0.0.0.0 ./scripts/install-postgres.sh
-sudo REDIS_BIND=0.0.0.0 ./scripts/install-redis.sh
+sudo PG_BIND=0.0.0.0 ./scripts/infra/install-postgres.sh
+sudo REDIS_BIND=0.0.0.0 ./scripts/infra/install-redis.sh
 ```
 
 ## Docker Compose（推荐）

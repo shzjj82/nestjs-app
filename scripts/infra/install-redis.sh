@@ -3,9 +3,9 @@ set -euo pipefail
 
 # 在云服务器或本机安装 Redis，不依赖 Docker。
 # 用法：
-#   sudo ./scripts/install-redis.sh
-#   sudo REDIS_BIND=127.0.0.1 ./scripts/install-redis.sh   # 仅本机可连（默认）
-#   sudo REDIS_BIND=0.0.0.0 ./scripts/install-redis.sh     # 允许远程连
+#   sudo ./scripts/infra/install-redis.sh
+#   sudo REDIS_BIND=127.0.0.1 ./scripts/infra/install-redis.sh   # 仅本机可连（默认）
+#   sudo REDIS_BIND=0.0.0.0 ./scripts/infra/install-redis.sh     # 允许远程连
 #
 # 环境变量：
 #   REDIS_BIND / REDIS_PORT

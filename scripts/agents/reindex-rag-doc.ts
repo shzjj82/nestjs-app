@@ -1,6 +1,6 @@
 /**
  * 从 docs 库读一篇文档，MQTT 通知 agents 重建 RAG 索引。
- * 用法：npx ts-node -r tsconfig-paths/register scripts/reindex-rag-doc.ts [appCode] [slug]
+ * 用法：npx ts-node -r tsconfig-paths/register scripts/agents/reindex-rag-doc.ts [appCode] [slug]
  */
 import { ClientProxyFactory, Transport } from '@nestjs/microservices';
 import { Client } from 'pg';

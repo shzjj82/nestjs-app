@@ -3,9 +3,9 @@ set -euo pipefail
 
 # 在云服务器或本机安装 PostgreSQL，不依赖 Docker。
 # 用法：
-#   sudo ./scripts/install-postgres.sh
-#   sudo PG_BIND=127.0.0.1 ./scripts/install-postgres.sh   # 仅本机可连（默认）
-#   sudo PG_BIND=0.0.0.0 ./scripts/install-postgres.sh     # 允许远程连
+#   sudo ./scripts/infra/install-postgres.sh
+#   sudo PG_BIND=127.0.0.1 ./scripts/infra/install-postgres.sh   # 仅本机可连（默认）
+#   sudo PG_BIND=0.0.0.0 ./scripts/infra/install-postgres.sh     # 允许远程连
 #
 # 环境变量：
 #   POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB / POSTGRES_PORT / PG_BIND

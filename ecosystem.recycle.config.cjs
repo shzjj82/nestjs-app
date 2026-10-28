@@ -36,11 +36,12 @@ function replicaCount(name, fallback) {
 const usercenterReplicas = replicaCount('USERCENTER_REPLICAS', 1);
 const appVersion = process.env.APP_VERSION ?? '0.0.1';
 const expectedAppVersion = process.env.EXPECTED_APP_VERSION ?? appVersion;
-const databaseUrl = process.env.DATABASE_URL ?? 'postgres://nestjs:nestjs@127.0.0.1:5432/nestjs';
-const wechatDatabaseUrl =
-  process.env.WECHAT_DATABASE_URL ?? databaseUrl.replace(/\/[^/?]+(\?|$)/, '/wechat$1');
-const recycleDatabaseUrl =
-  process.env.RECYCLE_DATABASE_URL ?? databaseUrl.replace(/\/[^/?]+(\?|$)/, '/recycle$1');
+const databaseUrl =
+  process.env.USERCENTER_DATABASE_URL ||
+  process.env.DATABASE_URL ||
+  'postgres://nestjs:nestjs@127.0.0.1:5432/nestjs';
+const wechatDatabaseUrl = process.env.WECHAT_DATABASE_URL || '';
+const recycleDatabaseUrl = process.env.RECYCLE_DATABASE_URL || '';
 const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
 
 const usercenterApps = Array.from({ length: usercenterReplicas }, (_, index) => {

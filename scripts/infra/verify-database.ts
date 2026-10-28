@@ -17,7 +17,7 @@
  * 用法：
  *   npm run verify:db
  *   # 或
- *   npx ts-node -T scripts/verify-database.ts
+ *   npx ts-node -T scripts/infra/verify-database.ts
  *
  * 环境变量（默认取 docker-compose 的默认值）：
  *   DATABASE_URL / REDIS_URL / MQTT_URL

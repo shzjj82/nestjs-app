@@ -3,9 +3,9 @@ set -euo pipefail
 
 # 在云服务器或本机安装 Mosquitto，不依赖 Docker。
 # 用法：
-#   sudo ./scripts/install-mosquitto.sh
-#   sudo MQTT_BIND=127.0.0.1 ./scripts/install-mosquitto.sh   # 仅本机可连
-#   sudo MQTT_BIND=0.0.0.0 ./scripts/install-mosquitto.sh     # 默认，允许远程连
+#   sudo ./scripts/infra/install-mosquitto.sh
+#   sudo MQTT_BIND=127.0.0.1 ./scripts/infra/install-mosquitto.sh   # 仅本机可连
+#   sudo MQTT_BIND=0.0.0.0 ./scripts/infra/install-mosquitto.sh     # 默认，允许远程连
 
 MQTT_BIND="${MQTT_BIND:-0.0.0.0}"
 MQTT_PORT="${MQTT_PORT:-1883}"

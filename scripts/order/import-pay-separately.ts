@@ -13,7 +13,7 @@
  *   ORDER_DATABASE_URL   默认把 DATABASE_URL 的库名换成 order
  *   AGENTS_DATABASE_URL  默认把 DATABASE_URL 的库名换成 agents
  *
- *   npx ts-node -r tsconfig-paths/register scripts/import-pay-separately.ts
+ *   npx ts-node -r tsconfig-paths/register scripts/order/import-pay-separately.ts
  */
 import { Client } from 'pg';
 

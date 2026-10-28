@@ -10,9 +10,9 @@
  *   本工具负责把那套库建出来 / 清掉重建 / 打印状态，不碰业务代码。
  *
  * 用法：
- *   node scripts/recycle-db-tool.cjs ensure --admin <url> --dbs a,b,c
- *   node scripts/recycle-db-tool.cjs reset  --admin <url> --dbs a,b,c
- *   node scripts/recycle-db-tool.cjs report --urls "main=<url>,recycle=<url>,wechat=<url>"
+ *   node scripts/recycle/db-tool.cjs ensure --admin <url> --dbs a,b,c
+ *   node scripts/recycle/db-tool.cjs reset  --admin <url> --dbs a,b,c
+ *   node scripts/recycle/db-tool.cjs report --urls "main=<url>,recycle=<url>,wechat=<url>"
  *
  * --admin 是「管理连接」，用来执行 CREATE/DROP DATABASE；填任意一个能连上的库
  * （脚本自己会换成 postgres 库），账号需要有 CREATEDB 权限。
@@ -260,24 +260,24 @@ async function main() {
     // 从 env 文件读连接串，缺失的按 env.ts 的规则推导，然后出报表
     const file = args.file || '.env.recycle';
     const values = readEnvKeys(file, [
+      'USERCENTER_DATABASE_URL',
       'DATABASE_URL',
       'RECYCLE_DATABASE_URL',
       'WECHAT_DATABASE_URL',
     ]);
-    const main = values.DATABASE_URL;
+    const main = values.USERCENTER_DATABASE_URL || values.DATABASE_URL;
     if (!main) {
-      console.error(`${file} 里没有 DATABASE_URL`);
+      console.error(`${file} 里没有 USERCENTER_DATABASE_URL`);
       process.exit(1);
     }
-    const derive = (base) => {
-      const u = new URL(main);
-      u.pathname = `/${base}`;
-      return u.toString();
-    };
+    if (!values.RECYCLE_DATABASE_URL || !values.WECHAT_DATABASE_URL) {
+      console.error(`${file} 里需要同时写 RECYCLE_DATABASE_URL 和 WECHAT_DATABASE_URL`);
+      process.exit(1);
+    }
     console.log('=== 数据库状态 ===');
     await reportOne('main', main);
-    await reportOne('recycle', values.RECYCLE_DATABASE_URL || derive('recycle'));
-    await reportOne('wechat', values.WECHAT_DATABASE_URL || derive('wechat'));
+    await reportOne('recycle', values.RECYCLE_DATABASE_URL);
+    await reportOne('wechat', values.WECHAT_DATABASE_URL);
     return;
   }
 

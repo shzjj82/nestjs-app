@@ -4,8 +4,8 @@ set -euo pipefail
 # ============================================================================
 # 重新加载环境变量并重启回收服务。
 #
-#   ./scripts/pm2-reload-recycle.sh            # 重载全部 5 个服务
-#   ./scripts/pm2-reload-recycle.sh wechat     # 只重载 wechat
+#   ./scripts/recycle/reload.sh            # 重载全部 5 个服务
+#   ./scripts/recycle/reload.sh wechat     # 只重载 wechat
 #
 # 为什么不能只改文件就生效？
 #   PM2 在「启动进程的那一刻」把当时的环境变量快照进进程，之后进程内的
@@ -23,7 +23,7 @@ set -euo pipefail
 #   3. 应用启动时 dotenv 加载的项目根 .env    <- 注意它也存在，但不会覆盖上面两项
 # ============================================================================
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 # pm2 进程清单放项目专用目录：一是避免和其它项目的进程混在一起，
@@ -42,6 +42,15 @@ if [[ -f "$ENV_FILE" ]]; then
 else
   echo "未找到 $ENV_FILE，将只使用当前 shell 的环境变量" >&2
 fi
+
+# 文件里写 USERCENTER_DATABASE_URL；usercenter 进程读的仍是 DATABASE_URL
+if [[ -n "${USERCENTER_DATABASE_URL:-}" ]]; then
+  DATABASE_URL="$USERCENTER_DATABASE_URL"
+fi
+export DATABASE_URL="${DATABASE_URL:-}"
+export USERCENTER_DATABASE_URL="${USERCENTER_DATABASE_URL:-$DATABASE_URL}"
+export RECYCLE_DATABASE_URL="${RECYCLE_DATABASE_URL:-}"
+export WECHAT_DATABASE_URL="${WECHAT_DATABASE_URL:-}"
 
 if [[ $# -gt 0 ]]; then
   TARGETS=("$@")

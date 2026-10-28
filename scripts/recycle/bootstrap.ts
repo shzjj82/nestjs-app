@@ -38,7 +38,7 @@
  *     RECYCLE_BOOTSTRAP_DRY_RUN     设为 1 只打印计划、不落库
  *
  * 用法：
- *   npx ts-node -r tsconfig-paths/register scripts/recycle-bootstrap.ts
+ *   npx ts-node -r tsconfig-paths/register scripts/recycle/bootstrap.ts
  *
  * 幂等性说明：脚本靠 code 唯一 + 409 判定已存在，因此可以在任何时刻重跑；
  * 升级网关路由后重跑即可把新接口补进白名单。

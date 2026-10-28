@@ -2,10 +2,10 @@
 set -euo pipefail
 
 # 用法：
-#   ./scripts/pm2-restart.sh
-#   MQTT_URL=mqtt://x.x.x.x:1883 ./scripts/pm2-restart.sh gateway
+#   ./scripts/pm2/restart.sh
+#   MQTT_URL=mqtt://x.x.x.x:1883 ./scripts/pm2/restart.sh gateway
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 SCOPE="${1:-all}"
@@ -33,7 +33,7 @@ if pm2 describe gateway >/dev/null 2>&1; then
     *) pm2 restart all ;;
   esac
 else
-  exec "$ROOT/scripts/pm2-start.sh" "${SCOPE}"
+  exec "$ROOT/scripts/pm2/start.sh" "${SCOPE}"
 fi
 
 pm2 status

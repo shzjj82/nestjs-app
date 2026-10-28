@@ -4,34 +4,32 @@ set -euo pipefail
 # ============================================================================
 # 切换到「另一套数据库」来验证回收服务。
 #
-#   ./scripts/recycle-switch-db.sh                 # 切到 *_v2（默认后缀）
-#   ./scripts/recycle-switch-db.sh v3              # 切到 *_v3
-#   ./scripts/recycle-switch-db.sh v2 --reset      # 先删掉 *_v2 再重建（真·从零）
-#   ./scripts/recycle-switch-db.sh v2 --reload     # 切完顺便重载服务
-#   ./scripts/recycle-switch-db.sh v2 --reload --bootstrap
-#   ./scripts/recycle-switch-db.sh base            # 切回原始库名（不加后缀）
+#   ./scripts/recycle/switch-db.sh                 # 切到 *_v2（默认后缀）
+#   ./scripts/recycle/switch-db.sh v3              # 切到 *_v3
+#   ./scripts/recycle/switch-db.sh v2 --reset      # 先删掉 *_v2 再重建（真·从零）
+#   ./scripts/recycle/switch-db.sh v2 --reload     # 切完顺便重载服务
+#   ./scripts/recycle/switch-db.sh v2 --reload --bootstrap
+#   ./scripts/recycle/switch-db.sh base            # 切回原始库名（不加后缀）
 #
 # 为什么要切库：
 #   当前库里已经跑过一轮，留着订单 / 审批 / 目录种子等数据。再验证一遍时
 #   新数据混在旧数据里看不出效果（"不知道这 11 单是刚才建的还是上次的"）。
 #   换一套空库名，服务起来后会自己跑迁移 + 灌种子，看到的就是纯净结果。
 #
-# 三个库的关系（见 libs/common/src/env.ts）：
-#   DATABASE_URL          -> usercenter 主库，uc_* 表
-#   RECYCLE_DATABASE_URL  -> recycle 库（不写时由 DATABASE_URL 把库名换成 recycle）
-#   WECHAT_DATABASE_URL   -> wechat 库（同理）
-#   注意：recycle/wechat 的库名是「替换」而不是「加后缀」，所以必须显式写
-#         这两个变量，否则换了主库名之后它们仍指向 recycle / wechat 老库。
+# 三个库的关系：
+#   USERCENTER_DATABASE_URL  -> usercenter（uc_*），启动时映射为进程内的 DATABASE_URL
+#   RECYCLE_DATABASE_URL     -> recycle 库
+#   WECHAT_DATABASE_URL      -> wechat 库
 #
 # 谁负责建库：recycle 与 wechat 服务启动时会自动 CREATE DATABASE；
 #             usercenter 不会，所以主库由本脚本先建好。
 # ============================================================================
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 ENV_FILE="${ENV_FILE:-.env.recycle}"
-TOOL="scripts/recycle-db-tool.cjs"
+TOOL="scripts/recycle/db-tool.cjs"
 
 SUFFIX="v2"
 RESET=0
@@ -67,11 +65,11 @@ echo "env 文件: $ENV_FILE"
 echo "库名后缀: ${SUFFIX:-（无，使用原始库名）}"
 
 # ---------- 取当前连接串，据此推导目标库 ----------
-CURRENT_URL="$(node "$TOOL" readenv --file "$ENV_FILE" --keys DATABASE_URL \
-  | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const v=JSON.parse(d).DATABASE_URL;console.log(v||"")})')"
+CURRENT_URL="$(node "$TOOL" readenv --file "$ENV_FILE" --keys USERCENTER_DATABASE_URL,DATABASE_URL \
+  | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const v=JSON.parse(d);console.log(v.USERCENTER_DATABASE_URL||v.DATABASE_URL||"")})')"
 
 if [[ -z "$CURRENT_URL" ]]; then
-  echo "  $ENV_FILE 里没有 DATABASE_URL，改用默认值"
+  echo "  $ENV_FILE 里没有 USERCENTER_DATABASE_URL，改用默认值"
   CURRENT_URL="postgres://nestjs:nestjs@127.0.0.1:5432/nestjs"
 fi
 
@@ -109,7 +107,7 @@ fi
 echo
 echo "=== 写入 $ENV_FILE ==="
 node "$TOOL" writeenv --file "$ENV_FILE" \
-  --set "DATABASE_URL=$MAIN_URL,RECYCLE_DATABASE_URL=$RECYCLE_URL,WECHAT_DATABASE_URL=$WECHAT_URL"
+  --set "USERCENTER_DATABASE_URL=$MAIN_URL,RECYCLE_DATABASE_URL=$RECYCLE_URL,WECHAT_DATABASE_URL=$WECHAT_URL"
 
 # ---------- 现状 ----------
 echo
@@ -119,7 +117,7 @@ node "$TOOL" report --urls "main=$MAIN_URL,recycle=$RECYCLE_URL,wechat=$WECHAT_U
 echo
 if [[ "$RELOAD" == "1" ]]; then
   echo "=== 重载服务 ==="
-  ENV_FILE="$ENV_FILE" bash scripts/pm2-reload-recycle.sh
+  ENV_FILE="$ENV_FILE" bash scripts/recycle/reload.sh
 else
   echo "接下来执行："
   echo "  npm run recycle:reload"
@@ -132,7 +130,7 @@ if [[ "$BOOTSTRAP" == "1" ]]; then
   # shellcheck disable=SC1090
   . "./$ENV_FILE"
   set +a
-  npx ts-node -T -r tsconfig-paths/register scripts/recycle-bootstrap.ts
+  npx ts-node -T -r tsconfig-paths/register scripts/recycle/bootstrap.ts
 elif [[ "$RELOAD" == "1" ]]; then
   echo
   echo "⚠️  新库里没有业务登记与小程序配置，别忘了跑："
@@ -141,6 +139,6 @@ fi
 
 echo
 echo "切库完成。当前指向："
-echo "  main    -> $MAIN_DB"
+echo "  usercenter -> $MAIN_DB"
 echo "  recycle -> $RECYCLE_DB"
 echo "  wechat  -> $WECHAT_DB"
