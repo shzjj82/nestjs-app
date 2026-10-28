@@ -13,7 +13,7 @@ set -euo pipefail
 # 因此编译时间约为全量的一半，内存占用也小得多。
 #
 # 流程：加载环境变量 → 检查基础设施 → 按 env 里的库名确保 database 存在（没有就建）
-#       → 若运行中进程已 online 且环境一致则跳过
+#       → 若运行中进程已 online 且环境一致则跳过编译/拉起，但仍跑开通脚本
 #       → 否则：装依赖 → 编译 → pm2 拉起 → 开通 → 健康检查
 #
 # 环境变量见 .env.recycle.example（默认读取 .env.recycle）
@@ -58,7 +58,6 @@ USERCENTER_DATABASE_URL="${USERCENTER_DATABASE_URL:-${DATABASE_URL:-postgres://n
 DATABASE_URL="$USERCENTER_DATABASE_URL"
 REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 PORT="${PORT:-3000}"
-USERCENTER_REPLICAS="${USERCENTER_REPLICAS:-1}"
 
 if [[ -z "${RECYCLE_DATABASE_URL:-}" || -z "${WECHAT_DATABASE_URL:-}" ]]; then
   echo "缺少 RECYCLE_DATABASE_URL 或 WECHAT_DATABASE_URL，请在 $ENV_FILE 里写全三个库" >&2
@@ -72,16 +71,11 @@ USERCENTER_DB="$(db_name "$USERCENTER_DATABASE_URL")"
 RECYCLE_DB="$(db_name "$RECYCLE_DATABASE_URL")"
 WECHAT_DB="$(db_name "$WECHAT_DATABASE_URL")"
 
-export MQTT_URL DATABASE_URL USERCENTER_DATABASE_URL REDIS_URL PORT USERCENTER_REPLICAS
+export MQTT_URL DATABASE_URL USERCENTER_DATABASE_URL REDIS_URL PORT
 export RECYCLE_DATABASE_URL WECHAT_DATABASE_URL
 
-# 最小部署需要的服务集合（编译用名，不含副本后缀）
 SERVICES=(gateway usercenter upload wechat recycle)
-# PM2 进程名：usercenter 实际是 usercenter-1 / usercenter-2 …
-PM2_APPS=(gateway upload wechat recycle)
-for ((i = 1; i <= USERCENTER_REPLICAS; i++)); do
-  PM2_APPS+=("usercenter-$i")
-done
+PM2_APPS=("${SERVICES[@]}")
 
 if [[ "${SKIP_INFRA:-0}" != "1" ]]; then
   echo
@@ -148,7 +142,9 @@ if ! command -v pm2 >/dev/null 2>&1; then
   npm install -g pm2
 fi
 
-# 运行中的进程已经 online，且注入的环境变量与当前 .env.recycle 一致 → 不重建
+# 运行中的进程已经 online，且注入的环境变量与当前 .env.recycle 一致 → 不重建进程
+# 开通脚本仍会跑（幂等），避免「服务在、业务白名单没写」
+SKIP_LAUNCH=0
 if [[ "$FORCE" != "1" ]]; then
   echo
   echo "=== 检测运行中的环境 ==="
@@ -202,34 +198,14 @@ if [[ "$FORCE" != "1" ]]; then
       process.exit(1);
     }
   ' "${PM2_APPS[@]}"; then
-    echo "  进程已 online，环境与 $ENV_FILE 一致，跳过启动"
-    echo
-    echo "=== 健康检查 ==="
-    node -e '
-const http = require("http");
-const port = Number(process.argv[1]);
-const paths = ["/recycle/health", "/wechat/health", "/upload/health"];
-const get = (p) => new Promise((res) => {
-  const req = http.get({ host: "127.0.0.1", port, path: p, timeout: 8000 }, (r) => {
-    let d = ""; r.on("data", (c) => (d += c)); r.on("end", () => res(r.statusCode));
-  });
-  req.on("error", () => res("ERR"));
-  req.on("timeout", () => { req.destroy(); res("TIMEOUT"); });
-});
-(async () => {
-  for (const p of paths) console.log("  " + p.padEnd(18) + "-> HTTP " + (await get(p)));
-})();
-' "$PORT"
-    echo
-    pm2 status
-    echo
-    echo "强制重建: FORCE=1 npm run recycle:start   或   ./scripts/recycle/start.sh --force"
-    exit 0
+    echo "  进程已 online，环境与 $ENV_FILE 一致，跳过编译与拉起"
+    SKIP_LAUNCH=1
   else
     echo "  需要启动（进程缺失、未 online，或环境与 $ENV_FILE 不一致）"
   fi
 fi
 
+if [[ "$SKIP_LAUNCH" != "1" ]]; then
 echo
 echo "=== 依赖 ==="
 if [[ ! -d node_modules ]]; then
@@ -269,6 +245,8 @@ echo "=== 拉起服务 ==="
 for service in "${PM2_APPS[@]}"; do
   pm2 delete "$service" >/dev/null 2>&1 || true
 done
+# 旧版副本名 usercenter-1 / usercenter-2，避免和新的 usercenter 并存
+pm2 delete /usercenter-/ >/dev/null 2>&1 || true
 # 文件名必须含 .config.：pm2 只把这样的文件当配置文件解析，
 # 否则会把它当成普通脚本启动，结果只起 1 个名为文件名的进程
 pm2 start ecosystem.recycle.config.cjs
@@ -277,15 +255,17 @@ pm2 save
 echo
 echo "等待服务接入 MQTT ..."
 sleep 12
+fi
 
 if [[ "${SKIP_BOOTSTRAP:-0}" != "1" ]]; then
   echo
   echo "=== 开通回收业务（登记业务 / 角色 / 小程序）==="
-  npx ts-node -T -r tsconfig-paths/register scripts/recycle/bootstrap.ts || {
+  if ! npx ts-node -T -r tsconfig-paths/register scripts/recycle/bootstrap.ts; then
     echo
-    echo "开通未完成（服务可能还没就绪）。稍后手动重跑：" >&2
-    echo "  npx ts-node -T -r tsconfig-paths/register scripts/recycle/bootstrap.ts" >&2
-  }
+    echo "开通失败。确认 MQTT 与 usercenter 已起来后重跑：" >&2
+    echo "  npm run recycle:bootstrap" >&2
+    exit 1
+  fi
 fi
 
 echo

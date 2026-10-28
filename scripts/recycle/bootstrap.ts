@@ -46,9 +46,12 @@
 import { ClientProxy, ClientProxyFactory } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
-import { MQTT_PATTERNS, mqttClientOptions } from '@app/common';
-import { DEFAULT_FEATURE_CATALOG } from '../libs/common/src/feature-catalog';
-import { bizApiKeys } from '../libs/common/src/gateway-routes';
+import {
+  MQTT_PATTERNS,
+  mqttClientOptions,
+  DEFAULT_FEATURE_CATALOG,
+  bizApiKeys,
+} from '@app/common';
 
 type RoleRow = { id: string; code: string; name: string };
 type BusinessRow = {

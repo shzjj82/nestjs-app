@@ -4,7 +4,7 @@
  */
 import { ClientProxyFactory, Transport } from '@nestjs/microservices';
 import { Client } from 'pg';
-import { MQTT_PATTERNS, docsDatabaseUrl } from '../libs/common/src';
+import { MQTT_PATTERNS, docsDatabaseUrl } from '@app/common';
 
 async function main() {
   const appCode = process.argv[2] || 'wiki';

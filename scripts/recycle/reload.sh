@@ -55,7 +55,7 @@ export WECHAT_DATABASE_URL="${WECHAT_DATABASE_URL:-}"
 if [[ $# -gt 0 ]]; then
   TARGETS=("$@")
 else
-  TARGETS=(gateway usercenter-1 upload wechat recycle)
+  TARGETS=(gateway usercenter upload wechat recycle)
 fi
 
 echo "重载服务: ${TARGETS[*]}"
@@ -63,6 +63,7 @@ echo "重载服务: ${TARGETS[*]}"
 for service in "${TARGETS[@]}"; do
   pm2 delete "$service" >/dev/null 2>&1 || true
 done
+pm2 delete /usercenter-/ >/dev/null 2>&1 || true
 # 等端口释放再起，否则 gateway 会撞 EADDRINUSE（旧进程还没完全退出）
 sleep 3
 pm2 start ecosystem.recycle.config.cjs --only "$(IFS=,; echo "${TARGETS[*]}")"
