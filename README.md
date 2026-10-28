@@ -41,7 +41,7 @@ npm run start:admin
 适合 1 核小机器，进程比 Docker 更省内存。Linux 用 `sudo`，macOS 直接跑。
 
 ```bash
-chmod +x scripts/infra/*.sh scripts/pm2/*.sh scripts/recycle/*.sh
+chmod +x scripts/infra/*.sh scripts/pm2/*.sh deploy/recycle/scripts/*.sh deploy/recycle/db/*.sh
 
 # 1. 安装 PostgreSQL + Redis
 sudo ./scripts/infra/install-db.sh
@@ -56,11 +56,19 @@ sudo ./scripts/infra/install-mosquitto.sh
 npm run pm2:start
 
 # 云上只跑网关，微服务在本地：
-MQTT_URL=mqtt://127.0.0.1:1883 PORT=3000 npm run pm2:start:gateway
+MQTT_URL=mqtt://127.0.0.1:1883 PORT=3000 bash scripts/pm2/start.sh gateway
 ```
 
-常用命令：`npm run pm2:status` / `npm run pm2:logs` / `npm run pm2:restart` / `npm run pm2:stop`。  
+常用命令：`pm2 status` / `pm2 logs` / `npm run pm2:restart` / `npm run pm2:stop`。  
 开机自启：`pm2 startup && pm2 save`。
+
+只跑部分服务的发布场景放在 `deploy/<场景>/`（环境变量、PM2、Compose、启动脚本都在该目录），约定见 `deploy/README.md`。回收最小部署：
+
+```bash
+cp deploy/recycle/.env.example deploy/recycle/.env   # 填密钥
+npm run recycle:start            # 本机 PM2
+# 或 npm run recycle:docker:up   # 容器
+```
 
 脚本默认只监听本机。如需远程连接：
 
@@ -71,7 +79,7 @@ sudo REDIS_BIND=0.0.0.0 ./scripts/infra/install-redis.sh
 
 ## Docker Compose（推荐）
 
-一次拉起 PostgreSQL、Redis、Mosquitto，以及 gateway、usercenter、order、docs、upload、wechat、agents 各 1 个实例。请求地址始终是 `http://localhost:3000`。用户中心要多实例时再加 `--scale usercenter=3`：
+一次拉起 PostgreSQL、Redis、Mosquitto，以及 gateway、usercenter、order、docs、upload、wechat、recycle、agents 各 1 个实例。请求地址始终是 `http://localhost:3000`。用户中心要多实例时再加 `--scale usercenter=3`。裁剪场景用 `deploy/<场景>/docker-compose.yml`。
 
 ```bash
 npm run docker:up

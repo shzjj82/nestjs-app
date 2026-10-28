@@ -4,8 +4,9 @@ coverage
 .data
 .env
 .env.local
-# 最小部署的真实环境变量文件（模板 .env.recycle.example 需要提交，故只忽略这一个精确文件名）
-.env.recycle
+# 各发布场景的真实密钥（模板是 deploy/<场景>/.env.example，要提交）
+deploy/*/.env
+deploy/*/.env.local
 *.log
 .DS_Store
 .next

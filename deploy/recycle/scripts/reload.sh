@@ -4,12 +4,12 @@ set -euo pipefail
 # ============================================================================
 # 重新加载环境变量并重启回收服务。
 #
-#   ./scripts/recycle/reload.sh            # 重载全部 5 个服务
-#   ./scripts/recycle/reload.sh wechat     # 只重载 wechat
+#   ./deploy/recycle/scripts/reload.sh            # 重载全部 5 个服务
+#   ./deploy/recycle/scripts/reload.sh wechat     # 只重载 wechat
 #
 # 为什么不能只改文件就生效？
 #   PM2 在「启动进程的那一刻」把当时的环境变量快照进进程，之后进程内的
-#   process.env 就不再随外部文件变化。所以改完 .env.recycle 必须重建进程。
+#   process.env 就不再随外部文件变化。所以改完本目录 .env 必须重建进程。
 #
 # 为什么用 delete + start 而不是 restart --update-env？
 #   --update-env 依赖 PM2 daemon 自己的环境，而 daemon 往往是上一次
@@ -18,26 +18,19 @@ set -euo pipefail
 #   delete + start 会重新从当前 shell 捕获环境变量，行为确定。
 #
 # 变量优先级（从高到低）：
-#   1. 本脚本 export 的 .env.recycle          <- 改这个值这里
-#   2. PM2 配置 ecosystem.recycle.config.cjs 里写死的 env
-#   3. 应用启动时 dotenv 加载的项目根 .env    <- 注意它也存在，但不会覆盖上面两项
+#   1. 本脚本 export 的场景根目录 .env          <- 改这个值这里
+#   2. PM2 配置 ecosystem.config.cjs 里写死的 env
+#   3. 应用启动时 dotenv 加载的项目根 .env      <- 注意它也存在，但不会覆盖上面两项
 # ============================================================================
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-cd "$ROOT"
-
-# pm2 进程清单放项目专用目录：一是避免和其它项目的进程混在一起，
-# 二是 ~/.pm2 历史上被 sudo 跑过、属主变成 root 后当前用户写不进去。
-# 想用回默认目录就自己 export PM2_HOME=~/.pm2
-export PM2_HOME="${PM2_HOME:-$HOME/.pm2-nestjs}"
-
-ENV_FILE="${ENV_FILE:-.env.recycle}"
+# shellcheck source=_common.sh
+. "$(cd "$(dirname "$0")" && pwd)/_common.sh"
 
 if [[ -f "$ENV_FILE" ]]; then
   echo "加载环境变量: $ENV_FILE"
   set -a
   # shellcheck disable=SC1090
-  . "./$ENV_FILE"
+  . "$ENV_FILE"
   set +a
 else
   echo "未找到 $ENV_FILE，将只使用当前 shell 的环境变量" >&2
@@ -66,7 +59,7 @@ done
 pm2 delete /usercenter-/ >/dev/null 2>&1 || true
 # 等端口释放再起，否则 gateway 会撞 EADDRINUSE（旧进程还没完全退出）
 sleep 3
-pm2 start ecosystem.recycle.config.cjs --only "$(IFS=,; echo "${TARGETS[*]}")"
+pm2 start "$ECOSYSTEM" --only "$(IFS=,; echo "${TARGETS[*]}")"
 pm2 save
 
 echo

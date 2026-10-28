@@ -4,10 +4,10 @@ set -euo pipefail
 # ============================================================================
 # recycle 最小部署：一条命令拉起「回收业务」所需的全部服务并完成开通。
 #
-#   ./scripts/recycle/start.sh
-#   ./scripts/recycle/start.sh --force     # 即使环境已一致也重建
+#   ./deploy/recycle/scripts/start.sh
+#   ./deploy/recycle/scripts/start.sh --force     # 即使环境已一致也重建
 #
-# 与 scripts/pm2/start.sh 的区别 —— 只跑 5 个服务：
+# 与根目录 scripts/pm2/start.sh 的区别 —— 只跑 5 个服务：
 #   gateway / usercenter / upload / wechat / recycle
 # 不跑 order（回收订单在 recycle 自己的库）、docs、agents。
 # 因此编译时间约为全量的一半，内存占用也小得多。
@@ -16,7 +16,7 @@ set -euo pipefail
 #       → 若运行中进程已 online 且环境一致则跳过编译/拉起，但仍跑开通脚本
 #       → 否则：装依赖 → 编译 → pm2 拉起 → 开通 → 健康检查
 #
-# 环境变量见 .env.recycle.example（默认读取 .env.recycle）
+# 环境变量见 deploy/recycle/.env.example（默认读取场景根目录 .env）
 # 可选：
 #   SKIP_INFRA=1          基础设施已就绪，跳过连通性检查
 #   SKIP_BOOTSTRAP=1      只起服务，不跑开通脚本
@@ -24,11 +24,8 @@ set -euo pipefail
 #   FORCE=1 / --force     忽略「环境已一致」检测，强制重建
 # ============================================================================
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-cd "$ROOT"
-
-# 见 scripts/recycle/reload.sh 的说明：进程清单固定在项目专用目录
-export PM2_HOME="${PM2_HOME:-$HOME/.pm2-nestjs}"
+# shellcheck source=_common.sh
+. "$(cd "$(dirname "$0")" && pwd)/_common.sh"
 
 FORCE="${FORCE:-0}"
 for arg in "$@"; do
@@ -39,17 +36,15 @@ for arg in "$@"; do
   esac
 done
 
-ENV_FILE="${ENV_FILE:-.env.recycle}"
-
 if [[ -f "$ENV_FILE" ]]; then
   echo "加载环境变量: $ENV_FILE"
   set -a
   # shellcheck disable=SC1090
-  . "./$ENV_FILE"
+  . "$ENV_FILE"
   set +a
 else
   echo "未找到 $ENV_FILE，将使用环境变量与默认值" >&2
-  echo "  提示: cp .env.recycle.example .env.recycle" >&2
+  echo "  提示: cp deploy/recycle/.env.example deploy/recycle/.env" >&2
 fi
 
 MQTT_URL="${MQTT_URL:-mqtt://127.0.0.1:1883}"
@@ -119,7 +114,7 @@ if [[ "${SKIP_INFRA:-0}" != "1" ]]; then
     echo "  基础设施就绪"
   else
     echo
-    echo "基础设施未就绪。参考 docker-compose.yml 启动 postgres / redis / mosquitto，" >&2
+    echo "基础设施未就绪。参考 deploy/recycle/docker-compose.yml 启动 postgres / redis / mosquitto，" >&2
     echo "确认后加 SKIP_INFRA=1 跳过本检查。" >&2
     exit 1
   fi
@@ -130,7 +125,7 @@ echo "=== 准备数据库（按环境变量，缺则新建）==="
 echo "  usercenter -> $USERCENTER_DB"
 echo "  recycle    -> $RECYCLE_DB"
 echo "  wechat     -> $WECHAT_DB"
-node scripts/recycle/db-tool.cjs ensure --admin "$USERCENTER_DATABASE_URL" --dbs "$USERCENTER_DB,$RECYCLE_DB,$WECHAT_DB"
+node "$DB_TOOL" ensure --admin "$USERCENTER_DATABASE_URL" --dbs "$USERCENTER_DB,$RECYCLE_DB,$WECHAT_DB"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "未找到 node，请先安装 Node.js 18+" >&2
@@ -142,7 +137,7 @@ if ! command -v pm2 >/dev/null 2>&1; then
   npm install -g pm2
 fi
 
-# 运行中的进程已经 online，且注入的环境变量与当前 .env.recycle 一致 → 不重建进程
+# 运行中的进程已经 online，且注入的环境变量与当前场景 .env 一致 → 不重建进程
 # 开通脚本仍会跑（幂等），避免「服务在、业务白名单没写」
 SKIP_LAUNCH=0
 if [[ "$FORCE" != "1" ]]; then
@@ -249,7 +244,7 @@ done
 pm2 delete /usercenter-/ >/dev/null 2>&1 || true
 # 文件名必须含 .config.：pm2 只把这样的文件当配置文件解析，
 # 否则会把它当成普通脚本启动，结果只起 1 个名为文件名的进程
-pm2 start ecosystem.recycle.config.cjs
+pm2 start "$ECOSYSTEM"
 pm2 save
 
 echo
@@ -260,7 +255,7 @@ fi
 if [[ "${SKIP_BOOTSTRAP:-0}" != "1" ]]; then
   echo
   echo "=== 开通回收业务（登记业务 / 角色 / 小程序）==="
-  if ! npx ts-node -T -r tsconfig-paths/register scripts/recycle/bootstrap.ts; then
+  if ! npx ts-node -T -r tsconfig-paths/register "$BOOTSTRAP"; then
     echo
     echo "开通失败。确认 MQTT 与 usercenter 已起来后重跑：" >&2
     echo "  npm run recycle:bootstrap" >&2
@@ -297,4 +292,4 @@ echo
 echo "MQTT_URL=${MQTT_URL}"
 echo "网关: http://127.0.0.1:${PORT}"
 echo "查看日志: pm2 logs"
-echo "重新开通: npx ts-node -T -r tsconfig-paths/register scripts/recycle/bootstrap.ts"
+echo "重新开通: npm run recycle:bootstrap"

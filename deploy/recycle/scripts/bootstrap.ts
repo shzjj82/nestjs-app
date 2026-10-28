@@ -20,7 +20,7 @@
  *   - **只做最小集**：不含 teams / orders / docs / agents 相关接口，
  *     因为最小部署不跑 order / docs / agents 三个服务，开了也调不通。
  *
- * 环境变量（见 .env.recycle.example）：
+ * 环境变量（见 deploy/recycle/.env.example）：
  *   必填
  *     MQTT_URL                      MQTT 地址，如 mqtt://127.0.0.1:1883
  *     WECHAT_APP_ID                 小程序 appId（同时写进接入端的 wechatAppId）
@@ -38,7 +38,7 @@
  *     RECYCLE_BOOTSTRAP_DRY_RUN     设为 1 只打印计划、不落库
  *
  * 用法：
- *   npx ts-node -r tsconfig-paths/register scripts/recycle/bootstrap.ts
+ *   npx ts-node -r tsconfig-paths/register deploy/recycle/scripts/bootstrap.ts
  *
  * 幂等性说明：脚本靠 code 唯一 + 409 判定已存在，因此可以在任何时刻重跑；
  * 升级网关路由后重跑即可把新接口补进白名单。
@@ -119,7 +119,7 @@ function env(key: string, fallback?: string): string | undefined {
 function requiredEnv(key: string): string {
   const value = env(key);
   if (!value) {
-    throw new Error(`缺少必填环境变量 ${key}，请参考 .env.recycle.example 配置`);
+    throw new Error(`缺少必填环境变量 ${key}，请参考 deploy/recycle/.env.example 配置`);
   }
   return value;
 }

@@ -10,9 +10,9 @@
  *   本工具负责把那套库建出来 / 清掉重建 / 打印状态，不碰业务代码。
  *
  * 用法：
- *   node scripts/recycle/db-tool.cjs ensure --admin <url> --dbs a,b,c
- *   node scripts/recycle/db-tool.cjs reset  --admin <url> --dbs a,b,c
- *   node scripts/recycle/db-tool.cjs report --urls "main=<url>,recycle=<url>,wechat=<url>"
+ *   node deploy/recycle/db/tool.cjs ensure --admin <url> --dbs a,b,c
+ *   node deploy/recycle/db/tool.cjs reset  --admin <url> --dbs a,b,c
+ *   node deploy/recycle/db/tool.cjs report --urls "main=<url>,recycle=<url>,wechat=<url>"
  *
  * --admin 是「管理连接」，用来执行 CREATE/DROP DATABASE；填任意一个能连上的库
  * （脚本自己会换成 postgres 库），账号需要有 CREATEDB 权限。
@@ -258,7 +258,7 @@ async function main() {
 
   if (command === 'reportenv') {
     // 从 env 文件读连接串，缺失的按 env.ts 的规则推导，然后出报表
-    const file = args.file || '.env.recycle';
+    const file = args.file || 'deploy/recycle/.env';
     const values = readEnvKeys(file, [
       'USERCENTER_DATABASE_URL',
       'DATABASE_URL',

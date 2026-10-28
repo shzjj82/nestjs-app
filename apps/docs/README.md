@@ -46,9 +46,9 @@ src/
 ## 本地
 
 ```bash
-npm run start:docs
+nest start docs --watch
 # 另开终端
-npm run start:gateway
+nest start gateway --watch
 ```
 
 ```bash

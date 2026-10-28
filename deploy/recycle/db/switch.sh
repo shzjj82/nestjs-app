@@ -4,12 +4,12 @@ set -euo pipefail
 # ============================================================================
 # 切换到「另一套数据库」来验证回收服务。
 #
-#   ./scripts/recycle/switch-db.sh                 # 切到 *_v2（默认后缀）
-#   ./scripts/recycle/switch-db.sh v3              # 切到 *_v3
-#   ./scripts/recycle/switch-db.sh v2 --reset      # 先删掉 *_v2 再重建（真·从零）
-#   ./scripts/recycle/switch-db.sh v2 --reload     # 切完顺便重载服务
-#   ./scripts/recycle/switch-db.sh v2 --reload --bootstrap
-#   ./scripts/recycle/switch-db.sh base            # 切回原始库名（不加后缀）
+#   ./deploy/recycle/db/switch.sh                 # 切到 *_v2（默认后缀）
+#   ./deploy/recycle/db/switch.sh v3              # 切到 *_v3
+#   ./deploy/recycle/db/switch.sh v2 --reset      # 先删掉 *_v2 再重建（真·从零）
+#   ./deploy/recycle/db/switch.sh v2 --reload     # 切完顺便重载服务
+#   ./deploy/recycle/db/switch.sh v2 --reload --bootstrap
+#   ./deploy/recycle/db/switch.sh base            # 切回原始库名（不加后缀）
 #
 # 为什么要切库：
 #   当前库里已经跑过一轮，留着订单 / 审批 / 目录种子等数据。再验证一遍时
@@ -25,11 +25,8 @@ set -euo pipefail
 #             usercenter 不会，所以主库由本脚本先建好。
 # ============================================================================
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-cd "$ROOT"
-
-ENV_FILE="${ENV_FILE:-.env.recycle}"
-TOOL="scripts/recycle/db-tool.cjs"
+# shellcheck source=../scripts/_common.sh
+. "$(cd "$(dirname "$0")/../scripts" && pwd)/_common.sh"
 
 SUFFIX="v2"
 RESET=0
@@ -65,7 +62,7 @@ echo "env 文件: $ENV_FILE"
 echo "库名后缀: ${SUFFIX:-（无，使用原始库名）}"
 
 # ---------- 取当前连接串，据此推导目标库 ----------
-CURRENT_URL="$(node "$TOOL" readenv --file "$ENV_FILE" --keys USERCENTER_DATABASE_URL,DATABASE_URL \
+CURRENT_URL="$(node "$DB_TOOL" readenv --file "$ENV_FILE" --keys USERCENTER_DATABASE_URL,DATABASE_URL \
   | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const v=JSON.parse(d);console.log(v.USERCENTER_DATABASE_URL||v.DATABASE_URL||"")})')"
 
 if [[ -z "$CURRENT_URL" ]]; then
@@ -98,26 +95,26 @@ WECHAT_DB="${WECHAT_URL##*/}"
 echo
 echo "=== 准备数据库 ==="
 if [[ "$RESET" == "1" ]]; then
-  node "$TOOL" reset --admin "$CURRENT_URL" --dbs "$MAIN_DB,$RECYCLE_DB,$WECHAT_DB"
+  node "$DB_TOOL" reset --admin "$CURRENT_URL" --dbs "$MAIN_DB,$RECYCLE_DB,$WECHAT_DB"
 else
-  node "$TOOL" ensure --admin "$CURRENT_URL" --dbs "$MAIN_DB,$RECYCLE_DB,$WECHAT_DB"
+  node "$DB_TOOL" ensure --admin "$CURRENT_URL" --dbs "$MAIN_DB,$RECYCLE_DB,$WECHAT_DB"
 fi
 
 # ---------- 写回 env ----------
 echo
 echo "=== 写入 $ENV_FILE ==="
-node "$TOOL" writeenv --file "$ENV_FILE" \
+node "$DB_TOOL" writeenv --file "$ENV_FILE" \
   --set "USERCENTER_DATABASE_URL=$MAIN_URL,RECYCLE_DATABASE_URL=$RECYCLE_URL,WECHAT_DATABASE_URL=$WECHAT_URL"
 
 # ---------- 现状 ----------
 echo
-node "$TOOL" report --urls "main=$MAIN_URL,recycle=$RECYCLE_URL,wechat=$WECHAT_URL"
+node "$DB_TOOL" report --urls "main=$MAIN_URL,recycle=$RECYCLE_URL,wechat=$WECHAT_URL"
 
 # ---------- 后续动作 ----------
 echo
 if [[ "$RELOAD" == "1" ]]; then
   echo "=== 重载服务 ==="
-  ENV_FILE="$ENV_FILE" bash scripts/recycle/reload.sh
+  ENV_FILE="$ENV_FILE" bash "$RELOAD_SH"
 else
   echo "接下来执行："
   echo "  npm run recycle:reload"
@@ -128,13 +125,13 @@ if [[ "$BOOTSTRAP" == "1" ]]; then
   echo "=== 重新开通业务（新库里没有业务登记，必须跑一次）==="
   set -a
   # shellcheck disable=SC1090
-  . "./$ENV_FILE"
+  . "$ENV_FILE"
   set +a
-  npx ts-node -T -r tsconfig-paths/register scripts/recycle/bootstrap.ts
+  npx ts-node -T -r tsconfig-paths/register "$BOOTSTRAP"
 elif [[ "$RELOAD" == "1" ]]; then
   echo
   echo "⚠️  新库里没有业务登记与小程序配置，别忘了跑："
-  echo "    set -a && . ./.env.recycle && set +a && npm run recycle:bootstrap"
+  echo "    set -a && . ./deploy/recycle/.env && set +a && npm run recycle:bootstrap"
 fi
 
 echo
