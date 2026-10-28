@@ -4,8 +4,12 @@ coverage
 .data
 .env
 .env.local
+# 最小部署的真实环境变量文件（模板 .env.recycle.example 需要提交，故只忽略这一个精确文件名）
+.env.recycle
 *.log
 .DS_Store
 .next
 web/admin/.next
 web/admin/node_modules
+.cursor
+.workbuddy
