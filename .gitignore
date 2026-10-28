@@ -11,3 +11,5 @@ coverage
 .next
 web/admin/.next
 web/admin/node_modules
+.cursor
+.workbuddy
