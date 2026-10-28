@@ -1,3 +1,7 @@
+/**
+ * 全量部署：gateway / usercenter / order / docs / upload / wechat / recycle / agents。
+ * 裁剪场景（只跑其中一部分）放在 deploy/<场景>/ecosystem.config.cjs，不要在根目录再加一份。
+ */
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://127.0.0.1:1883';
 const gatewayPort = process.env.PORT ?? '3000';
 

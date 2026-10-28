@@ -3,10 +3,10 @@ set -euo pipefail
 
 # 默认先用 Docker 拉起 postgres / redis / mosquitto，再用 PM2 跑业务进程。
 # 用法：
-#   ./scripts/pm2-start.sh              # 启动全部（gateway + usercenter + order + docs x3 + upload + wechat + agents x3）
-#   ./scripts/pm2-start.sh gateway      # 只启动网关
-#   ./scripts/pm2-start.sh apps         # 只启动 usercenter + order + docs + upload + wechat + agents
-#   SKIP_INFRA=1 ./scripts/pm2-start.sh # 跳过 Docker，使用本机已有数据库
+#   ./scripts/pm2/start.sh              # 启动全部（gateway + usercenter + order + docs x3 + upload + wechat + agents x3）
+#   ./scripts/pm2/start.sh gateway      # 只启动网关
+#   ./scripts/pm2/start.sh apps         # 只启动 usercenter + order + docs + upload + wechat + agents
+#   SKIP_INFRA=1 ./scripts/pm2/start.sh # 跳过 Docker，使用本机已有数据库
 # 环境变量：
 #   MQTT_URL=mqtt://127.0.0.1:1883
 #   DATABASE_URL=postgres://nestjs:nestjs@127.0.0.1:5432/nestjs
@@ -16,7 +16,7 @@ set -euo pipefail
 #   DOCS_REPLICAS=1
 #   AGENTS_REPLICAS=1
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 SCOPE="${1:-all}"
@@ -118,5 +118,5 @@ echo "MQTT_URL=${MQTT_URL}"
 echo "DATABASE_URL=${DATABASE_URL}"
 echo "REDIS_URL=${REDIS_URL}"
 echo "网关: http://127.0.0.1:${PORT}"
-echo "查看日志: npm run pm2:logs"
+echo "查看日志: pm2 logs"
 echo "开机自启: pm2 startup && pm2 save"

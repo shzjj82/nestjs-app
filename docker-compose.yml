@@ -1,8 +1,10 @@
+# 全量开发/全量部署。裁剪场景的 compose 在 deploy/<场景>/docker-compose.yml。
 x-app-env: &app-env
   MQTT_URL: mqtt://mosquitto:1883
   DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/${POSTGRES_DB:-nestjs}
   DOCS_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/docs
   WECHAT_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/wechat
+  RECYCLE_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/recycle
   REDIS_URL: redis://redis:6379
   UPLOAD_API_KEY: ${UPLOAD_API_KEY:-dev-upload-key}
   DOCS_SERVICE_KEY: ${DOCS_SERVICE_KEY:-dev-docs-key}
@@ -143,6 +145,19 @@ services:
       WECHAT_APP_ID: ${WECHAT_APP_ID:-}
       WECHAT_SECRET: ${WECHAT_SECRET:-}
       WECHAT_MP_CODE: ${WECHAT_MP_CODE:-wechat}
+    depends_on: *app-depends
+
+  recycle:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        APP_NAME: recycle
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      INSTANCE_ID: recycle-1
+      RECYCLE_INTERNAL_KEY: ${RECYCLE_INTERNAL_KEY:-dev-recycle-internal-key}
     depends_on: *app-depends
 
   agents:

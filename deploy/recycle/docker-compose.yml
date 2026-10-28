@@ -1,0 +1,157 @@
+# recycle 最小部署：gateway / usercenter / upload / wechat / recycle
+# 不跑 order / docs / agents。镜像与 Dockerfile 仍用仓库根的 docker/。
+#
+#   npm run recycle:docker:up
+#   docker compose -f deploy/recycle/docker-compose.yml --project-name nestjs-recycle up --build
+#
+# 容器内 MQTT/DB/Redis 走 compose 服务名；密钥从本目录 .env 注入。
+# 本机 127.0.0.1 的连接串只给 PM2 用，不要原样传进容器。
+
+x-app-env: &app-env
+  MQTT_URL: mqtt://mosquitto:1883
+  DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/${POSTGRES_DB:-nestjs}
+  WECHAT_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/wechat
+  RECYCLE_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/recycle
+  REDIS_URL: redis://redis:6379
+  APP_VERSION: ${APP_VERSION:-0.0.1}
+  EXPECTED_APP_VERSION: ${EXPECTED_APP_VERSION:-${APP_VERSION:-0.0.1}}
+  CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3100,http://127.0.0.1:3100}
+
+x-app-depends: &app-depends
+  mosquitto:
+    condition: service_started
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+
+x-build: &app-build
+  context: ../..
+  dockerfile: ../../docker/Dockerfile
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ../../docker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nestjs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nestjs}
+      POSTGRES_DB: ${POSTGRES_DB:-nestjs}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../docker/postgres-init/02-create-wechat.sh:/docker-entrypoint-initdb.d/02-create-wechat.sh:ro
+      - ../../docker/postgres-init/06-create-recycle.sh:/docker-entrypoint-initdb.d/06-create-recycle.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nestjs} -d ${POSTGRES_DB:-nestjs}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  gateway:
+    build:
+      <<: *app-build
+      args:
+        APP_NAME: gateway
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file: .env
+    environment:
+      <<: *app-env
+      PORT: 3000
+      MQTT_TIMEOUT_MS: 5000
+      UPLOAD_API_KEY: ${UPLOAD_API_KEY:-dev-upload-key}
+    depends_on: *app-depends
+
+  usercenter:
+    build:
+      <<: *app-build
+      args:
+        APP_NAME: usercenter
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+      SEED_APP_CODE: ${SEED_APP_CODE:-web}
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin123}
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_MP_CODE: ${WECHAT_MP_CODE:-recycle}
+    depends_on: *app-depends
+
+  upload:
+    build:
+      <<: *app-build
+      args:
+        APP_NAME: upload
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+      INSTANCE_ID: upload
+      UPLOAD_API_KEY: ${UPLOAD_API_KEY:-dev-upload-key}
+      UPLOAD_DRIVER: ${UPLOAD_DRIVER:-oss}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:-}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:-}
+      OSS_BUCKET: ${OSS_BUCKET:-}
+      OSS_REGION: ${OSS_REGION:-oss-cn-shanghai}
+      UPLOAD_PUBLIC_BASE: ${UPLOAD_PUBLIC_BASE:-}
+    depends_on: *app-depends
+
+  wechat:
+    build:
+      <<: *app-build
+      args:
+        APP_NAME: wechat
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+      INSTANCE_ID: wechat
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_SECRET: ${WECHAT_SECRET:-}
+      WECHAT_MP_CODE: ${WECHAT_MP_CODE:-recycle}
+      WECHAT_MP_NAME: ${WECHAT_MP_NAME:-墨盒回收}
+      WECHAT_QRCODE_CHECK_PATH: ${WECHAT_QRCODE_CHECK_PATH:-false}
+    depends_on: *app-depends
+
+  recycle:
+    build:
+      <<: *app-build
+      args:
+        APP_NAME: recycle
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+      INSTANCE_ID: recycle
+      RECYCLE_INTERNAL_KEY: ${RECYCLE_INTERNAL_KEY:-dev-recycle-internal-key}
+    depends_on: *app-depends
+
+volumes:
+  postgres_data:
+  redis_data:
