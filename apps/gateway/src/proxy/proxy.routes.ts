@@ -32,6 +32,8 @@ export const PROXY_HTTP_PATHS: RouteInfo[] = [
   { path: 'agents/{*path}', method: RequestMethod.ALL },
   { path: 'recycle', method: RequestMethod.ALL },
   { path: 'recycle/{*path}', method: RequestMethod.ALL },
+  { path: 'medical', method: RequestMethod.ALL },
+  { path: 'medical/{*path}', method: RequestMethod.ALL },
 ];
 
 export function requestPathname(req: { path?: string; url: string }): string {

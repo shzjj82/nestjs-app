@@ -3,6 +3,7 @@ import { ClientProxy } from '@nestjs/microservices';
 import {
   AGENTS_CLIENT,
   DOCS_CLIENT,
+  MEDICAL_CLIENT,
   ORDER_CLIENT,
   RECYCLE_CLIENT,
   UPLOAD_CLIENT,
@@ -23,6 +24,7 @@ export class ClientHub {
     @Inject(WECHAT_CLIENT) wechatClient: ClientProxy,
     @Inject(AGENTS_CLIENT) agentsClient: ClientProxy,
     @Inject(RECYCLE_CLIENT) recycleClient: ClientProxy,
+    @Inject(MEDICAL_CLIENT) medicalClient: ClientProxy,
     private readonly mqtt: MqttProxy,
   ) {
     this.clients = {
@@ -33,6 +35,7 @@ export class ClientHub {
       [WECHAT_CLIENT]: wechatClient,
       [AGENTS_CLIENT]: agentsClient,
       [RECYCLE_CLIENT]: recycleClient,
+      [MEDICAL_CLIENT]: medicalClient,
     };
   }
 

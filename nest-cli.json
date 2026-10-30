@@ -91,6 +91,15 @@
         "tsConfigPath": "apps/recycle/tsconfig.app.json"
       }
     },
+    "medical": {
+      "type": "application",
+      "root": "apps/medical",
+      "entryFile": "main",
+      "sourceRoot": "apps/medical/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/medical/tsconfig.app.json"
+      }
+    },
     "common": {
       "type": "library",
       "root": "libs/common",

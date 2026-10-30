@@ -82,17 +82,12 @@ export function docsDatabaseUrl(): string {
 
 /** recycle 默认独立库 `recycle`；可用 RECYCLE_DATABASE_URL 覆盖 */
 export function recycleDatabaseUrl(): string {
-  if (process.env.RECYCLE_DATABASE_URL) {
-    return process.env.RECYCLE_DATABASE_URL;
-  }
-  const shared = databaseUrl();
-  try {
-    const parsed = new URL(shared);
-    parsed.pathname = '/recycle';
-    return parsed.toString();
-  } catch {
-    return shared.replace(/\/[^/?]+(\?|$)/, '/recycle$1');
-  }
+  return namedDatabaseUrl('RECYCLE_DATABASE_URL', 'recycle');
+}
+
+/** medical 默认独立库 `medical`；可用 MEDICAL_DATABASE_URL 覆盖 */
+export function medicalDatabaseUrl(): string {
+  return namedDatabaseUrl('MEDICAL_DATABASE_URL', 'medical');
 }
 
 /** 回收服务内部事件密钥；跨上下文事件必须携带，防止伪造 */

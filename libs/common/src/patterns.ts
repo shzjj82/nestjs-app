@@ -5,6 +5,7 @@ export const UPLOAD_CLIENT = 'UPLOAD_CLIENT';
 export const WECHAT_CLIENT = 'WECHAT_CLIENT';
 export const AGENTS_CLIENT = 'AGENTS_CLIENT';
 export const RECYCLE_CLIENT = 'RECYCLE_CLIENT';
+export const MEDICAL_CLIENT = 'MEDICAL_CLIENT';
 
 export const MQTT_GROUPS = {
   USERCENTER: 'usercenter',
@@ -14,6 +15,7 @@ export const MQTT_GROUPS = {
   WECHAT: 'wechat',
   AGENTS: 'agents',
   RECYCLE: 'recycle',
+  MEDICAL: 'medical',
 } as const;
 
 export const MQTT_PATTERNS = {
@@ -189,6 +191,45 @@ export const MQTT_PATTERNS = {
   RECYCLE_EVT_APPROVAL_REQUESTED: 'recycle.evt.approval.requested',
   /** 内部事件：审批 → 订单（不注册到网关） */
   RECYCLE_EVT_APPROVAL_DECIDED: 'recycle.evt.approval.decided',
+  MEDICAL_HEALTH: 'medical.health',
+  MEDICAL_API_DOCS: 'medical.apiDocs',
+  MEDICAL_AUTH_LOGIN: 'medical.auth.login',
+  MEDICAL_AUTH_ME: 'medical.auth.me',
+  MEDICAL_DASHBOARD: 'medical.dashboard',
+  MEDICAL_PATIENT_LIST: 'medical.patient.list',
+  MEDICAL_PATIENT_FACETS: 'medical.patient.facets',
+  MEDICAL_PATIENT_DUPLICATES: 'medical.patient.duplicates',
+  MEDICAL_PATIENT_MERGE: 'medical.patient.merge',
+  MEDICAL_PATIENT_UPDATE: 'medical.patient.update',
+  MEDICAL_PATIENT_DETAIL: 'medical.patient.detail',
+  MEDICAL_PATIENT_SYNC: 'medical.patient.sync',
+  MEDICAL_VISIT_LIST: 'medical.visit.list',
+  MEDICAL_VISIT_SYNC: 'medical.visit.sync',
+  MEDICAL_VISIT_REVIEW: 'medical.visit.review',
+  MEDICAL_CASE_LIST: 'medical.case.list',
+  MEDICAL_CASE_DETAIL: 'medical.case.detail',
+  MEDICAL_CASE_CREATE: 'medical.case.create',
+  MEDICAL_CASE_UPDATE: 'medical.case.update',
+  MEDICAL_CASE_ADD_VISIT: 'medical.case.addVisit',
+  MEDICAL_CASE_ARCHIVE: 'medical.case.archive',
+  MEDICAL_KNOWLEDGE_EXTERNAL: 'medical.knowledge.external',
+  MEDICAL_KNOWLEDGE_EXTERNAL_SYNC: 'medical.knowledge.external.sync',
+  MEDICAL_KNOWLEDGE_INTERNAL: 'medical.knowledge.internal',
+  MEDICAL_KNOWLEDGE_INTERNAL_SYNC: 'medical.knowledge.internal.sync',
+  MEDICAL_AI_STATUS: 'medical.ai.status',
+  MEDICAL_AI_CHAT: 'medical.ai.chat',
+  MEDICAL_AI_ADVISE: 'medical.ai.advise',
+  MEDICAL_AI_PARSE: 'medical.ai.parse',
+  MEDICAL_AI_EXTRACT: 'medical.ai.extract',
+  MEDICAL_AI_COMPARE: 'medical.ai.compare',
+  MEDICAL_AI_SUMMARY: 'medical.ai.summary',
+  MEDICAL_AI_INTAKE_AUDIO: 'medical.ai.intakeAudio',
+  MEDICAL_SKILL_LIST: 'medical.skill.list',
+  MEDICAL_SKILL_TRIGGERS: 'medical.skill.triggers',
+  MEDICAL_SKILL_RUN: 'medical.skill.run',
+  MEDICAL_SKILL_CHAT: 'medical.skill.chat',
+  MEDICAL_SKILL_FOLLOWUP: 'medical.skill.followup',
+  MEDICAL_FILE_TONGUE: 'medical.file.tongue',
 } as const;
 
 export function sharePattern(group: string, pattern: string): string {

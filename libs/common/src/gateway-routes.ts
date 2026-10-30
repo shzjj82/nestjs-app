@@ -1,6 +1,7 @@
 import {
   AGENTS_CLIENT,
   DOCS_CLIENT,
+  MEDICAL_CLIENT,
   MQTT_PATTERNS,
   ORDER_CLIENT,
   RECYCLE_CLIENT,
@@ -200,7 +201,66 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'POST', path: '/agents/chat', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CHAT, auth: ['jwt'], override: true }),
   business({ method: 'POST', path: '/agents/rag/search', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_RAG_SEARCH, auth: ['jwt'] }),
   business({ method: 'POST', path: '/agents/vision', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_VISION_PARSE, auth: ['jwt'], override: true }),
+
+  ...medicalRoutes(),
 ];
+
+/**
+ * 中医诊所：诊所 token 在 medical 内校验，网关只要求 X-Biz-Code: medical。
+ * 登录不走 usercenter JWT，避免 TCM 前端必须先拿平台会话。
+ */
+function medicalRoutes(): GatewayRoute[] {
+  const medical = (route: Omit<RouteInput, 'client'>): GatewayRoute =>
+    business({ ...route, client: MEDICAL_CLIENT });
+  return [
+    { method: 'GET', path: '/medical/health', client: MEDICAL_CLIENT, pattern: MQTT_PATTERNS.MEDICAL_HEALTH },
+    medical({ method: 'POST', path: '/medical/auth/login', pattern: MQTT_PATTERNS.MEDICAL_AUTH_LOGIN }),
+    medical({ method: 'GET', path: '/medical/auth/me', pattern: MQTT_PATTERNS.MEDICAL_AUTH_ME }),
+    medical({ method: 'GET', path: '/medical/dashboard', pattern: MQTT_PATTERNS.MEDICAL_DASHBOARD }),
+
+    medical({ method: 'GET', path: '/medical/patients/facets', pattern: MQTT_PATTERNS.MEDICAL_PATIENT_FACETS }),
+    medical({ method: 'GET', path: '/medical/patients/duplicates', pattern: MQTT_PATTERNS.MEDICAL_PATIENT_DUPLICATES }),
+    medical({ method: 'POST', path: '/medical/patients/merge', pattern: MQTT_PATTERNS.MEDICAL_PATIENT_MERGE }),
+    medical({ method: 'POST', path: '/medical/patients/sync', pattern: MQTT_PATTERNS.MEDICAL_PATIENT_SYNC }),
+    medical({ method: 'GET', path: '/medical/patients', pattern: MQTT_PATTERNS.MEDICAL_PATIENT_LIST }),
+    medical({ method: 'PATCH', path: '/medical/patients/:key', pattern: MQTT_PATTERNS.MEDICAL_PATIENT_UPDATE }),
+    medical({ method: 'GET', path: '/medical/patients/:key', pattern: MQTT_PATTERNS.MEDICAL_PATIENT_DETAIL }),
+
+    medical({ method: 'POST', path: '/medical/visits/sync', pattern: MQTT_PATTERNS.MEDICAL_VISIT_SYNC }),
+    medical({ method: 'GET', path: '/medical/visits', pattern: MQTT_PATTERNS.MEDICAL_VISIT_LIST }),
+    medical({ method: 'PATCH', path: '/medical/visits/:externalId/review', pattern: MQTT_PATTERNS.MEDICAL_VISIT_REVIEW }),
+
+    medical({ method: 'GET', path: '/medical/cases', pattern: MQTT_PATTERNS.MEDICAL_CASE_LIST }),
+    medical({ method: 'POST', path: '/medical/cases', pattern: MQTT_PATTERNS.MEDICAL_CASE_CREATE }),
+    medical({ method: 'POST', path: '/medical/cases/:key/visits', pattern: MQTT_PATTERNS.MEDICAL_CASE_ADD_VISIT }),
+    medical({ method: 'POST', path: '/medical/cases/:key/archive', pattern: MQTT_PATTERNS.MEDICAL_CASE_ARCHIVE }),
+    medical({ method: 'GET', path: '/medical/cases/:key', pattern: MQTT_PATTERNS.MEDICAL_CASE_DETAIL }),
+    medical({ method: 'PATCH', path: '/medical/cases/:key', pattern: MQTT_PATTERNS.MEDICAL_CASE_UPDATE }),
+
+    medical({ method: 'GET', path: '/medical/knowledge/external', pattern: MQTT_PATTERNS.MEDICAL_KNOWLEDGE_EXTERNAL }),
+    medical({ method: 'POST', path: '/medical/knowledge/external/sync', pattern: MQTT_PATTERNS.MEDICAL_KNOWLEDGE_EXTERNAL_SYNC }),
+    medical({ method: 'GET', path: '/medical/knowledge/internal', pattern: MQTT_PATTERNS.MEDICAL_KNOWLEDGE_INTERNAL }),
+    medical({ method: 'POST', path: '/medical/knowledge/internal/sync', pattern: MQTT_PATTERNS.MEDICAL_KNOWLEDGE_INTERNAL_SYNC }),
+
+    medical({ method: 'GET', path: '/medical/ai/status', pattern: MQTT_PATTERNS.MEDICAL_AI_STATUS }),
+    medical({ method: 'POST', path: '/medical/ai/chat', pattern: MQTT_PATTERNS.MEDICAL_AI_CHAT }),
+    medical({ method: 'POST', path: '/medical/ai/advise', pattern: MQTT_PATTERNS.MEDICAL_AI_ADVISE }),
+    medical({ method: 'GET', path: '/medical/ai/advise', pattern: MQTT_PATTERNS.MEDICAL_AI_ADVISE }),
+    medical({ method: 'POST', path: '/medical/ai/parse', pattern: MQTT_PATTERNS.MEDICAL_AI_PARSE }),
+    medical({ method: 'POST', path: '/medical/ai/extract', pattern: MQTT_PATTERNS.MEDICAL_AI_EXTRACT }),
+    medical({ method: 'POST', path: '/medical/ai/compare', pattern: MQTT_PATTERNS.MEDICAL_AI_COMPARE }),
+    medical({ method: 'POST', path: '/medical/ai/summary', pattern: MQTT_PATTERNS.MEDICAL_AI_SUMMARY }),
+    medical({ method: 'POST', path: '/medical/ai/intake-audio', pattern: MQTT_PATTERNS.MEDICAL_AI_INTAKE_AUDIO }),
+
+    medical({ method: 'GET', path: '/medical/skills', pattern: MQTT_PATTERNS.MEDICAL_SKILL_LIST }),
+    medical({ method: 'GET', path: '/medical/skills/triggers', pattern: MQTT_PATTERNS.MEDICAL_SKILL_TRIGGERS }),
+    medical({ method: 'POST', path: '/medical/skills/run', pattern: MQTT_PATTERNS.MEDICAL_SKILL_RUN }),
+    medical({ method: 'POST', path: '/medical/skills/chat', pattern: MQTT_PATTERNS.MEDICAL_SKILL_CHAT }),
+    medical({ method: 'POST', path: '/medical/skills/followup', pattern: MQTT_PATTERNS.MEDICAL_SKILL_FOLLOWUP }),
+
+    medical({ method: 'POST', path: '/medical/files/tongue', pattern: MQTT_PATTERNS.MEDICAL_FILE_TONGUE }),
+  ];
+}
 
 function docsContentRoutes(prefix: '/docs/documents'): GatewayRoute[] {
   const auth: GatewayAuth[] = ['jwt', 'docs-key'];
@@ -232,6 +292,7 @@ export const SERVICE_API_DOCS: Array<{ client: string; service: string; pattern:
   { client: WECHAT_CLIENT, service: 'wechat', pattern: MQTT_PATTERNS.WECHAT_API_DOCS },
   { client: AGENTS_CLIENT, service: 'agents', pattern: MQTT_PATTERNS.AGENTS_API_DOCS },
   { client: RECYCLE_CLIENT, service: 'recycle', pattern: MQTT_PATTERNS.RECYCLE_API_DOCS },
+  { client: MEDICAL_CLIENT, service: 'medical', pattern: MQTT_PATTERNS.MEDICAL_API_DOCS },
 ];
 
 export interface BizApiCatalogItem {

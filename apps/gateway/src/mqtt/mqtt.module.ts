@@ -3,6 +3,7 @@ import { ClientProxy, ClientsModule } from '@nestjs/microservices';
 import {
   AGENTS_CLIENT,
   DOCS_CLIENT,
+  MEDICAL_CLIENT,
   mqttClientOptions,
   ORDER_CLIENT,
   RECYCLE_CLIENT,
@@ -44,6 +45,10 @@ import { MqttProxy } from './mqtt.proxy';
         name: RECYCLE_CLIENT,
         ...mqttClientOptions('gateway-recycle'),
       },
+      {
+        name: MEDICAL_CLIENT,
+        ...mqttClientOptions('gateway-medical'),
+      },
     ]),
   ],
   providers: [MqttProxy, ClientHub],
@@ -58,6 +63,7 @@ export class MqttModule implements OnModuleInit {
     @Inject(WECHAT_CLIENT) private readonly wechatClient: ClientProxy,
     @Inject(AGENTS_CLIENT) private readonly agentsClient: ClientProxy,
     @Inject(RECYCLE_CLIENT) private readonly recycleClient: ClientProxy,
+    @Inject(MEDICAL_CLIENT) private readonly medicalClient: ClientProxy,
   ) {}
 
   async onModuleInit() {
@@ -69,6 +75,7 @@ export class MqttModule implements OnModuleInit {
       this.wechatClient.connect(),
       this.agentsClient.connect(),
       this.recycleClient.connect(),
+      this.medicalClient.connect(),
     ]);
   }
 }

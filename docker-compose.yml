@@ -5,6 +5,7 @@ x-app-env: &app-env
   DOCS_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/docs
   WECHAT_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/wechat
   RECYCLE_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/recycle
+  MEDICAL_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/medical
   REDIS_URL: redis://redis:6379
   UPLOAD_API_KEY: ${UPLOAD_API_KEY:-dev-upload-key}
   DOCS_SERVICE_KEY: ${DOCS_SERVICE_KEY:-dev-docs-key}
@@ -158,6 +159,26 @@ services:
       <<: *app-env
       INSTANCE_ID: recycle-1
       RECYCLE_INTERNAL_KEY: ${RECYCLE_INTERNAL_KEY:-dev-recycle-internal-key}
+    depends_on: *app-depends
+
+  medical:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        APP_NAME: medical
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      INSTANCE_ID: medical-1
+      TYPEORM_SYNC: ${TYPEORM_SYNC:-true}
+      AUTH_BOOTSTRAP_PASSWORD: ${AUTH_BOOTSTRAP_PASSWORD:-tcm123456}
+      AUTH_SECRET: ${AUTH_SECRET:-tcm-dev-auth-secret-change-me}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      LLM_MODEL: ${LLM_MODEL:-qwen-plus}
+      LLM_REASONER_MODEL: ${LLM_REASONER_MODEL:-}
+      TCM_SKILLS_DIR: ${TCM_SKILLS_DIR:-}
     depends_on: *app-depends
 
   agents:

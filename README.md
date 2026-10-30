@@ -41,7 +41,7 @@ npm run start:admin
 适合 1 核小机器，进程比 Docker 更省内存。Linux 用 `sudo`，macOS 直接跑。
 
 ```bash
-chmod +x scripts/infra/*.sh scripts/pm2/*.sh deploy/recycle/scripts/*.sh deploy/recycle/db/*.sh
+chmod +x scripts/infra/*.sh scripts/pm2/*.sh deploy/recycle/scripts/*.sh deploy/recycle/db/*.sh deploy/medical/scripts/*.sh deploy/medical/db/*.sh
 
 # 1. 安装 PostgreSQL + Redis
 sudo ./scripts/infra/install-db.sh
@@ -68,6 +68,14 @@ MQTT_URL=mqtt://127.0.0.1:1883 PORT=3000 bash scripts/pm2/start.sh gateway
 cp deploy/recycle/.env.example deploy/recycle/.env   # 填密钥
 npm run recycle:start            # 本机 PM2
 # 或 npm run recycle:docker:up   # 容器
+```
+
+中医诊所最小部署（`gateway` / `usercenter` / `upload` / `medical`）：
+
+```bash
+cp deploy/medical/.env.example deploy/medical/.env   # 填密钥
+npm run medical:start            # 本机 PM2
+# 或 npm run medical:docker:up   # 容器
 ```
 
 脚本默认只监听本机。如需远程连接：

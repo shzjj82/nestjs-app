@@ -1,5 +1,5 @@
 /**
- * 全量部署：gateway / usercenter / order / docs / upload / wechat / recycle / agents。
+ * 全量部署：gateway / usercenter / order / docs / upload / wechat / recycle / medical / agents。
  * 裁剪场景（只跑其中一部分）放在 deploy/<场景>/ecosystem.config.cjs，不要在根目录再加一份。
  */
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://127.0.0.1:1883';
@@ -28,6 +28,9 @@ const wechatDatabaseUrl =
 const recycleDatabaseUrl =
   process.env.RECYCLE_DATABASE_URL ??
   databaseUrl.replace(/\/[^/?]+(\?|$)/, '/recycle$1');
+const medicalDatabaseUrl =
+  process.env.MEDICAL_DATABASE_URL ??
+  databaseUrl.replace(/\/[^/?]+(\?|$)/, '/medical$1');
 const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
 
 function replicate(service, count, extraEnv) {
@@ -188,6 +191,35 @@ module.exports = {
         INSTANCE_ID: 'recycle-1',
         APP_VERSION: appVersion,
         EXPECTED_APP_VERSION: expectedAppVersion,
+      },
+    },
+    {
+      name: 'medical',
+      script: 'dist/apps/medical/main.js',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      max_memory_restart: '400M',
+      env: {
+        NODE_ENV: 'production',
+        MQTT_URL: mqttUrl,
+        DATABASE_URL: databaseUrl,
+        MEDICAL_DATABASE_URL: medicalDatabaseUrl,
+        REDIS_URL: redisUrl,
+        INSTANCE_ID: 'medical-1',
+        APP_VERSION: appVersion,
+        EXPECTED_APP_VERSION: expectedAppVersion,
+        TYPEORM_SYNC: process.env.TYPEORM_SYNC ?? 'true',
+        AUTH_BOOTSTRAP_PASSWORD: process.env.AUTH_BOOTSTRAP_PASSWORD ?? 'tcm123456',
+        AUTH_SECRET: process.env.AUTH_SECRET ?? 'tcm-dev-auth-secret-change-me',
+        ID_CARD_KEY: process.env.ID_CARD_KEY ?? '',
+        LLM_API_KEY: process.env.LLM_API_KEY ?? '',
+        LLM_BASE_URL:
+          process.env.LLM_BASE_URL ??
+          'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        LLM_MODEL: process.env.LLM_MODEL ?? 'qwen-plus',
+        LLM_REASONER_MODEL: process.env.LLM_REASONER_MODEL ?? '',
+        TCM_SKILLS_DIR: process.env.TCM_SKILLS_DIR ?? '',
       },
     },
     ...agentsApps,

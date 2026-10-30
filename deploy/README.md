@@ -15,6 +15,11 @@ deploy/<场景>/
   db/                     # 仅该场景需要时
 ```
 
-新增场景时复制 `deploy/recycle/` 再改进程列表和环境变量，不要往根目录再加 `ecosystem.xxx.config.cjs` / `.env.xxx`。
+新增场景时复制 `deploy/recycle/` 或 `deploy/medical/` 再改进程列表和环境变量，不要往根目录再加 `ecosystem.xxx.config.cjs` / `.env.xxx`。
+
+现有场景：
+
+- `deploy/recycle/`：回收业务（gateway / usercenter / upload / wechat / recycle）
+- `deploy/medical/`：中医诊所（gateway / usercenter / upload / medical）
 
 启动必须在仓库根执行（或由脚本 `cd` 到根），因为 PM2 的 `script` 是 `dist/apps/<服务>/main.js`。
