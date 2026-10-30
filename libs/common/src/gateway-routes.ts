@@ -201,10 +201,10 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'POST', path: '/agents/chat', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CHAT, auth: ['jwt'], override: true }),
   business({ method: 'POST', path: '/agents/rag/search', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_RAG_SEARCH, auth: ['jwt'] }),
   business({ method: 'POST', path: '/agents/vision', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_VISION_PARSE, auth: ['jwt'], override: true }),
-
-  ...medicalRoutes(),
 ];
 
+function docsContentRoutes(prefix: '/docs/documents'): GatewayRoute[] {
+  const auth: GatewayAuth[] = ['jwt', 'docs-key'];
 /**
  * 中医诊所：诊所 token 在 medical 内校验，网关只要求 X-Biz-Code: medical。
  * 登录不走 usercenter JWT，避免 TCM 前端必须先拿平台会话。
@@ -262,8 +262,6 @@ function medicalRoutes(): GatewayRoute[] {
   ];
 }
 
-function docsContentRoutes(prefix: '/docs/documents'): GatewayRoute[] {
-  const auth: GatewayAuth[] = ['jwt', 'docs-key'];
   const docs = (route: Omit<RouteInput, 'client'>) =>
     business({ ...route, client: DOCS_CLIENT });
   return [
@@ -292,9 +290,9 @@ export const SERVICE_API_DOCS: Array<{ client: string; service: string; pattern:
   { client: WECHAT_CLIENT, service: 'wechat', pattern: MQTT_PATTERNS.WECHAT_API_DOCS },
   { client: AGENTS_CLIENT, service: 'agents', pattern: MQTT_PATTERNS.AGENTS_API_DOCS },
   { client: RECYCLE_CLIENT, service: 'recycle', pattern: MQTT_PATTERNS.RECYCLE_API_DOCS },
-  { client: MEDICAL_CLIENT, service: 'medical', pattern: MQTT_PATTERNS.MEDICAL_API_DOCS },
 ];
 
+  { client: MEDICAL_CLIENT, service: 'medical', pattern: MQTT_PATTERNS.MEDICAL_API_DOCS },
 export interface BizApiCatalogItem {
   key: string;
   name: string;
