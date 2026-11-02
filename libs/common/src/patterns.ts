@@ -123,6 +123,11 @@ export const MQTT_PATTERNS = {
   AGENTS_CHAT: 'agents.chat',
   AGENTS_CHAT_STATUS: 'agents.chat.status',
   AGENTS_VISION_PARSE: 'agents.vision.parse',
+  AGENTS_SPEECH_TRANSCRIBE: 'agents.speech.transcribe',
+  AGENTS_VIDEO_SUBMIT: 'agents.video.submit',
+  AGENTS_MEDIA_JOB: 'agents.media.job',
+  AGENTS_LANGUAGE_EXTRACT: 'agents.language.extract',
+  AGENTS_LANGUAGE_COMPLETE: 'agents.language.complete',
   /** 内部：docs 保存后索引文档（不注册网关） */
   AGENTS_RAG_INDEX: 'agents.rag.index',
   /** 内部：docs 删除后清索引（不注册网关） */
@@ -224,12 +229,14 @@ export const MQTT_PATTERNS = {
   MEDICAL_AI_COMPARE: 'medical.ai.compare',
   MEDICAL_AI_SUMMARY: 'medical.ai.summary',
   MEDICAL_AI_INTAKE_AUDIO: 'medical.ai.intakeAudio',
+  MEDICAL_AI_JOB: 'medical.ai.job',
   MEDICAL_SKILL_LIST: 'medical.skill.list',
   MEDICAL_SKILL_TRIGGERS: 'medical.skill.triggers',
   MEDICAL_SKILL_RUN: 'medical.skill.run',
   MEDICAL_SKILL_CHAT: 'medical.skill.chat',
   MEDICAL_SKILL_FOLLOWUP: 'medical.skill.followup',
   MEDICAL_FILE_TONGUE: 'medical.file.tongue',
+  MEDICAL_FILE_ASSIST: 'medical.file.assist',
 } as const;
 
 export function sharePattern(group: string, pattern: string): string {

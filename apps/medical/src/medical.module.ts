@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import {
+  AgentsClient,
   ApiDocsModule,
   MQTT_GROUPS,
   MQTT_PATTERNS,
   sharePattern,
 } from '@app/common';
 import { DatabaseModule } from './database/database.module';
+import { MedicalMqttModule } from './mqtt/medical-mqtt.module';
 import { MedicalController } from './medical.controller';
 import { AiModule } from './modules/ai/ai.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -17,6 +19,7 @@ import { PatientsModule } from './modules/patients/patients.module';
 
 @Module({
   imports: [
+    MedicalMqttModule,
     DatabaseModule,
     AuthModule,
     DashboardModule,
@@ -35,5 +38,6 @@ import { PatientsModule } from './modules/patients/patients.module';
     }),
   ],
   controllers: [MedicalController],
+  providers: [AgentsClient],
 })
 export class MedicalModule {}

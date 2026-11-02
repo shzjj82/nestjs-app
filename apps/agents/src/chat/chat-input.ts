@@ -12,11 +12,13 @@ export function parseChatInput(payload: unknown): AgentChatInput {
     rpcFail(400, 'AI_EMPTY');
   }
   const ragTopK = Number(data.ragTopK);
+  const temperature = Number(data.temperature);
   return {
     messages,
     attachments: parseAttachments(data.attachments),
     system: optionalString(data.system),
     sync: data.sync !== false,
+    temperature: Number.isFinite(temperature) ? temperature : undefined,
     rag: data.rag === true,
     ragTopK:
       Number.isFinite(ragTopK) && ragTopK > 0

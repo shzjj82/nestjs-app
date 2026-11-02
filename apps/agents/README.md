@@ -14,7 +14,10 @@ src/
   chat/                   OpenAI 兼容 chat/completions
   rag/                    Embedding、分块、pgvector 检索与索引
   vision/                 图片识别
-  speech/                 后续语音合成 / 识别
+  speech/                 短录音通义 ASR
+  video/                  视频/长音频听悟任务
+  language/               通用 JSON 抽取
+  media/                  听悟任务表与轮询
 ```
 
 ## 网关 HTTP
@@ -25,6 +28,10 @@ src/
 - `GET /agents/chat/status` `{ enabled, model, rag, embeddingModel }`
 - `POST /agents/chat` `sync` 默认 true；`rag: true` 做检索增强，返回可选 `sources`
 - `POST /agents/rag/search` `{ query, topK?, mineOnly? }` → `{ items }`
+- `POST /agents/speech/transcribe` 短录音 `{ audioBase64, mime }` → `{ transcript }`；长音频 `{ fileUrl }` → `{ jobId }`
+- `POST /agents/video/submit` `{ fileUrl }` → `{ jobId }`
+- `GET /agents/media/jobs/:id` 听悟任务状态
+- `POST /agents/language/extract` `{ system, user }` → `{ json, fields }`
 
 ```bash
 curl -X POST http://localhost:3000/agents/chat \
@@ -55,6 +62,9 @@ curl -X POST http://localhost:3000/agents/rag/search \
 | `AI_EMBEDDING_MODEL` | 默认 `text-embedding-3-small`；通义可用 `text-embedding-v4` |
 | `AI_EMBEDDING_DIM` | 默认 `1536`，须与表 `ag_rag_chunks.embedding` 一致 |
 | `AI_TIMEOUT_MS` | 超时 |
+| `AI_ASR_API_BASE` / `AI_ASR_API_KEY` / `AI_ASR_MODEL` | 短语音，默认 `qwen3-asr-flash`；密钥回退 `AI_API_KEY` |
+| `TINGWU_APP_KEY` / `ALIBABA_CLOUD_ACCESS_KEY_ID` / `ALIBABA_CLOUD_ACCESS_KEY_SECRET` | 通义听悟离线任务 |
+| `TINGWU_REGION` | 默认 `cn-beijing` |
 | `AGENTS_DATABASE_URL` | 独立库 `agents`（含 pgvector） |
 
 流式 HTTP 默认 `:3006`，网关用 `AGENTS_HTTP_URL` 连接。

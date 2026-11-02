@@ -4,7 +4,7 @@ set -euo pipefail
 # ============================================================================
 # 重新加载环境变量并重启中医服务。
 #
-#   ./deploy/medical/scripts/reload.sh            # 重载全部 4 个服务
+#   ./deploy/medical/scripts/reload.sh            # 重载全部诊所服务
 #   ./deploy/medical/scripts/reload.sh medical    # 只重载 medical
 # ============================================================================
 
@@ -31,7 +31,7 @@ export MEDICAL_DATABASE_URL="${MEDICAL_DATABASE_URL:-}"
 if [[ $# -gt 0 ]]; then
   TARGETS=("$@")
 else
-  TARGETS=(gateway usercenter upload medical)
+  TARGETS=(gateway usercenter upload medical agents)
 fi
 
 echo "重载服务: ${TARGETS[*]}"
@@ -78,7 +78,7 @@ PORT="${PORT:-3000}"
 node -e '
 const http = require("http");
 const port = Number(process.argv[1]);
-const paths = ["/medical/health", "/upload/health"];
+const paths = ["/medical/health", "/upload/health", "/agents/health"];
 const get = (p) => new Promise((res) => {
   const req = http.get({ host: "127.0.0.1", port, path: p, timeout: 8000 }, (r) => {
     let d = ""; r.on("data", (c) => (d += c)); r.on("end", () => res(r.statusCode));

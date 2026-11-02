@@ -5,6 +5,7 @@ import {
   MQTT_GROUPS,
   MQTT_PATTERNS,
   optionalString,
+  rpcFail,
   sharePattern,
 } from '@app/common';
 import { clinicBody, optionalNumber, requireClinic } from '../../clinic';
@@ -63,8 +64,12 @@ export class AiController {
   )
   @ApiDoc({ name: '按页签摘录字段' })
   async extract(payload: Record<string, unknown>) {
-    await requireClinic(this.auth, payload);
-    return this.ai.extractSection(clinicBody(payload));
+    const user = await requireClinic(this.auth, payload);
+    return this.ai.extractSection({
+      ...clinicBody(payload),
+      bizCode: optionalString(payload._bizCode) ?? 'medical',
+      accountId: user.id,
+    });
   }
 
   @MessagePattern(
@@ -90,7 +95,22 @@ export class AiController {
   )
   @ApiDoc({ name: '接诊录音转写' })
   async intakeAudio(payload: Record<string, unknown>) {
+    const user = await requireClinic(this.auth, payload);
+    return this.ai.transcribeIntake({
+      ...clinicBody(payload),
+      bizCode: optionalString(payload._bizCode) ?? 'medical',
+      accountId: user.id,
+    });
+  }
+
+  @MessagePattern(
+    sharePattern(MQTT_GROUPS.MEDICAL, MQTT_PATTERNS.MEDICAL_AI_JOB),
+  )
+  @ApiDoc({ name: '查询转写任务' })
+  async job(payload: Record<string, unknown>) {
     await requireClinic(this.auth, payload);
-    return this.ai.transcribeIntake(clinicBody(payload));
+    const id = optionalString(payload.id);
+    if (!id) rpcFail(400, '缺少任务编号');
+    return this.ai.getMediaJob(id, optionalString(payload._bizCode) ?? 'medical');
   }
 }

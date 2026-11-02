@@ -174,10 +174,7 @@ services:
       TYPEORM_SYNC: ${TYPEORM_SYNC:-true}
       AUTH_BOOTSTRAP_PASSWORD: ${AUTH_BOOTSTRAP_PASSWORD:-tcm123456}
       AUTH_SECRET: ${AUTH_SECRET:-tcm-dev-auth-secret-change-me}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_BASE_URL: ${LLM_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
-      LLM_MODEL: ${LLM_MODEL:-qwen-plus}
-      LLM_REASONER_MODEL: ${LLM_REASONER_MODEL:-}
+      AGENTS_HTTP_URL: http://agents:3006
       TCM_SKILLS_DIR: ${TCM_SKILLS_DIR:-}
     depends_on: *app-depends
 
@@ -195,6 +192,7 @@ services:
       AI_API_BASE: ${AI_API_BASE:-https://api.openai.com/v1}
       AI_API_KEY: ${AI_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_REASONER_MODEL: ${AI_REASONER_MODEL:-}
       AI_EMBEDDING_API_BASE: ${AI_EMBEDDING_API_BASE:-}
       AI_EMBEDDING_API_KEY: ${AI_EMBEDDING_API_KEY:-}
       AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-text-embedding-3-small}

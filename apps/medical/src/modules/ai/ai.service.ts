@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { ChatMessage, DeepSeekClient, extractJson } from '../../lib/tcm-agents';
+import { AgentsClient } from '@app/common';
+import type { ChatMessage } from '../../lib/tcm-agents';
 import { KnowledgeService } from '../knowledge/knowledge.service';
 import { PatientsService } from '../patients/patients.service';
 import { VisitsService } from '../patients/visits.service';
@@ -23,6 +24,18 @@ const EMERGENCY_FLAGS = [
 
 const DISCLAIMER = '本内容由 AI 辅助生成，须经执业医师审核后使用，不得直接作为处方交付患者。';
 
+export type ChatReply = {
+  mode: 'llm' | 'rule_based' | 'rule_based_fallback';
+  conclusion: string;
+  evidence: string[];
+  citations: Array<{ kind: string; title: string; note?: string }>;
+  risks: string[];
+  missing: string[];
+  disclaimer: string;
+};
+
+export type ChatStreamEvent = { delta: string } | { reply: ChatReply };
+
 const CHAT_SYSTEM = `你是中医诊所里给医生用的助手，不直接面向患者。
 规则：
 1. 区分档案事实、医生记录和你的推测，推测必须标明；
@@ -30,7 +43,7 @@ const CHAT_SYSTEM = `你是中医诊所里给医生用的助手，不直接面�
 3. 治疗建议必须带来源；内部医案须说明样本量局限；
 4. 高风险、急重症、禁忌必须提醒医生复核；
 5. 不得给出患者可直接执行的侵入性操作指导；
-6. 只输出 JSON 对象。`;
+6. 直接写答复正文，不要输出 JSON，不要用代码块包裹。`;
 
 const ADVISE_SYSTEM = `你是给中医师提供决策支持的助手（不直接面向患者开方）。
 规则：
@@ -45,20 +58,21 @@ const PARSE_SYSTEM = `你是资深中医师兼病案管理员，把口语化的�
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
-  private readonly client = new DeepSeekClient();
 
   constructor(
     private readonly knowledge: KnowledgeService,
     private readonly patients: PatientsService,
     private readonly visits: VisitsService,
+    private readonly agents: AgentsClient,
   ) {}
 
-  status() {
-    return {
-      ...this.client.status(),
-      asr: process.env.ASR_PROVIDER ?? 'none',
-      vision: process.env.VISION_PROVIDER ?? 'none',
-    };
+  async status() {
+    try {
+      const ai = await this.agents.status();
+      return { ...ai, asr: 'agents', vision: 'agents' };
+    } catch {
+      return { enabled: false, asr: 'agents', vision: 'agents' };
+    }
   }
 
   /** 联合「外部参考库 + 内部资料库 + 本院高疗效医案」给出治疗建议。 */
@@ -108,39 +122,33 @@ export class AiService {
       disclaimer: DISCLAIMER,
     };
 
-    if (!this.client.enabled) {
-      result.plan = {
-        treatmentPrinciple: '证据不足（未配置 AI）',
-        acupuncturePlan: internal.flatMap((row) => toArray(pick(row.payload, ['acupoints'])).map((p) => ({
-          point: p, source: row.id,
-        }))),
-        note: '未配置 LLM_API_KEY（通义百炼），仅返回资料库检索结果，未做综合推理。',
-      };
-      return result;
-    }
-
     try {
-      const messages: ChatMessage[] = [
-        { role: 'system', content: ADVISE_SYSTEM },
-        {
-          role: 'user',
-          content: [
-            '【病人情况】\n' + caseText,
-            '【外部治疗参考资料库】\n' + JSON.stringify(result.external).slice(0, 8000),
-            '【内部治疗资料库】\n' + JSON.stringify(result.internal).slice(0, 8000),
-            '【本院相似医案】\n' + JSON.stringify(cases).slice(0, 4000),
-            '输出 JSON：{caseProfile:{tcmDisease,tcmSyndrome,keySymptoms},safetyAlerts:[],treatmentPrinciple,acupuncturePlan:[{point,manipulation,retentionMin,rationale,source}],herbalPlan:[{formula,modification,source}],lifestyleAdvice:[],followupPlan,evidenceSummary:{externalHits,internalHits,caseHits,insufficientFields},confidence}',
-          ].join('\n\n'),
-        },
-      ];
-      const plan = await this.client.chatJson<Record<string, unknown>>(messages, { reasoner: true, temperature: 0.2 });
+      const plan = await this.extractViaAgents(
+        ADVISE_SYSTEM,
+        [
+          '【病人情况】\n' + caseText,
+          '【外部治疗参考资料库】\n' + JSON.stringify(result.external).slice(0, 8000),
+          '【内部治疗资料库】\n' + JSON.stringify(result.internal).slice(0, 8000),
+          '【本院相似医案】\n' + JSON.stringify(cases).slice(0, 4000),
+          '输出 JSON：{caseProfile:{tcmDisease,tcmSyndrome,keySymptoms},safetyAlerts:[],treatmentPrinciple,acupuncturePlan:[{point,manipulation,retentionMin,rationale,source}],herbalPlan:[{formula,modification,source}],lifestyleAdvice:[],followupPlan,evidenceSummary:{externalHits,internalHits,caseHits,insufficientFields},confidence}',
+        ].join('\n\n'),
+        'medical',
+        undefined,
+        true,
+      );
       result.plan = plan;
       result.mode = 'llm';
       return result;
     } catch (error) {
       this.logger.warn(`AI 建议生成失败，降级为检索草稿: ${String(error)}`);
       result.mode = 'rule_based_fallback';
-      result.plan = { note: 'AI 生成失败，以下仅为资料库命中结果。', error: String(error).slice(0, 300) };
+      result.plan = {
+        note: 'AI 生成失败，以下仅为资料库命中结果。',
+        error: String(error).slice(0, 300),
+        acupuncturePlan: internal.flatMap((row) => toArray(pick(row.payload, ['acupoints'])).map((p) => ({
+          point: p, source: row.id,
+        }))),
+      };
       return result;
     }
   }
@@ -152,15 +160,89 @@ export class AiService {
     patientId?: string;
     scopes?: { patient?: boolean; internal?: boolean; external?: boolean };
     answerMode?: 'summary' | 'review' | 'advise' | 'teach';
-  }): Promise<{
-    mode: 'llm' | 'rule_based' | 'rule_based_fallback';
-    conclusion: string;
-    evidence: string[];
-    citations: Array<{ kind: string; title: string; note?: string }>;
-    risks: string[];
-    missing: string[];
-    disclaimer: string;
-  }> {
+  }): Promise<ChatReply> {
+    let last: ChatReply | undefined;
+    for await (const event of this.chatStream(input)) {
+      if ('reply' in event) last = event.reply;
+    }
+    if (!last) throw new BadRequestException('对话没有返回结果');
+    return last;
+  }
+
+  /** SSE 逐字输出结论，结束时带上来源。 */
+  async *chatStream(input: {
+    message?: string;
+    history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+    patientId?: string;
+    scopes?: { patient?: boolean; internal?: boolean; external?: boolean };
+    answerMode?: 'summary' | 'review' | 'advise' | 'teach';
+  }): AsyncGenerator<ChatStreamEvent> {
+    const prepared = await this.prepareChat(input);
+    if (!prepared.messages) {
+      yield { reply: prepared.fallback };
+      return;
+    }
+    const system = prepared.messages.find((item) => item.role === 'system')?.content;
+    const dialog = prepared.messages
+      .filter((item): item is { role: 'user' | 'assistant'; content: string } =>
+        item.role === 'user' || item.role === 'assistant',
+      )
+      .map((item) => ({ role: item.role, content: item.content }));
+    let conclusion = '';
+    try {
+      for await (const delta of this.agents.streamChat({
+        bizCode: 'medical',
+        system,
+        messages: dialog,
+        temperature: 0.2,
+      })) {
+        conclusion += delta;
+        yield { delta };
+      }
+      yield {
+        reply: {
+          mode: 'llm',
+          conclusion: conclusion.trim() || prepared.fallback.conclusion,
+          evidence: prepared.fallback.evidence,
+          citations: prepared.fallback.citations,
+          risks: prepared.fallback.risks,
+          missing: [],
+          disclaimer: DISCLAIMER,
+        },
+      };
+    } catch (error) {
+      this.logger.warn(`AI 对话失败，降级为检索草稿: ${String(error)}`);
+      if (conclusion.trim()) {
+        yield {
+          reply: {
+            mode: 'llm',
+            conclusion: conclusion.trim(),
+            evidence: prepared.fallback.evidence,
+            citations: prepared.fallback.citations,
+            risks: prepared.fallback.risks,
+            missing: [`生成中断：${String(error).slice(0, 80)}`],
+            disclaimer: DISCLAIMER,
+          },
+        };
+        return;
+      }
+      yield {
+        reply: {
+          ...prepared.fallback,
+          mode: 'rule_based_fallback',
+          missing: [`模型暂不可用：${String(error).slice(0, 80)}`],
+        },
+      };
+    }
+  }
+
+  private async prepareChat(input: {
+    message?: string;
+    history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+    patientId?: string;
+    scopes?: { patient?: boolean; internal?: boolean; external?: boolean };
+    answerMode?: 'summary' | 'review' | 'advise' | 'teach';
+  }): Promise<{ messages: ChatMessage[] | null; fallback: ChatReply }> {
     const question = String(input.message ?? '').trim();
     if (!question) throw new BadRequestException('请输入问题');
     const scopes = {
@@ -207,8 +289,8 @@ export class AiService {
       ...external.map((row) => ({ kind: 'external', title: row.title, note: '外部治疗参考资料' })),
     ];
     const risks = EMERGENCY_FLAGS.filter((flag) => query.includes(flag));
-    const fallback = {
-      mode: 'rule_based' as const,
+    const fallback: ChatReply = {
+      mode: 'rule_based',
       conclusion: citations.length
         ? '未配置或未调用模型，以下为资料库检索结果，请医生自行判断。'
         : '当前范围没有可引用的本地资料。',
@@ -221,7 +303,6 @@ export class AiService {
       missing: citations.length ? [] : ['请勾选资料范围，或指定一位患者'],
       disclaimer: DISCLAIMER,
     };
-    if (!this.client.enabled) return fallback;
 
     const modeHint = {
       summary: '用简洁条目概括，不要展开处方。',
@@ -229,19 +310,13 @@ export class AiService {
       advise: '给治疗参考，每条必须带来源；无来源须标明模型通用知识。',
       teach: '用教学口吻，患者信息必须脱敏，不出现可识别身份。',
     }[answerMode];
-
-    try {
-      const history = (input.history ?? []).slice(-8).map((item) => ({
-        role: item.role,
-        content: item.content.slice(0, 2000),
-      }));
-      const parsed = await this.client.chatJson<{
-        conclusion?: string;
-        evidence?: string[];
-        citations?: Array<{ kind?: string; title?: string; note?: string }>;
-        risks?: string[];
-        missing?: string[];
-      }>([
+    const history = (input.history ?? []).slice(-8).map((item) => ({
+      role: item.role,
+      content: item.content.slice(0, 2000),
+    }));
+    return {
+      fallback,
+      messages: [
         { role: 'system', content: CHAT_SYSTEM },
         ...history,
         {
@@ -252,109 +327,144 @@ export class AiService {
             scopes.internal ? `【内部治疗资料库】\n${JSON.stringify(internal.map((row) => ({ id: row.id, title: row.title }))).slice(0, 6000)}` : '【内部治疗资料库】未纳入本次检索。',
             scopes.external ? `【外部治疗参考资料库】\n${JSON.stringify(external.map((row) => ({ id: row.id, title: row.title }))).slice(0, 6000)}` : '【外部治疗参考资料库】未纳入本次检索。',
             `【问题】\n${question}`,
-            '输出 JSON：{conclusion,evidence:[],citations:[{kind:internal|external|patient|model,title,note}],risks:[],missing:[]}',
+            '请直接写答复正文。',
           ].join('\n\n'),
         },
-      ], { temperature: 0.2, maxTokens: 2500 });
-      const nextCitations = (parsed.citations ?? [])
-        .map((item) => ({ kind: String(item.kind || 'model'), title: String(item.title || '').trim(), note: item.note ? String(item.note) : undefined }))
-        .filter((item) => item.title);
-      return {
-        mode: 'llm',
-        conclusion: String(parsed.conclusion || '').trim() || fallback.conclusion,
-        evidence: Array.isArray(parsed.evidence) ? parsed.evidence.map((item) => String(item)).filter(Boolean) : fallback.evidence,
-        citations: nextCitations.length ? nextCitations : fallback.citations,
-        risks: Array.isArray(parsed.risks) && parsed.risks.length ? parsed.risks.map((item) => String(item)) : risks,
-        missing: Array.isArray(parsed.missing) ? parsed.missing.map((item) => String(item)).filter(Boolean) : [],
-        disclaimer: DISCLAIMER,
-      };
-    } catch (error) {
-      this.logger.warn(`AI 对话失败，降级为检索草稿: ${String(error)}`);
-      return { ...fallback, mode: 'rule_based_fallback', missing: [`模型暂不可用：${String(error).slice(0, 80)}`] };
-    }
+      ],
+    };
   }
 
   /** 把一段医生口述/录音转写解析成结构化医案。可用于前端预览后再落库。 */
   async parseNote(input: { text?: string; doctorNote?: string }) {
     const material = input.doctorNote || input.text || '';
     if (!material) throw new Error('缺少待解析内容');
-    if (!this.client.enabled) throw new Error('未配置 LLM_API_KEY（通义百炼），无法调用 AI 解析');
-    const raw = await this.client.chat([
-      { role: 'system', content: PARSE_SYSTEM },
-      {
-        role: 'user',
-        content: `素材：\n${material}\n\n输出结构：{visitDate,narrative,tcmDisease,tcmSyndrome,treatmentPrinciple,symptoms:[],tongue,pulse,acupoints:[{name,manipulation,retentionMin,rationale}],prescriptions:[{name,composition}],advice:[],nextPlan,uncertainFields:[]}`,
-      },
-    ], { temperature: 0.2 });
-    return extractJson<Record<string, unknown>>(raw);
+    try {
+      return await this.extractViaAgents(
+        PARSE_SYSTEM,
+        `素材：\n${material}\n\n输出结构：{visitDate,narrative,tcmDisease,tcmSyndrome,treatmentPrinciple,symptoms:[],tongue,pulse,acupoints:[{name,manipulation,retentionMin,rationale}],prescriptions:[{name,composition}],advice:[],nextPlan,uncertainFields:[]}`,
+        'medical',
+      );
+    } catch (error) {
+      throw new BadRequestException(agentMessage(error, 'AI 解析暂时不可用，请稍后重试或手工填写'));
+    }
   }
 
   /**
-   * 录音文件先转写，再拆进主诉字段。不落库，由前端核对后随建档提交。
+   * 录音文件先转写，再拆进主诉字段。ASR 和语言抽取都走 agents，本服务只组诊所字段。
    */
-  async transcribeIntake(input: { audioBase64?: string; mime?: string }) {
-    const transcript = await this.transcribeAudio(input.audioBase64 ?? '', input.mime ?? '');
-    const fields = await this.parseIntake(transcript);
+  async transcribeIntake(input: {
+    audioBase64?: string;
+    mime?: string;
+    fileUrl?: string;
+    provider?: string;
+    bizCode?: string;
+    accountId?: string;
+  }) {
+    const bizCode = input.bizCode || 'medical';
+    let transcribed: { transcript?: string; jobId?: string; status?: string; provider?: string };
+    try {
+      transcribed = await this.agents.transcribe({
+        bizCode,
+        audioBase64: input.audioBase64,
+        mime: input.mime,
+        fileUrl: input.fileUrl,
+        provider: input.provider,
+        accountId: input.accountId,
+      });
+    } catch (error) {
+      throw new BadRequestException(agentMessage(error, '语音识别暂时不可用，请稍后重试或改为文字填写'));
+    }
+    if (transcribed.jobId && !transcribed.transcript) {
+      return { jobId: transcribed.jobId, status: transcribed.status, provider: transcribed.provider };
+    }
+    const transcript = (transcribed.transcript ?? '').trim();
+    if (!transcript) throw new BadRequestException('没有识别到语音内容');
+    const fields = await this.parseIntake(transcript, bizCode, input.accountId);
     return { transcript, fields };
   }
 
-  async parseIntake(transcript: string) {
+  async getMediaJob(id: string, bizCode = 'medical') {
+    try {
+      return await this.agents.getMediaJob({ bizCode, id });
+    } catch (error) {
+      throw new BadRequestException(agentMessage(error, '查询转写任务失败'));
+    }
+  }
+
+  async parseIntake(transcript: string, bizCode = 'medical', accountId?: string) {
     const material = transcript.trim();
     if (!material) throw new BadRequestException('没有识别到语音内容');
-    if (!this.client.enabled) throw new BadRequestException('未配置 LLM_API_KEY（通义百炼），无法解析录音');
-    let parsed: Record<string, unknown>;
     try {
-      parsed = await this.client.chatJson<Record<string, unknown>>([
-        { role: 'system', content: INTAKE_PARSE_SYSTEM },
-        {
-          role: 'user',
-          content: `口述：\n${material.slice(0, 8000)}\n\n按系统说明输出 JSON。`,
-        },
-      ], { temperature: 0.1 });
+      const parsed = await this.extractViaAgents(
+        INTAKE_PARSE_SYSTEM,
+        `口述：\n${material.slice(0, 8000)}\n\n按系统说明输出 JSON。`,
+        bizCode,
+        accountId,
+      );
+      return normalizeIntake(parsed);
     } catch (error) {
       this.logger.warn(`主诉解析失败: ${String(error).slice(0, 300)}`);
       throw new BadRequestException('录音已识别，但整理成病历字段失败，请稍后重试或手工填写');
     }
-    return normalizeIntake(parsed);
   }
 
   /** 按页签从文字里摘字段。没提到的留空，不推测。 */
-  async extractSection(input: { text?: string; section?: string }) {
+  async extractSection(input: { text?: string; section?: string; bizCode?: string; accountId?: string }) {
     const text = (input.text ?? '').trim();
     if (!text) throw new BadRequestException('没有可解析的内容');
-    if (!this.client.enabled) throw new BadRequestException('未配置 LLM_API_KEY（通义百炼），无法解析');
     const section = input.section === 'condition' || input.section === 'plan' ? input.section : 'chart';
-    let parsed: Record<string, unknown>;
     try {
-      parsed = await this.client.chatJson<Record<string, unknown>>([
-        { role: 'system', content: EXTRACT_SYSTEM[section] },
-        { role: 'user', content: `材料：\n${text.slice(0, 8000)}` },
-      ], { temperature: 0.1 });
+      const parsed = await this.extractViaAgents(
+        EXTRACT_SYSTEM[section],
+        `材料：\n${text.slice(0, 8000)}`,
+        input.bizCode || 'medical',
+        input.accountId,
+      );
+      const fields = Object.fromEntries(
+        EXTRACT_KEYS[section].map((key) => [key, typeof parsed[key] === 'string' ? parsed[key].trim() : '']),
+      );
+      return { section, fields };
     } catch (error) {
       this.logger.warn(`页签解析失败: ${String(error).slice(0, 300)}`);
-      throw new BadRequestException('解析暂时不可用，请稍后重试或手工填写');
+      throw new BadRequestException(agentMessage(error, '解析暂时不可用，请稍后重试或手工填写'));
     }
-    const fields = Object.fromEntries(
-      EXTRACT_KEYS[section].map((key) => [key, typeof parsed[key] === 'string' ? parsed[key].trim() : '']),
-    );
-    return { section, fields };
+  }
+
+  private async extractViaAgents(
+    system: string,
+    user: string,
+    bizCode: string,
+    accountId?: string,
+    reasoner = false,
+  ) {
+    const result = await this.agents.extract({
+      bizCode,
+      system,
+      user,
+      temperature: 0.1,
+      reasoner,
+      accountId,
+    });
+    const parsed = result.fields && Object.keys(result.fields).length ? result.fields : asObject(result.json);
+    if (!parsed) throw new Error('语言模型没有返回 JSON');
+    return parsed;
   }
 
   /** 对照上次已确认记录，只返回本次材料里写明的变化。 */
   async compareVisit(input: { previous?: string; current?: string }) {
     const current = (input.current ?? '').trim();
     if (!current) throw new BadRequestException('请先填写本次情况');
-    if (!this.client.enabled) throw new BadRequestException('未配置 LLM_API_KEY（通义百炼），无法对比');
     const previous = (input.previous ?? '').trim() || '（没有上次记录）';
     let parsed: Record<string, unknown>;
     try {
-      parsed = await this.client.chatJson<Record<string, unknown>>([
-        { role: 'system', content: COMPARE_SYSTEM },
-        { role: 'user', content: `上次：\n${previous.slice(0, 4000)}\n\n本次：\n${current.slice(0, 4000)}` },
-      ], { temperature: 0.1 });
+      parsed = await this.extractViaAgents(
+        COMPARE_SYSTEM,
+        `上次：\n${previous.slice(0, 4000)}\n\n本次：\n${current.slice(0, 4000)}`,
+        'medical',
+      );
     } catch (error) {
       this.logger.warn(`病情对比失败: ${String(error).slice(0, 300)}`);
-      throw new BadRequestException('对比暂时不可用，请稍后重试或手工记录变化');
+      throw new BadRequestException(agentMessage(error, '对比暂时不可用，请稍后重试或手工记录变化'));
     }
     return {
       improved: textList(parsed.improved),
@@ -369,80 +479,23 @@ export class AiService {
   async summarizeVisit(input: { previous?: string; current?: string }) {
     const current = (input.current ?? '').trim();
     if (!current) throw new BadRequestException('请先填写本次情况');
-    if (!this.client.enabled) throw new BadRequestException('未配置 LLM_API_KEY（通义百炼），无法生成摘要');
     const previous = (input.previous ?? '').trim();
     let parsed: Record<string, unknown>;
     try {
-      parsed = await this.client.chatJson<Record<string, unknown>>([
-        { role: 'system', content: SUMMARY_SYSTEM },
-        {
-          role: 'user',
-          content: `${previous ? `上次：\n${previous.slice(0, 3000)}\n\n` : ''}本次：\n${current.slice(0, 4000)}`,
-        },
-      ], { temperature: 0.2 });
+      parsed = await this.extractViaAgents(
+        SUMMARY_SYSTEM,
+        `${previous ? `上次：\n${previous.slice(0, 3000)}\n\n` : ''}本次：\n${current.slice(0, 4000)}`,
+        'medical',
+      );
     } catch (error) {
       this.logger.warn(`病情摘要失败: ${String(error).slice(0, 300)}`);
-      throw new BadRequestException('摘要暂时不可用，请手工填写');
+      throw new BadRequestException(agentMessage(error, '摘要暂时不可用，请手工填写'));
     }
     const summary = typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
     if (!summary) throw new BadRequestException('没有生成摘要，请手工填写');
     return { summary };
   }
 
-  private async transcribeAudio(audioBase64: string, mime: string): Promise<string> {
-    const payload = audioBase64.replace(/^data:[^,]*,/, '').replace(/\s/g, '');
-    if (!payload) throw new BadRequestException('没有录音内容');
-    let bytes = 0;
-    try {
-      bytes = Buffer.from(payload, 'base64').byteLength;
-    } catch {
-      throw new BadRequestException('录音内容无法读取');
-    }
-    if (!bytes) throw new BadRequestException('没有录音内容');
-    if (bytes > 8 * 1024 * 1024) throw new BadRequestException('录音文件请控制在 8MB 以内');
-    const format = audioFormat(mime);
-    const key = process.env.ASR_API_KEY || process.env.LLM_API_KEY || process.env.QWEN_API_KEY || process.env.DEEPSEEK_API_KEY || '';
-    if (!key) throw new BadRequestException('未配置语音识别密钥，暂不能识别录音');
-    const base = (
-      process.env.ASR_BASE_URL ||
-      process.env.LLM_BASE_URL ||
-      process.env.QWEN_BASE_URL ||
-      'https://dashscope.aliyuncs.com/compatible-mode/v1'
-    ).replace(/\/+$/, '');
-    const model = asrModel();
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 60000);
-    try {
-      const response = await fetch(`${base}/chat/completions`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model,
-          messages: [{
-            role: 'user',
-            content: [{ type: 'input_audio', input_audio: { data: payload, format } }],
-          }],
-          stream: false,
-          asr_options: { language: 'zh', enable_itn: false },
-        }),
-      });
-      const raw = await response.text();
-      if (!response.ok) {
-        this.logger.warn(`语音识别失败 ${response.status}: ${raw.slice(0, 300)}`);
-        throw new BadRequestException(asrErrorMessage(raw));
-      }
-      const transcript = messageText(safeJson(raw)).trim();
-      if (!transcript) throw new BadRequestException('没有识别到语音内容');
-      return transcript;
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      this.logger.warn(`语音识别请求失败: ${String(error).slice(0, 300)}`);
-      throw new BadRequestException('语音识别暂时不可用，请稍后重试或改为文字填写');
-    } finally {
-      clearTimeout(timer);
-    }
-  }
 }
 
 const COMPARE_SYSTEM = `你对照上次病情和本次口述，只摘本次明确说到的变化。
@@ -481,64 +534,16 @@ function textList(value: unknown): string[] {
   return value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean);
 }
 
-function asrModel(): string {
-  const configured = (process.env.ASR_MODEL ?? '').trim();
-  if (configured && !/^paraformer-v2$/i.test(configured)) return configured;
-  return 'qwen3-asr-flash';
+function agentMessage(error: unknown, fallback: string): string {
+  if (error instanceof BadRequestException) return String(error.message);
+  const payload = error as { message?: string };
+  return payload?.message || fallback;
 }
 
-function audioFormat(mime: string): string {
-  const normalized = mime.toLowerCase().split(';')[0]?.trim() ?? '';
-  const table: Record<string, string> = {
-    'audio/webm': 'webm',
-    'video/webm': 'webm',
-    'audio/wav': 'wav',
-    'audio/x-wav': 'wav',
-    'audio/wave': 'wav',
-    'audio/mpeg': 'mp3',
-    'audio/mp3': 'mp3',
-    'audio/mp4': 'm4a',
-    'audio/m4a': 'm4a',
-    'audio/x-m4a': 'm4a',
-    'audio/aac': 'aac',
-    'audio/ogg': 'ogg',
-  };
-  const format = table[normalized];
-  if (!format) throw new BadRequestException('请上传 webm、wav、mp3、m4a 或 ogg 录音');
-  return format;
-}
-
-function safeJson(raw: string): Record<string, unknown> {
-  try {
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
-
-function messageText(data: Record<string, unknown>): string {
-  const choices = data.choices;
-  const first = Array.isArray(choices) ? choices[0] as Record<string, unknown> | undefined : undefined;
-  const message = first?.message as Record<string, unknown> | undefined;
-  const content = message?.content;
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content.map((part) => {
-      if (typeof part === 'string') return part;
-      if (part && typeof part === 'object' && 'text' in part) return String((part as { text?: unknown }).text ?? '');
-      return '';
-    }).join('');
-  }
-  return '';
-}
-
-function asrErrorMessage(raw: string): string {
-  const data = safeJson(raw);
-  const error = data.error as Record<string, unknown> | undefined;
-  const message = typeof error?.message === 'string' ? error.message : '';
-  if (/api.key|invalid.*key|unauthorized/i.test(message)) return '语音识别密钥无效，请检查 ASR_API_KEY 或 LLM_API_KEY';
-  if (/model/i.test(message)) return '当前语音识别模型不可用，请确认已开通 qwen3-asr-flash';
-  return '语音识别失败，请稍后重试或改为文字填写';
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function cleanText(value: unknown): string {

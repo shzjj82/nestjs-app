@@ -1,4 +1,5 @@
 export { DeepSeekClient, extractJson } from './deepseek';
+export { detectLlmFamily, buildChatBody } from './llm-protocol';
 export type { ChatMessage, ChatTool, ChatResult, ToolCallPayload, JsonSchema } from './deepseek';
 export {
   loadSkill,
@@ -10,5 +11,6 @@ export type { SkillManifest, SkillTool, SkillTrigger, SkillRuntime, SkillPolicy 
 export { runSkillTool, runSkillToolJson, buildArgs, resolveSkillTools } from './skills/executor';
 export type { RunResult, RunOptions } from './skills/executor';
 export { TcmAgent } from './agent';
-export type { AgentReply, AgentStep } from './agent';
+export type { AgentReply, AgentStep, LlmPort } from './agent';
+export { AgentsLlmAdapter } from './agents-llm';
 export { parseYaml } from './mini-yaml';

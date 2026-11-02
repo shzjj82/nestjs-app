@@ -201,10 +201,15 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'POST', path: '/agents/chat', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CHAT, auth: ['jwt'], override: true }),
   business({ method: 'POST', path: '/agents/rag/search', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_RAG_SEARCH, auth: ['jwt'] }),
   business({ method: 'POST', path: '/agents/vision', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_VISION_PARSE, auth: ['jwt'], override: true }),
+  business({ method: 'POST', path: '/agents/speech/transcribe', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_SPEECH_TRANSCRIBE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/agents/video/submit', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_VIDEO_SUBMIT, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/agents/media/jobs/:id', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_MEDIA_JOB, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/agents/language/extract', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_LANGUAGE_EXTRACT, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/agents/language/complete', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_LANGUAGE_COMPLETE, auth: ['jwt'] }),
+
+  ...medicalRoutes(),
 ];
 
-function docsContentRoutes(prefix: '/docs/documents'): GatewayRoute[] {
-  const auth: GatewayAuth[] = ['jwt', 'docs-key'];
 /**
  * 中医诊所：诊所 token 在 medical 内校验，网关只要求 X-Biz-Code: medical。
  * 登录不走 usercenter JWT，避免 TCM 前端必须先拿平台会话。
@@ -243,7 +248,7 @@ function medicalRoutes(): GatewayRoute[] {
     medical({ method: 'POST', path: '/medical/knowledge/internal/sync', pattern: MQTT_PATTERNS.MEDICAL_KNOWLEDGE_INTERNAL_SYNC }),
 
     medical({ method: 'GET', path: '/medical/ai/status', pattern: MQTT_PATTERNS.MEDICAL_AI_STATUS }),
-    medical({ method: 'POST', path: '/medical/ai/chat', pattern: MQTT_PATTERNS.MEDICAL_AI_CHAT }),
+    medical({ method: 'POST', path: '/medical/ai/chat', pattern: MQTT_PATTERNS.MEDICAL_AI_CHAT, override: true }),
     medical({ method: 'POST', path: '/medical/ai/advise', pattern: MQTT_PATTERNS.MEDICAL_AI_ADVISE }),
     medical({ method: 'GET', path: '/medical/ai/advise', pattern: MQTT_PATTERNS.MEDICAL_AI_ADVISE }),
     medical({ method: 'POST', path: '/medical/ai/parse', pattern: MQTT_PATTERNS.MEDICAL_AI_PARSE }),
@@ -251,6 +256,7 @@ function medicalRoutes(): GatewayRoute[] {
     medical({ method: 'POST', path: '/medical/ai/compare', pattern: MQTT_PATTERNS.MEDICAL_AI_COMPARE }),
     medical({ method: 'POST', path: '/medical/ai/summary', pattern: MQTT_PATTERNS.MEDICAL_AI_SUMMARY }),
     medical({ method: 'POST', path: '/medical/ai/intake-audio', pattern: MQTT_PATTERNS.MEDICAL_AI_INTAKE_AUDIO }),
+    medical({ method: 'GET', path: '/medical/ai/jobs/:id', pattern: MQTT_PATTERNS.MEDICAL_AI_JOB }),
 
     medical({ method: 'GET', path: '/medical/skills', pattern: MQTT_PATTERNS.MEDICAL_SKILL_LIST }),
     medical({ method: 'GET', path: '/medical/skills/triggers', pattern: MQTT_PATTERNS.MEDICAL_SKILL_TRIGGERS }),
@@ -258,10 +264,23 @@ function medicalRoutes(): GatewayRoute[] {
     medical({ method: 'POST', path: '/medical/skills/chat', pattern: MQTT_PATTERNS.MEDICAL_SKILL_CHAT }),
     medical({ method: 'POST', path: '/medical/skills/followup', pattern: MQTT_PATTERNS.MEDICAL_SKILL_FOLLOWUP }),
 
-    medical({ method: 'POST', path: '/medical/files/tongue', pattern: MQTT_PATTERNS.MEDICAL_FILE_TONGUE }),
+    medical({
+      method: 'POST',
+      path: '/medical/files/tongue',
+      pattern: MQTT_PATTERNS.MEDICAL_FILE_TONGUE,
+      override: true,
+    }),
+    medical({
+      method: 'POST',
+      path: '/medical/files/assist',
+      pattern: MQTT_PATTERNS.MEDICAL_FILE_ASSIST,
+      override: true,
+    }),
   ];
 }
 
+function docsContentRoutes(prefix: '/docs/documents'): GatewayRoute[] {
+  const auth: GatewayAuth[] = ['jwt', 'docs-key'];
   const docs = (route: Omit<RouteInput, 'client'>) =>
     business({ ...route, client: DOCS_CLIENT });
   return [
@@ -290,9 +309,9 @@ export const SERVICE_API_DOCS: Array<{ client: string; service: string; pattern:
   { client: WECHAT_CLIENT, service: 'wechat', pattern: MQTT_PATTERNS.WECHAT_API_DOCS },
   { client: AGENTS_CLIENT, service: 'agents', pattern: MQTT_PATTERNS.AGENTS_API_DOCS },
   { client: RECYCLE_CLIENT, service: 'recycle', pattern: MQTT_PATTERNS.RECYCLE_API_DOCS },
+  { client: MEDICAL_CLIENT, service: 'medical', pattern: MQTT_PATTERNS.MEDICAL_API_DOCS },
 ];
 
-  { client: MEDICAL_CLIENT, service: 'medical', pattern: MQTT_PATTERNS.MEDICAL_API_DOCS },
 export interface BizApiCatalogItem {
   key: string;
   name: string;

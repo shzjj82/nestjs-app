@@ -1,5 +1,5 @@
-# medical 最小部署：gateway / usercenter / upload / medical
-# 不跑 order / docs / wechat / agents / recycle。镜像与 Dockerfile 仍用仓库根的 docker/。
+# medical 最小部署：gateway / usercenter / upload / medical / agents
+# 不跑 order / docs / wechat / recycle。镜像与 Dockerfile 仍用仓库根的 docker/。
 #
 #   npm run medical:docker:up
 #   docker compose -f deploy/medical/docker-compose.yml --project-name nestjs-medical up --build
@@ -11,6 +11,7 @@ x-app-env: &app-env
   MQTT_URL: mqtt://mosquitto:1883
   DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/${POSTGRES_DB:-nestjs}
   MEDICAL_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/medical
+  AGENTS_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/agents
   REDIS_URL: redis://redis:6379
   APP_VERSION: ${APP_VERSION:-0.0.1}
   EXPECTED_APP_VERSION: ${EXPECTED_APP_VERSION:-${APP_VERSION:-0.0.1}}
@@ -48,6 +49,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-nestjs}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ../../docker/postgres-init/04-create-agents.sh:/docker-entrypoint-initdb.d/04-create-agents.sh:ro
+      - ../../docker/postgres-init/05-enable-pgvector.sh:/docker-entrypoint-initdb.d/05-enable-pgvector.sh:ro
       - ../../docker/postgres-init/07-create-medical.sh:/docker-entrypoint-initdb.d/07-create-medical.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nestjs} -d ${POSTGRES_DB:-nestjs}"]
@@ -83,6 +86,8 @@ services:
       PORT: 3000
       MQTT_TIMEOUT_MS: ${MQTT_TIMEOUT_MS:-90000}
       UPLOAD_API_KEY: ${UPLOAD_API_KEY:-dev-upload-key}
+      AGENTS_HTTP_URL: http://agents:3006
+      MEDICAL_HTTP_URL: http://medical:3011
     depends_on: *app-depends
 
   usercenter:
@@ -132,11 +137,33 @@ services:
       AUTH_BOOTSTRAP_PASSWORD: ${AUTH_BOOTSTRAP_PASSWORD:-tcm123456}
       AUTH_SECRET: ${AUTH_SECRET:-tcm-dev-auth-secret-change-me}
       ID_CARD_KEY: ${ID_CARD_KEY:-}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_BASE_URL: ${LLM_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
-      LLM_MODEL: ${LLM_MODEL:-qwen-plus}
-      LLM_REASONER_MODEL: ${LLM_REASONER_MODEL:-}
+      AGENTS_HTTP_URL: http://agents:3006
       TCM_SKILLS_DIR: ${TCM_SKILLS_DIR:-}
+    depends_on: *app-depends
+
+  agents:
+    build:
+      <<: *app-build
+      args:
+        APP_NAME: agents
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+      INSTANCE_ID: agents
+      AGENTS_HTTP_PORT: 3006
+      AI_API_BASE: ${LLM_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      AI_API_KEY: ${LLM_API_KEY:-}
+      AI_MODEL: ${LLM_MODEL:-qwen-plus}
+      AI_REASONER_MODEL: ${LLM_REASONER_MODEL:-}
+      AI_ASR_API_BASE: ${LLM_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      AI_ASR_API_KEY: ${LLM_API_KEY:-}
+      AI_ASR_MODEL: ${AI_ASR_MODEL:-qwen3-asr-flash}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-90000}
+      TINGWU_APP_KEY: ${TINGWU_APP_KEY:-}
+      TINGWU_REGION: ${TINGWU_REGION:-cn-beijing}
+      ALIBABA_CLOUD_ACCESS_KEY_ID: ${ALIBABA_CLOUD_ACCESS_KEY_ID:-}
+      ALIBABA_CLOUD_ACCESS_KEY_SECRET: ${ALIBABA_CLOUD_ACCESS_KEY_SECRET:-}
     depends_on: *app-depends
 
 volumes:

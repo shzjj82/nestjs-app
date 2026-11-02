@@ -1,5 +1,7 @@
+export * from './agents.client';
 export * from './api-docs';
 export * from './env';
+export * from './llm-protocol';
 export * from './feature-catalog';
 export * from './gateway-routes';
 export * from './handle-log.interceptor';

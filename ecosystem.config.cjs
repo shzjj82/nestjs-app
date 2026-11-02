@@ -70,10 +70,23 @@ const agentsApps = replicate('agents', agentsReplicas, (id) => ({
   AGENTS_HTTP_PORT: String(
     Number.isFinite(agentsHttpPort) ? agentsHttpPort + id - 1 : 3006 + id - 1,
   ),
+  AGENTS_DATABASE_URL:
+    process.env.AGENTS_DATABASE_URL ??
+    databaseUrl.replace(/\/[^/?]+(\?|$)/, '/agents$1'),
   AI_API_BASE: process.env.AI_API_BASE ?? 'https://api.openai.com/v1',
   AI_API_KEY: process.env.AI_API_KEY ?? '',
   AI_MODEL: process.env.AI_MODEL ?? 'gpt-4o-mini',
+  AI_REASONER_MODEL: process.env.AI_REASONER_MODEL ?? '',
+  AI_ASR_API_BASE: process.env.AI_ASR_API_BASE ?? '',
+  AI_ASR_API_KEY: process.env.AI_ASR_API_KEY ?? '',
+  AI_ASR_MODEL: process.env.AI_ASR_MODEL ?? 'qwen3-asr-flash',
   AI_TIMEOUT_MS: process.env.AI_TIMEOUT_MS ?? '90000',
+  TINGWU_APP_KEY: process.env.TINGWU_APP_KEY ?? '',
+  TINGWU_REGION: process.env.TINGWU_REGION ?? 'cn-beijing',
+  ALIBABA_CLOUD_ACCESS_KEY_ID:
+    process.env.ALIBABA_CLOUD_ACCESS_KEY_ID ?? process.env.ALIYUN_ACCESS_KEY_ID ?? '',
+  ALIBABA_CLOUD_ACCESS_KEY_SECRET:
+    process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET ?? process.env.ALIYUN_ACCESS_KEY_SECRET ?? '',
 }));
 
 module.exports = {
@@ -99,6 +112,7 @@ module.exports = {
           'http://localhost:3100,http://127.0.0.1:3100',
         AGENTS_MQTT_TIMEOUT_MS: process.env.AGENTS_MQTT_TIMEOUT_MS ?? '90000',
         AGENTS_HTTP_URL: process.env.AGENTS_HTTP_URL ?? 'http://127.0.0.1:3006',
+        MEDICAL_HTTP_URL: process.env.MEDICAL_HTTP_URL ?? 'http://127.0.0.1:3011',
       },
     },
     ...usercenterApps,
@@ -213,13 +227,9 @@ module.exports = {
         AUTH_BOOTSTRAP_PASSWORD: process.env.AUTH_BOOTSTRAP_PASSWORD ?? 'tcm123456',
         AUTH_SECRET: process.env.AUTH_SECRET ?? 'tcm-dev-auth-secret-change-me',
         ID_CARD_KEY: process.env.ID_CARD_KEY ?? '',
-        LLM_API_KEY: process.env.LLM_API_KEY ?? '',
-        LLM_BASE_URL:
-          process.env.LLM_BASE_URL ??
-          'https://dashscope.aliyuncs.com/compatible-mode/v1',
-        LLM_MODEL: process.env.LLM_MODEL ?? 'qwen-plus',
-        LLM_REASONER_MODEL: process.env.LLM_REASONER_MODEL ?? '',
+        AGENTS_HTTP_URL: process.env.AGENTS_HTTP_URL ?? 'http://127.0.0.1:3006',
         TCM_SKILLS_DIR: process.env.TCM_SKILLS_DIR ?? '',
+        MEDICAL_HTTP_PORT: process.env.MEDICAL_HTTP_PORT ?? '3011',
       },
     },
     ...agentsApps,

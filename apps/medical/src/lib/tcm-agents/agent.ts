@@ -1,12 +1,12 @@
 /**
- * Agent 主循环：把 Skill 工具暴露给 DeepSeek 做 function calling。
+ * Agent 主循环：把 Skill 工具暴露给语言模型做 function calling。
  *
  * 两条运行路径：
- * 1) 有 DEEPSEEK_API_KEY：模型自行选择工具 → 执行 → 由模型综合成自然语言答复；
- * 2) 无 Key（或调用失败）：按 skill.yaml 的 intent_routes 关键词做规则路由，
+ * 1) 已接入 llm（走 agents）：模型自行选择工具 → 执行 → 由模型综合成自然语言答复；
+ * 2) 未接入：按 skill.yaml 的 intent_routes 关键词做规则路由，
  *    直接执行对应命令并把原始输出返回，**流程不中断**，产物标记为 degraded。
  */
-import { DeepSeekClient, type ChatMessage, type ChatTool, type ToolCallPayload } from './deepseek';
+import type { ChatMessage, ChatTool, ToolCallPayload } from './deepseek';
 import { loadSkills, matchSkill, type SkillManifest, type SkillTool } from './skills/registry';
 import { runSkillTool } from './skills/executor';
 
@@ -37,18 +37,33 @@ const SYSTEM_PROMPT = `你是中医诊所的 AI 助手，负责把日常接诊�
 
 const MAX_ROUNDS = 8;
 
-export interface TcmAgentOptions {
-  skillsRoot: string;
-  client?: DeepSeekClient;
+export interface LlmPort {
+  enabled: boolean;
+  chat(messages: ChatMessage[], opts?: { temperature?: number; reasoner?: boolean }): Promise<string>;
+  completions(
+    messages: ChatMessage[],
+    opts?: { tools?: ChatTool[]; temperature?: number; reasoner?: boolean },
+  ): Promise<{ content: string; toolCalls: ToolCallPayload[] }>;
 }
 
+export interface TcmAgentOptions {
+  skillsRoot: string;
+  llm?: LlmPort;
+}
+
+const DISABLED_LLM: LlmPort = {
+  enabled: false,
+  chat: async () => '',
+  completions: async () => ({ content: '', toolCalls: [] }),
+};
+
 export class TcmAgent {
-  readonly client: DeepSeekClient;
+  readonly llm: LlmPort;
   readonly skills: SkillManifest[];
   private toolIndex = new Map<string, { manifest: SkillManifest; tool: SkillTool }>();
 
   constructor(options: TcmAgentOptions) {
-    this.client = options.client ?? new DeepSeekClient();
+    this.llm = options.llm ?? DISABLED_LLM;
     this.skills = loadSkills(options.skillsRoot);
     for (const manifest of this.skills) {
       for (const tool of manifest.tools) {
@@ -97,13 +112,13 @@ export class TcmAgent {
       { role: 'user', content: input },
     ];
 
-    if (!this.client.enabled) {
+    if (!this.llm.enabled) {
       return this.ruleRoute(chosen, input);
     }
 
     const steps: AgentStep[] = [];
     for (let round = 0; round < MAX_ROUNDS; round += 1) {
-      const result = await this.client.completions(messages, { tools: this.toChatTools(), temperature: 0.2 });
+      const result = await this.llm.completions(messages, { tools: this.toChatTools(), temperature: 0.2 });
       if (result.toolCalls.length === 0) {
         return { text: result.content || '（模型未返回内容）', steps, mode: 'llm', usedSkill: chosen.id };
       }
@@ -123,7 +138,7 @@ export class TcmAgent {
         });
       }
     }
-    const tail = await this.client.chat([...messages, {
+    const tail = await this.llm.chat([...messages, {
       role: 'user',
       content: '请根据已获取的工具结果给出简明答复（中文，含必要的后续建议）。',
     }]);
@@ -155,8 +170,7 @@ export class TcmAgent {
       (lowered.includes('对比') || lowered.includes('疗效') ? lastByName(manifest, 'summary') : undefined);
     if (!toolName) {
       return {
-        text: '未配置 DEEPSEEK_API_KEY，当前只能命中明确的关键词命令（建档/治疗建议/疗效对比）。'
-          + '配置 Key 后可完整理解自然语言。',
+        text: '语言模型未接入，当前只能命中明确的关键词命令（建档/治疗建议/疗效对比）。',
         steps: [],
         mode: 'rule',
         usedSkill: manifest.id,

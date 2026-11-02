@@ -7,9 +7,9 @@ set -euo pipefail
 #   ./deploy/medical/scripts/start.sh
 #   ./deploy/medical/scripts/start.sh --force     # 即使环境已一致也重建
 #
-# 与根目录 scripts/pm2/start.sh 的区别 —— 只跑 4 个服务：
-#   gateway / usercenter / upload / medical
-# 不跑 order、docs、wechat、agents、recycle。
+# 与根目录 scripts/pm2/start.sh 的区别 —— 只跑诊所需要的服务：
+#   gateway / usercenter / upload / medical / agents
+# 不跑 order、docs、wechat、recycle。
 #
 # 流程：加载环境变量 → 检查基础设施 → 按 env 里的库名确保 database 存在（没有就建）
 #       → 若运行中进程已 online 且环境一致则跳过编译/拉起，但仍跑开通脚本
@@ -62,11 +62,16 @@ db_name() {
 }
 USERCENTER_DB="$(db_name "$USERCENTER_DATABASE_URL")"
 MEDICAL_DB="$(db_name "$MEDICAL_DATABASE_URL")"
+AGENTS_DATABASE_URL="${AGENTS_DATABASE_URL:-}"
+if [[ -z "$AGENTS_DATABASE_URL" && -n "$DATABASE_URL" ]]; then
+  AGENTS_DATABASE_URL="$(node -e 'const u=new URL(process.argv[1]); u.pathname="/agents"; console.log(u.toString())' "$DATABASE_URL")"
+fi
+AGENTS_DB="$(db_name "$AGENTS_DATABASE_URL")"
 
 export MQTT_URL DATABASE_URL USERCENTER_DATABASE_URL REDIS_URL PORT
-export MEDICAL_DATABASE_URL
+export MEDICAL_DATABASE_URL AGENTS_DATABASE_URL
 
-SERVICES=(gateway usercenter upload medical)
+SERVICES=(gateway usercenter upload medical agents)
 PM2_APPS=("${SERVICES[@]}")
 
 if [[ "${SKIP_INFRA:-0}" != "1" ]]; then
@@ -119,7 +124,8 @@ echo
 echo "=== 准备数据库（按环境变量，缺则新建）==="
 echo "  usercenter -> $USERCENTER_DB"
 echo "  medical    -> $MEDICAL_DB"
-node "$DB_TOOL" ensure --admin "$USERCENTER_DATABASE_URL" --dbs "$USERCENTER_DB,$MEDICAL_DB"
+echo "  agents     -> $AGENTS_DB"
+node "$DB_TOOL" ensure --admin "$USERCENTER_DATABASE_URL" --dbs "$USERCENTER_DB,$MEDICAL_DB,$AGENTS_DB"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "未找到 node，请先安装 Node.js 18+" >&2
@@ -247,7 +253,7 @@ echo "=== 健康检查 ==="
 node -e '
 const http = require("http");
 const port = Number(process.argv[1]);
-const paths = ["/medical/health", "/upload/health"];
+const paths = ["/medical/health", "/upload/health", "/agents/health"];
 const get = (p) => new Promise((res) => {
   const req = http.get({ host: "127.0.0.1", port, path: p, timeout: 8000 }, (r) => {
     let d = ""; r.on("data", (c) => (d += c)); r.on("end", () => res(r.statusCode));

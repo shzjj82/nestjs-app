@@ -10,6 +10,10 @@ export function aiModel(): string {
   return process.env.AI_MODEL?.trim() || 'gpt-4o-mini';
 }
 
+export function aiReasonerModel(): string {
+  return process.env.AI_REASONER_MODEL?.trim() || aiModel();
+}
+
 export function aiVisionModel(): string {
   return process.env.AI_VISION_MODEL?.trim() || 'qwen-vl-max';
 }
@@ -44,6 +48,34 @@ export function aiEmbeddingDim(): number {
 export function aiTimeoutMs(): number {
   const n = Number(process.env.AI_TIMEOUT_MS ?? 90_000);
   return Number.isFinite(n) && n > 0 ? n : 90_000;
+}
+
+export function aiAsrApiBase(): string {
+  const dedicated = process.env.AI_ASR_API_BASE?.trim();
+  if (dedicated) return dedicated.replace(/\/+$/, '');
+  if (process.env.AI_API_BASE?.trim()) return aiApiBase();
+  return 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+}
+
+export function aiAsrApiKey(): string {
+  return process.env.AI_ASR_API_KEY?.trim() || aiApiKey();
+}
+
+export function aiAsrModel(): string {
+  const configured = (process.env.AI_ASR_MODEL ?? '').trim();
+  if (configured && !/^paraformer-v2$/i.test(configured)) return configured;
+  return 'qwen3-asr-flash';
+}
+
+export function asrConfigured(): boolean {
+  return Boolean(aiAsrApiKey());
+}
+
+export function tingwuConfigured(): boolean {
+  const key = process.env.TINGWU_APP_KEY?.trim();
+  const id = process.env.ALIBABA_CLOUD_ACCESS_KEY_ID?.trim() || process.env.ALIYUN_ACCESS_KEY_ID?.trim();
+  const secret = process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET?.trim() || process.env.ALIYUN_ACCESS_KEY_SECRET?.trim();
+  return Boolean(key && id && secret);
 }
 
 export function aiConfigured(): boolean {

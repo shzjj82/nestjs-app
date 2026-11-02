@@ -138,6 +138,8 @@ describe('matchRoute', () => {
     expect(matchRoute('POST', '/agents/vision')?.override).toBe(true);
     expect(matchRoute('POST', '/agents/vision')?.auth).toEqual(['jwt']);
     expect(matchRoute('POST', '/agents/vision')?.pattern).toBe(MQTT_PATTERNS.AGENTS_VISION_PARSE);
+    expect(matchRoute('POST', '/agents/language/extract')?.pattern).toBe(MQTT_PATTERNS.AGENTS_LANGUAGE_EXTRACT);
+    expect(matchRoute('POST', '/agents/language/complete')?.pattern).toBe(MQTT_PATTERNS.AGENTS_LANGUAGE_COMPLETE);
     expect(matchRoute('POST', '/agents/chat/async')).toBeNull();
     expect(matchRoute('GET', '/agents/jobs/job-1')).toBeNull();
   });

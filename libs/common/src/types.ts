@@ -404,10 +404,35 @@ export interface AgentChatInput {
   system?: string;
   /** true（默认）一次返回完整 reply；false 上游 stream，网关 SSE 转给前端 */
   sync?: boolean;
+  temperature?: number;
   /** true 时用当前业务下账号可见文档做 RAG 增强；未配 embedding 时忽略 */
   rag?: boolean;
   /** RAG 取回片段数，默认 6 */
   ragTopK?: number;
+}
+
+export interface AgentCompleteMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: AgentToolCall[];
+}
+
+export interface AgentChatTool {
+  type: 'function';
+  function: { name: string; description: string; parameters: Record<string, unknown> };
+}
+
+export interface AgentToolCall {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+}
+
+export interface AgentCompleteResult {
+  content: string;
+  toolCalls: AgentToolCall[];
 }
 
 export interface AgentRagSource {

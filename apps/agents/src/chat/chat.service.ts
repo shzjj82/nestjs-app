@@ -6,6 +6,7 @@ import type {
   AgentChatStreamEvent,
   AgentRagSource,
 } from '@app/common';
+import { buildChatBody, detectLlmFamily, textFromStreamData } from '@app/common';
 import { asRecord } from '../common/rpc';
 import { rpcFail } from '../common/rpc';
 import { RagPort } from '../rag/rag-port';
@@ -20,7 +21,7 @@ import {
   ragContextAppendix,
   type UpstreamMessage,
 } from './chat-messages';
-import { contentFromUpstreamData, splitSseBlocks } from './chat-stream';
+import { splitSseBlocks } from './chat-stream';
 
 @Injectable()
 export class ChatService {
@@ -55,13 +56,14 @@ export class ChatService {
         for await (const delta of this.iterateUpstream(
           prepared.imageUrls.length ? prepared.withVision : prepared.textOnly,
           controller.signal,
+          input.temperature,
         )) {
           reply += delta;
           yield { delta };
         }
       } catch (err) {
         if (prepared.imageUrls.length && reply === '' && isUpstreamError(err)) {
-          for await (const delta of this.iterateUpstream(prepared.textOnly, controller.signal)) {
+          for await (const delta of this.iterateUpstream(prepared.textOnly, controller.signal, input.temperature)) {
             reply += delta;
             yield { delta };
           }
@@ -95,10 +97,11 @@ export class ChatService {
           prepared.imageUrls.length ? prepared.withVision : prepared.textOnly,
           controller.signal,
           false,
+          input.temperature,
         );
       } catch (err) {
         if (prepared.imageUrls.length && isUpstreamError(err)) {
-          reply = await this.callModel(prepared.textOnly, controller.signal, false);
+          reply = await this.callModel(prepared.textOnly, controller.signal, false, input.temperature);
         } else {
           throw err;
         }
@@ -163,8 +166,9 @@ export class ChatService {
     messages: UpstreamMessage[],
     signal: AbortSignal,
     stream: boolean,
+    temperature?: number,
   ): Promise<string> {
-    const res = await this.postCompletions(messages, signal, stream);
+    const res = await this.postCompletions(messages, signal, stream, temperature);
     if (stream) {
       return '';
     }
@@ -177,8 +181,9 @@ export class ChatService {
   private async *iterateUpstream(
     messages: UpstreamMessage[],
     signal: AbortSignal,
+    temperature?: number,
   ): AsyncGenerator<string> {
-    const res = await this.postCompletions(messages, signal, true);
+    const res = await this.postCompletions(messages, signal, true, temperature);
     if (!res.body) {
       rpcFail(502, 'AI_EMPTY');
     }
@@ -194,7 +199,7 @@ export class ChatService {
       const split = splitSseBlocks(buffer);
       buffer = split.rest;
       for (const data of split.events) {
-        const delta = contentFromUpstreamData(data);
+        const delta = textFromStreamData(data);
         if (delta) {
           yield delta;
         }
@@ -206,19 +211,24 @@ export class ChatService {
     messages: UpstreamMessage[],
     signal: AbortSignal,
     stream: boolean,
+    temperature?: number,
   ): Promise<Response> {
+    const model = aiModel();
     const res = await fetch(`${aiApiBase()}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${aiApiKey()}`,
       },
-      body: JSON.stringify({
-        model: aiModel(),
-        temperature: 0.7,
-        messages,
-        stream,
-      }),
+      body: JSON.stringify(
+        buildChatBody({
+          family: detectLlmFamily(model, aiApiBase()),
+          model,
+          messages,
+          stream,
+          temperature: temperature ?? 0.3,
+        }),
+      ),
       signal,
     });
     if (!res.ok) {

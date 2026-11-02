@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { join } from 'node:path';
+import { AgentsClient } from '@app/common';
 import {
+  AgentsLlmAdapter,
   SkillManifest,
   SkillTool,
   TcmAgent,
@@ -22,6 +24,8 @@ export class SkillsService implements OnModuleInit {
   private agent?: TcmAgent;
   private index = new Map<string, { manifest: SkillManifest; tool: SkillTool }>();
 
+  constructor(private readonly agents: AgentsClient) {}
+
   onModuleInit() {
     this.reload();
   }
@@ -32,7 +36,10 @@ export class SkillsService implements OnModuleInit {
     for (const manifest of this.manifests) {
       for (const tool of manifest.tools) this.index.set(tool.name, { manifest, tool });
     }
-    this.agent = new TcmAgent({ skillsRoot: this.root });
+    this.agent = new TcmAgent({
+      skillsRoot: this.root,
+      llm: new AgentsLlmAdapter(this.agents),
+    });
     this.logger.log(`已加载 ${this.manifests.length} 个 Skill：${this.manifests.map((s) => s.id).join(', ')}`);
     return this.manifests;
   }
