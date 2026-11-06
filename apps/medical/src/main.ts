@@ -9,11 +9,15 @@ import { MedicalModule } from './medical.module';
 async function bootstrap() {
   await ensureMedicalDatabase();
   const app = await NestFactory.create(MedicalModule);
-  const mqtt = app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.MQTT,
-    options: mqttBrokerOptions('medical'),
-  });
-  mqtt.useGlobalFilters(new HttpRpcFilter());
+  // inheritAppConfig：MQTT 侧继承全局 Filter，否则 HttpException 会变成网关 502 Internal server error
+  app.useGlobalFilters(new HttpRpcFilter());
+  app.connectMicroservice<MicroserviceOptions>(
+    {
+      transport: Transport.MQTT,
+      options: mqttBrokerOptions('medical'),
+    },
+    { inheritAppConfig: true },
+  );
   app.enableShutdownHooks();
   await app.startAllMicroservices();
   const port = Number(process.env.MEDICAL_HTTP_PORT ?? 3011);

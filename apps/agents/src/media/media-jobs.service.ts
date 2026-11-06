@@ -6,12 +6,14 @@ import { asRecord, optionalString, rpcFail } from '../common/rpc';
 import { MediaJobEntity } from '../entities/media-job.entity';
 import { TingwuClient } from './tingwu.client';
 
-const BACKOFF_MS = [15_000, 30_000, 60_000, 120_000, 300_000];
+const BACKOFF_MS = [5_000, 10_000, 20_000, 40_000, 60_000];
 const MAX_AGE_MS = 4 * 60 * 60 * 1000;
 const POLL_BATCH = 10;
 
 @Injectable()
 export class MediaJobsService {
+  private readonly refreshing = new Map<string, Promise<void>>();
+
   constructor(
     @InjectRepository(MediaJobEntity) private readonly jobs: Repository<MediaJobEntity>,
     private readonly dataSource: DataSource,
@@ -77,7 +79,34 @@ export class MediaJobsService {
     if (!bizCode) rpcFail(400, '缺少业务标识');
     const job = await this.jobs.findOne({ where: { id, bizCode } });
     if (!job) rpcFail(404, '任务不存在');
+    if (this.shouldRefresh(job)) {
+      try {
+        await this.refresh(job);
+      } catch {
+        // pollOne 已把失败记在任务上，查询仍返回当前进度。
+      }
+      const fresh = await this.jobs.findOne({ where: { id, bizCode } });
+      if (fresh) return publicJob(fresh);
+    }
     return publicJob(job);
+  }
+
+  private refresh(job: MediaJobEntity): Promise<void> {
+    const pending = this.refreshing.get(job.id);
+    if (pending) return pending;
+    const task = this.pollOne(job).finally(() => {
+      this.refreshing.delete(job.id);
+    });
+    this.refreshing.set(job.id, task);
+    return task;
+  }
+
+  /** 查询时顺手问一次听悟，避免只靠 20 秒定时轮询。 */
+  private shouldRefresh(job: MediaJobEntity): boolean {
+    if (!job.upstreamTaskId) return false;
+    if (job.status !== 'submitted' && job.status !== 'polling') return false;
+    const touched = job.updatedAt?.getTime() ?? 0;
+    return Date.now() - touched >= 3_000;
   }
 
   async pollDue(): Promise<number> {
@@ -93,7 +122,7 @@ export class MediaJobsService {
       `
         UPDATE ag_media_jobs SET
           status = 'polling',
-          next_poll_at = NOW() + interval '2 minutes',
+          next_poll_at = NOW() + interval '30 seconds',
           poll_count = poll_count + 1
         WHERE id IN (
           SELECT id FROM ag_media_jobs

@@ -27,7 +27,7 @@ export class TingwuClient {
       AppKey: this.appKey(),
       Input: {
         SourceLanguage: 'cn',
-        FileUrl: input.fileUrl,
+        FileUrl: readableOssUrl(input.fileUrl),
         TaskKey: input.taskKey ?? '',
       },
       Parameters: {
@@ -148,6 +148,47 @@ export class TingwuClient {
     }
     return json;
   }
+}
+
+/** 私有 OSS 地址换成 6 小时可读链接，听悟才能拉取。已签名或非本桶地址原样返回。 */
+function readableOssUrl(fileUrl: string): string {
+  const bucket = process.env.OSS_BUCKET?.trim() ?? '';
+  const region = (process.env.OSS_REGION?.trim() || 'oss-cn-shanghai').replace(/^https?:\/\//, '');
+  const hostRegion = region.startsWith('oss-') ? region : `oss-${region}`;
+  const keyId =
+    process.env.OSS_ACCESS_KEY_ID?.trim() ||
+    process.env.ALIYUN_ACCESS_KEY_ID?.trim() ||
+    '';
+  const secret =
+    process.env.OSS_ACCESS_KEY_SECRET?.trim() ||
+    process.env.ALIYUN_ACCESS_KEY_SECRET?.trim() ||
+    '';
+  if (!bucket || !keyId || !secret) return fileUrl;
+  let url: URL;
+  try {
+    url = new URL(fileUrl);
+  } catch {
+    return fileUrl;
+  }
+  if (url.searchParams.has('Signature') || url.searchParams.has('X-Amz-Signature')) return fileUrl;
+  if (!url.hostname.endsWith('.aliyuncs.com')) return fileUrl;
+  const virtualHost = `${bucket}.${hostRegion}.aliyuncs.com`;
+  let objectKey = '';
+  if (url.hostname === virtualHost || url.hostname.startsWith(`${bucket}.`)) {
+    objectKey = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+  } else if (url.pathname.startsWith(`/${bucket}/`)) {
+    objectKey = decodeURIComponent(url.pathname.slice(bucket.length + 2));
+  }
+  if (!objectKey) return fileUrl;
+  const expires = Math.floor(Date.now() / 1000) + 6 * 60 * 60;
+  const stringToSign = `GET\n\n\n${expires}\n/${bucket}/${objectKey}`;
+  const signature = createHmac('sha1', secret).update(stringToSign).digest('base64');
+  const path = objectKey.split('/').map((part) => encodeURIComponent(part)).join('/');
+  const signed = new URL(`https://${virtualHost}/${path}`);
+  signed.searchParams.set('OSSAccessKeyId', keyId);
+  signed.searchParams.set('Expires', String(expires));
+  signed.searchParams.set('Signature', signature);
+  return signed.toString();
 }
 
 function signAcs3(input: {

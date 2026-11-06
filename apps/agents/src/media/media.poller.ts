@@ -9,7 +9,7 @@ export class MediaPoller {
 
   constructor(private readonly jobs: MediaJobsService) {}
 
-  @Interval(20_000)
+  @Interval(8_000)
   async tick() {
     if (this.running) return;
     this.running = true;

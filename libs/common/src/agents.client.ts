@@ -184,7 +184,7 @@ export class AgentsClient implements OnModuleInit {
     return this.send(MQTT_PATTERNS.AGENTS_MEDIA_JOB, {
       id: input.id,
       _bizCode: input.bizCode,
-    }, 15_000);
+    }, 30_000);
   }
 
   private async send<T>(pattern: string, payload: Record<string, unknown>, timeoutMs: number): Promise<T> {
