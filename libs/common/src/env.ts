@@ -26,31 +26,6 @@ export function databaseUrl(): string {
   return `postgres://${user}:${password}@${host}:${port}/${database}`;
 }
 
-/** wechat 默认独立库 `wechat`；可用 WECHAT_DATABASE_URL 覆盖 */
-export function wechatDatabaseUrl(): string {
-  if (process.env.WECHAT_DATABASE_URL) {
-    return process.env.WECHAT_DATABASE_URL;
-  }
-  const shared = databaseUrl();
-  try {
-    const parsed = new URL(shared);
-    parsed.pathname = '/wechat';
-    return parsed.toString();
-  } catch {
-    return shared.replace(/\/[^/?]+(\?|$)/, '/wechat$1');
-  }
-}
-
-/** order 默认独立库 `order`；可用 ORDER_DATABASE_URL 覆盖 */
-export function orderDatabaseUrl(): string {
-  return namedDatabaseUrl('ORDER_DATABASE_URL', 'order');
-}
-
-/** agents 默认独立库 `agents`；可用 AGENTS_DATABASE_URL 覆盖 */
-export function agentsDatabaseUrl(): string {
-  return namedDatabaseUrl('AGENTS_DATABASE_URL', 'agents');
-}
-
 function namedDatabaseUrl(envName: string, database: string): string {
   if (process.env[envName]) {
     return process.env[envName] as string;
@@ -65,39 +40,49 @@ function namedDatabaseUrl(envName: string, database: string): string {
   }
 }
 
+/** wechat 默认独立库 `wechat`；可用 WECHAT_DATABASE_URL 覆盖 */
+export function wechatDatabaseUrl(): string {
+  return namedDatabaseUrl('WECHAT_DATABASE_URL', 'wechat');
+}
+
+/** order 默认独立库 `order`；可用 ORDER_DATABASE_URL 覆盖 */
+export function orderDatabaseUrl(): string {
+  return namedDatabaseUrl('ORDER_DATABASE_URL', 'order');
+}
+
+/** agents 默认独立库 `agents`；可用 AGENTS_DATABASE_URL 覆盖 */
+export function agentsDatabaseUrl(): string {
+  return namedDatabaseUrl('AGENTS_DATABASE_URL', 'agents');
+}
+
 /** docs 默认独立库 `docs`；可用 DOCS_DATABASE_URL 覆盖 */
 export function docsDatabaseUrl(): string {
-  if (process.env.DOCS_DATABASE_URL) {
-    return process.env.DOCS_DATABASE_URL;
-  }
-  const shared = databaseUrl();
-  try {
-    const parsed = new URL(shared);
-    parsed.pathname = '/docs';
-    return parsed.toString();
-  } catch {
-    return shared.replace(/\/[^/?]+(\?|$)/, '/docs$1');
-  }
+  return namedDatabaseUrl('DOCS_DATABASE_URL', 'docs');
 }
 
 /** recycle 默认独立库 `recycle`；可用 RECYCLE_DATABASE_URL 覆盖 */
 export function recycleDatabaseUrl(): string {
-  if (process.env.RECYCLE_DATABASE_URL) {
-    return process.env.RECYCLE_DATABASE_URL;
-  }
-  const shared = databaseUrl();
-  try {
-    const parsed = new URL(shared);
-    parsed.pathname = '/recycle';
-    return parsed.toString();
-  } catch {
-    return shared.replace(/\/[^/?]+(\?|$)/, '/recycle$1');
-  }
+  return namedDatabaseUrl('RECYCLE_DATABASE_URL', 'recycle');
 }
 
 /** 回收服务内部事件密钥；跨上下文事件必须携带，防止伪造 */
 export function recycleInternalKey(): string {
   return readEnv('RECYCLE_INTERNAL_KEY', 'dev-recycle-internal-key');
+}
+
+/** notify 默认独立库 `notify`；可用 NOTIFY_DATABASE_URL 覆盖 */
+export function notifyDatabaseUrl(): string {
+  return namedDatabaseUrl('NOTIFY_DATABASE_URL', 'notify');
+}
+
+/** 消息服务内部投递密钥；其它微服务发通知时必须携带 */
+export function notifyInternalKey(): string {
+  return readEnv('NOTIFY_INTERNAL_KEY', 'dev-notify-internal-key');
+}
+
+/** 实时通知 topic：notify/{bizCode}/{userId} */
+export function notifyTopic(bizCode: string, userId: string): string {
+  return `notify/${bizCode}/${userId}`;
 }
 
 

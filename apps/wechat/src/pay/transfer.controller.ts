@@ -1,7 +1,6 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-import { ApiDoc, MQTT_PATTERNS, WechatHandleLogInterceptor } from '@app/common';
-import { wechatPattern } from '../common/rpc';
+import { ApiDoc, MQTT_PATTERNS, WechatHandleLogInterceptor, sharePattern, MQTT_GROUPS } from '@app/common';
 import { TransferService } from './transfer.service';
 
 @Controller()
@@ -9,7 +8,7 @@ import { TransferService } from './transfer.service';
 export class TransferController {
   constructor(private readonly transfer: TransferService) {}
 
-  @MessagePattern(wechatPattern(MQTT_PATTERNS.WECHAT_TRANSFER_CREATE))
+  @MessagePattern(sharePattern(MQTT_GROUPS.WECHAT, MQTT_PATTERNS.WECHAT_TRANSFER_CREATE))
   @ApiDoc({
     name: '发起商家转账',
     description:
@@ -19,7 +18,7 @@ export class TransferController {
     return this.transfer.create(payload);
   }
 
-  @MessagePattern(wechatPattern(MQTT_PATTERNS.WECHAT_TRANSFER_QUERY))
+  @MessagePattern(sharePattern(MQTT_GROUPS.WECHAT, MQTT_PATTERNS.WECHAT_TRANSFER_QUERY))
   @ApiDoc({
     name: '查询商家转账单',
     description: '按商户单号查单，用于同步收款确认结果',

@@ -368,6 +368,9 @@ export const PERMISSIONS = {
   WECHAT_QUERY: 'wechat.query',
   WECHAT_MANAGE: 'wechat.manage',
   WECHAT_QRCODE: 'wechat.qrcode',
+
+  NOTIFY_SEND: 'notify.send',
+  TODO_ASSIGN: 'todo.assign',
 } as const;
 
 /** 功能点目录分类展示顺序（含业务模块） */
@@ -390,6 +393,8 @@ export const PERMISSION_MODULE_ORDER = [
   '回收·订单',
   '回收·审批',
   '智能助手',
+  '消息通知',
+  '待办',
 ] as const;
 
 export type AgentChatRole = 'user' | 'assistant';

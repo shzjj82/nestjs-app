@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { compare } from 'bcrypt';
 import { TokenStore } from '@app/common';
 import type { AuthResult, AuthSession, User } from '@app/common';
-import { ClientsService } from '../apps/clients.service';
+import { ClientsService } from '../clients/clients.service';
 import { BusinessesService } from '../businesses/businesses.service';
 import type { AccountEntity, AccountType, BusinessEntity, ClientEntity } from '../entities';
 import { RbacService } from '../rbac/rbac.service';

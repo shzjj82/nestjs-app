@@ -1,7 +1,6 @@
 import { Controller, Logger, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-import { AgentsHandleLogInterceptor, ApiDoc, MQTT_PATTERNS } from '@app/common';
-import { agentsPattern } from '../common/rpc';
+import { AgentsHandleLogInterceptor, ApiDoc, MQTT_PATTERNS, sharePattern, MQTT_GROUPS } from '@app/common';
 import { RagService } from './rag.service';
 
 @Controller()
@@ -11,7 +10,7 @@ export class RagController {
 
   constructor(private readonly rag: RagService) {}
 
-  @MessagePattern(agentsPattern(MQTT_PATTERNS.AGENTS_RAG_INDEX))
+  @MessagePattern(sharePattern(MQTT_GROUPS.AGENTS, MQTT_PATTERNS.AGENTS_RAG_INDEX))
   @ApiDoc({ name: '索引文档', description: '内部：docs 保存后重建向量分块' })
   async index(payload: unknown) {
     try {
@@ -24,7 +23,7 @@ export class RagController {
     }
   }
 
-  @MessagePattern(agentsPattern(MQTT_PATTERNS.AGENTS_RAG_DELETE))
+  @MessagePattern(sharePattern(MQTT_GROUPS.AGENTS, MQTT_PATTERNS.AGENTS_RAG_DELETE))
   @ApiDoc({ name: '删除文档索引', description: '内部：docs 删除后清理向量' })
   async remove(payload: unknown) {
     try {
@@ -37,7 +36,7 @@ export class RagController {
     }
   }
 
-  @MessagePattern(agentsPattern(MQTT_PATTERNS.AGENTS_RAG_DELETE_BY_SOURCE))
+  @MessagePattern(sharePattern(MQTT_GROUPS.AGENTS, MQTT_PATTERNS.AGENTS_RAG_DELETE_BY_SOURCE))
   @ApiDoc({
     name: '按附件删除索引',
     description: '内部：文档去掉附件或 OSS 删对象后清理对应向量',
@@ -53,7 +52,7 @@ export class RagController {
     }
   }
 
-  @MessagePattern(agentsPattern(MQTT_PATTERNS.AGENTS_RAG_SEARCH))
+  @MessagePattern(sharePattern(MQTT_GROUPS.AGENTS, MQTT_PATTERNS.AGENTS_RAG_SEARCH))
   @ApiDoc({
     name: '文档向量检索',
     description: '按当前业务与账号可见范围检索文档分块',

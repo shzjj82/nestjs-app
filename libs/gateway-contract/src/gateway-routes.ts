@@ -3,12 +3,14 @@ import {
   DOCS_CLIENT,
   MQTT_PATTERNS,
   ORDER_CLIENT,
+  NOTIFY_CLIENT,
   RECYCLE_CLIENT,
   UPLOAD_CLIENT,
   USER_CLIENT,
   WECHAT_CLIENT,
-} from './patterns';
-import { PERMISSIONS } from './types';
+  microserviceApiDocs,
+  PERMISSIONS,
+} from '@app/common';
 
 export type GatewayAuth = 'jwt' | 'admin' | 'docs-key' | 'upload-key';
 export type GatewayHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -195,6 +197,23 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'POST', path: '/recycle/approvals/:id/cancel', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_APPROVAL_CANCEL, auth: ['jwt'] }),
   business({ method: 'GET', path: '/recycle/approvals/:id/records', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_APPROVAL_RECORDS, auth: ['jwt'] }),
 
+  { method: 'GET', path: '/notifications/health', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_HEALTH },
+  business({ method: 'GET', path: '/notifications/socket', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_SOCKET, auth: ['jwt'], override: true }),
+  business({ method: 'GET', path: '/notifications/unread-count', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_UNREAD_COUNT, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/notifications/read-all', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_READ_ALL, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/notifications', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_LIST, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/notifications/:id', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_FIND_ONE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/notifications/:id/read', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_READ, auth: ['jwt'] }),
+  platform({ method: 'POST', path: '/notifications', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_ADMIN_SEND, permissions: [PERMISSIONS.NOTIFY_SEND] }),
+
+  business({ method: 'GET', path: '/todos/open-count', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_OPEN_COUNT, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/todos', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_LIST, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/todos', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_CREATE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/todos/:id/done', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_DONE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/todos/:id/cancel', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_CANCEL, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/todos/:id', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_FIND_ONE, auth: ['jwt'] }),
+  platform({ method: 'POST', path: '/todos/assign', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_ADMIN_CREATE, permissions: [PERMISSIONS.TODO_ASSIGN] }),
+
   { method: 'GET', path: '/agents/health', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_HEALTH },
   business({ method: 'GET', path: '/agents/chat/status', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CHAT_STATUS, auth: ['jwt'] }),
   business({ method: 'POST', path: '/agents/chat', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CHAT, auth: ['jwt'], override: true }),
@@ -223,16 +242,8 @@ export function routeKey(route: Pick<GatewayRoute, 'method' | 'path'>): string {
   return `${route.method} ${route.path}`;
 }
 
-/** 各微服务应答接口文档（@ApiDoc）的 pattern */
-export const SERVICE_API_DOCS: Array<{ client: string; service: string; pattern: string }> = [
-  { client: USER_CLIENT, service: 'usercenter', pattern: MQTT_PATTERNS.USER_API_DOCS },
-  { client: DOCS_CLIENT, service: 'docs', pattern: MQTT_PATTERNS.DOC_API_DOCS },
-  { client: UPLOAD_CLIENT, service: 'upload', pattern: MQTT_PATTERNS.UPLOAD_API_DOCS },
-  { client: ORDER_CLIENT, service: 'order', pattern: MQTT_PATTERNS.ORDER_API_DOCS },
-  { client: WECHAT_CLIENT, service: 'wechat', pattern: MQTT_PATTERNS.WECHAT_API_DOCS },
-  { client: AGENTS_CLIENT, service: 'agents', pattern: MQTT_PATTERNS.AGENTS_API_DOCS },
-  { client: RECYCLE_CLIENT, service: 'recycle', pattern: MQTT_PATTERNS.RECYCLE_API_DOCS },
-];
+/** 各微服务应答接口文档（@ApiDoc）的 pattern；来自 MICROSERVICES 登记表 */
+export const SERVICE_API_DOCS = microserviceApiDocs();
 
 export interface BizApiCatalogItem {
   key: string;

@@ -7,7 +7,7 @@ import {
   UploadClient,
   WECHAT_CLIENT,
 } from '@app/common';
-import { AppsModule } from '../apps/apps.module';
+import { AccessClientsModule } from '../clients/clients.module';
 import { BusinessesModule } from '../businesses/businesses.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { UsersModule } from '../users/users.module';
@@ -20,7 +20,7 @@ import { WechatClient } from './wechat.client';
 @Module({
   imports: [
     RedisInfraModule,
-    AppsModule,
+    AccessClientsModule,
     BusinessesModule,
     UsersModule,
     RbacModule,

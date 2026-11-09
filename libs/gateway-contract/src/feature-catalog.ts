@@ -1,5 +1,5 @@
+import { PERMISSION_MODULE_ORDER, PERMISSIONS } from '@app/common';
 import { GATEWAY_ROUTES, routeKey, type GatewayHttpMethod } from './gateway-routes';
-import { PERMISSIONS } from './types';
 
 /**
  * 功能点用途（内部值仍用 platform/business）：
@@ -70,6 +70,8 @@ const platformMeta: Array<Omit<FeatureCatalogItem, 'scope' | 'apis'>> = [
   { module: '微信小程序', code: PERMISSIONS.WECHAT_QUERY, name: '查询小程序', description: '查看已登记的微信小程序与订阅模板', sort: 150 },
   { module: '微信小程序', code: PERMISSIONS.WECHAT_MANAGE, name: '管理小程序', description: '登记/编辑/删除小程序与订阅消息', sort: 160 },
   { module: '微信小程序', code: PERMISSIONS.WECHAT_QRCODE, name: '生成小程序码', description: '按小程序生成场景码', sort: 170 },
+  { module: '消息通知', code: PERMISSIONS.NOTIFY_SEND, name: '发送通知', description: '向指定用户投递站内通知', sort: 180 },
+  { module: '待办', code: PERMISSIONS.TODO_ASSIGN, name: '指派待办', description: '向指定用户创建待办', sort: 190 },
 ];
 
 /** 仅超管功能点编码（展示与分配时一律排除） */
@@ -403,6 +405,38 @@ const businessFeatures: FeatureCatalogItem[] = [
     sort: 250,
     apis: ['POST /agents/vision'],
   },
+  {
+    scope: 'business',
+    module: '消息通知',
+    code: 'notify.inbox',
+    name: '站内通知',
+    description: '查看本人通知、未读数、已读，以及实时 socket',
+    sort: 260,
+    apis: [
+      'GET /notifications',
+      'GET /notifications/unread-count',
+      'GET /notifications/socket',
+      'GET /notifications/:id',
+      'POST /notifications/:id/read',
+      'POST /notifications/read-all',
+    ],
+  },
+  {
+    scope: 'business',
+    module: '待办',
+    code: 'todo.inbox',
+    name: '我的待办',
+    description: '查看、新建本人待办，以及完成或取消',
+    sort: 270,
+    apis: [
+      'GET /todos',
+      'GET /todos/open-count',
+      'POST /todos',
+      'GET /todos/:id',
+      'POST /todos/:id/done',
+      'POST /todos/:id/cancel',
+    ],
+  },
 ];
 
 /** 从网关路由反查：平台功能编码 → 接口键列表 */
@@ -440,26 +474,8 @@ export const DEFAULT_FEATURE_CATALOG: FeatureCatalogItem[] = [
   ...businessFeatures,
 ];
 
-export const FEATURE_MODULE_ORDER = [
-  '用户中心',
-  '业务租户',
-  '接入端',
-  '角色权限',
-  '功能点目录',
-  '微信小程序',
-  '认证',
-  '团队',
-  '通用订单',
-  '文档',
-  '上传',
-  '微信业务',
-  '回收·基础',
-  '回收·目录',
-  '回收·门店',
-  '回收·订单',
-  '回收·审批',
-  '智能助手',
-] as const;
+/** 与 PERMISSION_MODULE_ORDER 同一份顺序，避免两处漂移 */
+export const FEATURE_MODULE_ORDER = PERMISSION_MODULE_ORDER;
 
 export function parseApiKey(key: string): { method: GatewayHttpMethod; path: string } | null {
   const trimmed = key.trim().replace(/\s+/g, ' ');

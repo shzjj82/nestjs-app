@@ -1,15 +1,11 @@
-import {
-  MQTT_GROUPS,
+import { optionalString, rpcFail } from '@app/common';
+
+export {
   optionalString,
+  requiredString,
   rpcFail,
-  sharePattern,
+  toPage,
 } from '@app/common';
-
-export { optionalString, requiredString, rpcFail } from '@app/common';
-
-export function ucPattern(pattern: string): string {
-  return sharePattern(MQTT_GROUPS.USERCENTER, pattern);
-}
 
 export function systemCodeOf(
   payload: Record<string, unknown>,
@@ -46,10 +42,4 @@ export function clientCodeOf(
     rpcFail(400, 'clientCode 必填');
   }
   return code;
-}
-
-export function toPage(page?: unknown, pageSize?: unknown) {
-  const current = Math.max(1, Number(page) || 1);
-  const size = Math.min(100, Math.max(1, Number(pageSize) || 20));
-  return { page: current, pageSize: size, skip: (current - 1) * size };
 }

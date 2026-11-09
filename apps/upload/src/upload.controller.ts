@@ -1,7 +1,6 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-import { MQTT_PATTERNS, serviceHealth, UploadHandleLogInterceptor } from '@app/common';
-import { uploadPattern } from './common/rpc';
+import { MQTT_PATTERNS, serviceHealth, UploadHandleLogInterceptor, sharePattern, MQTT_GROUPS } from '@app/common';
 import { StorageService } from './storage/storage.service';
 
 @Controller()
@@ -9,7 +8,7 @@ import { StorageService } from './storage/storage.service';
 export class UploadController {
   constructor(private readonly storage: StorageService) {}
 
-  @MessagePattern(uploadPattern(MQTT_PATTERNS.UPLOAD_HEALTH))
+  @MessagePattern(sharePattern(MQTT_GROUPS.UPLOAD, MQTT_PATTERNS.UPLOAD_HEALTH))
   async health() {
     const storage = this.storage.status();
     return serviceHealth('upload', {

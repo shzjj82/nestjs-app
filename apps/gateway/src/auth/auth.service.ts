@@ -3,7 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { GatewayAuth } from '@app/common';
+import type { GatewayAuth } from '@app/gateway-contract';
 import { docsServiceKey, TokenStore, uploadServiceKey } from '@app/common';
 import type { Request } from 'express';
 import type { GatewayUser } from './auth.types';

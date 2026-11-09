@@ -1,4 +1,4 @@
-import { formatApiKey, type FeatureScope } from '@app/common';
+import { formatApiKey, type FeatureScope } from '@app/gateway-contract';
 import { Workbook } from 'exceljs';
 
 const YES = new Set(['是', 'Y', 'y', '1', 'true', 'TRUE', '√', 'x', 'X']);

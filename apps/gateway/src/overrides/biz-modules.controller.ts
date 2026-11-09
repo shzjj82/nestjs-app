@@ -1,12 +1,15 @@
 import { Controller, ForbiddenException, Get, Query, Req, UseGuards } from '@nestjs/common';
 import {
-  GATEWAY_ROUTES,
   PERMISSIONS,
+  unwrapData,
+  type ServiceApiDocs,
+} from '@app/common';
+import {
+  GATEWAY_ROUTES,
   SERVICE_API_DOCS,
   routeKey,
-  unwrapData,
-} from '@app/common';
-import type { BizServiceCatalogItem, ServiceApiDocs } from '@app/common';
+  type BizServiceCatalogItem,
+} from '@app/gateway-contract';
 import type { Request } from 'express';
 import { AuthService } from '../auth/auth.service';
 import type { GatewayUser } from '../auth/auth.types';

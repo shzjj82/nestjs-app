@@ -4,7 +4,8 @@ import {
   Inject,
   Injectable,
 } from '@nestjs/common';
-import { BIZ_REGISTRY_KEY, matchRoute, REDIS } from '@app/common';
+import { BIZ_REGISTRY_KEY, REDIS } from '@app/common';
+import { matchRoute } from '@app/gateway-contract';
 import type { BusinessRegistryEntry } from '@app/common';
 import type { Request } from 'express';
 import type Redis from 'ioredis';

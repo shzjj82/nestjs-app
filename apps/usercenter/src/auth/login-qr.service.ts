@@ -19,7 +19,7 @@ import {
   type LoginQrStatusResult,
 } from '@app/common';
 import type Redis from 'ioredis';
-import { ClientsService } from '../apps/clients.service';
+import { ClientsService } from '../clients/clients.service';
 import { BusinessesService } from '../businesses/businesses.service';
 import { optionalString, requiredString, rpcFail } from '../rpc';
 import { AuthService } from './auth.service';

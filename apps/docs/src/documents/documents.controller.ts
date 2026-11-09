@@ -1,13 +1,7 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-import { ApiDoc, DocsHandleLogInterceptor, MQTT_PATTERNS } from '@app/common';
-import {
-  asRecord,
-  docsPattern,
-  optionalString,
-  requiredString,
-  rpcFail,
-} from '../common/rpc';
+import { ApiDoc, DocsHandleLogInterceptor, MQTT_PATTERNS, sharePattern, MQTT_GROUPS } from '@app/common';
+import { asRecord, optionalString, requiredString, rpcFail } from '../common/rpc';
 import { resolveAppCode } from '../common/app-code';
 import { isDocKind } from '../common/doc-kinds';
 import {
@@ -37,7 +31,7 @@ export class DocumentsController {
     private readonly rag: RagNotify,
   ) {}
 
-  @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_FIND_ALL))
+  @MessagePattern(sharePattern(MQTT_GROUPS.DOCS, MQTT_PATTERNS.DOC_POST_FIND_ALL))
   @ApiDoc({ name: '文档列表', description: 'scope 支持 public / feed / mine / all' })
   async findAll(payload: Record<string, unknown> = {}) {
     const appCode = resolveAppCode(payload);
@@ -89,7 +83,7 @@ export class DocumentsController {
     });
   }
 
-  @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_FIND_ID))
+  @MessagePattern(sharePattern(MQTT_GROUPS.DOCS, MQTT_PATTERNS.DOC_POST_FIND_ID))
   @ApiDoc({ name: '按 ID 查看文档', description: '工作区按 id 读取，含祖先链' })
   async findId(payload: Record<string, unknown>) {
     const post = await this.requireInBiz(payload);
@@ -110,7 +104,7 @@ export class DocumentsController {
     };
   }
 
-  @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_FIND_SLUG))
+  @MessagePattern(sharePattern(MQTT_GROUPS.DOCS, MQTT_PATTERNS.DOC_POST_FIND_SLUG))
   @ApiDoc({ name: '文档详情', description: '按 slug 读取已发布文档' })
   async findSlug(payload: Record<string, unknown>) {
     const privileged = payload._docsPrivileged === true;
@@ -165,7 +159,7 @@ export class DocumentsController {
     };
   }
 
-  @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_CREATE))
+  @MessagePattern(sharePattern(MQTT_GROUPS.DOCS, MQTT_PATTERNS.DOC_POST_CREATE))
   @ApiDoc({ name: '创建文档' })
   async create(payload: Record<string, unknown>) {
     const input = this.parseWrite(payload);
@@ -176,7 +170,7 @@ export class DocumentsController {
     return { post };
   }
 
-  @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_UPDATE))
+  @MessagePattern(sharePattern(MQTT_GROUPS.DOCS, MQTT_PATTERNS.DOC_POST_UPDATE))
   @ApiDoc({ name: '更新文档' })
   async update(payload: Record<string, unknown>) {
     const before = await this.requireInBiz(payload);
@@ -197,7 +191,7 @@ export class DocumentsController {
     return { post };
   }
 
-  @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_DELETE))
+  @MessagePattern(sharePattern(MQTT_GROUPS.DOCS, MQTT_PATTERNS.DOC_POST_DELETE))
   @ApiDoc({ name: '删除文档' })
   async remove(payload: Record<string, unknown>) {
     const id = requiredString(payload.id, 'id');
@@ -210,7 +204,7 @@ export class DocumentsController {
     return null;
   }
 
-  @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_CHILDREN))
+  @MessagePattern(sharePattern(MQTT_GROUPS.DOCS, MQTT_PATTERNS.DOC_POST_CHILDREN))
   @ApiDoc({ name: '创建子文档' })
   async createChild(payload: Record<string, unknown>) {
     await this.requireInBiz(payload);
@@ -225,7 +219,7 @@ export class DocumentsController {
     return result;
   }
 
-  @MessagePattern(docsPattern(MQTT_PATTERNS.DOC_POST_REPARENT))
+  @MessagePattern(sharePattern(MQTT_GROUPS.DOCS, MQTT_PATTERNS.DOC_POST_REPARENT))
   @ApiDoc({ name: '移动文档', description: '调整父文档与排序' })
   async reparent(payload: Record<string, unknown>) {
     await this.requireInBiz(payload);

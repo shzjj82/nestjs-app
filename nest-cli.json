@@ -91,6 +91,15 @@
         "tsConfigPath": "apps/recycle/tsconfig.app.json"
       }
     },
+    "notify": {
+      "type": "application",
+      "root": "apps/notify",
+      "entryFile": "main",
+      "sourceRoot": "apps/notify/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/notify/tsconfig.app.json"
+      }
+    },
     "common": {
       "type": "library",
       "root": "libs/common",
@@ -98,6 +107,24 @@
       "sourceRoot": "libs/common/src",
       "compilerOptions": {
         "tsConfigPath": "libs/common/tsconfig.lib.json"
+      }
+    },
+    "gateway-contract": {
+      "type": "library",
+      "root": "libs/gateway-contract",
+      "entryFile": "index",
+      "sourceRoot": "libs/gateway-contract/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/gateway-contract/tsconfig.lib.json"
+      }
+    },
+    "notify-contract": {
+      "type": "library",
+      "root": "libs/notify-contract",
+      "entryFile": "index",
+      "sourceRoot": "libs/notify-contract/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/notify-contract/tsconfig.lib.json"
       }
     }
   }

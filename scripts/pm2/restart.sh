@@ -19,6 +19,7 @@ npx nest build gateway
 if [[ "${SCOPE}" != "gateway" ]]; then
   npx nest build usercenter
   npx nest build order
+  npx nest build notify
 fi
 
 if pm2 describe gateway >/dev/null 2>&1; then
@@ -26,7 +27,7 @@ if pm2 describe gateway >/dev/null 2>&1; then
     gateway) pm2 restart gateway ;;
     apps)
       pm2 restart /usercenter-/ || true
-      pm2 restart order upload wechat || true
+      pm2 restart order upload wechat recycle notify || true
       pm2 restart /docs-/ || true
       pm2 restart /agents-/ || true
       ;;

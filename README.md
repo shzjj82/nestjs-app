@@ -1,6 +1,6 @@
 # NestJS MQTT 微服务 Monorepo
 
-对外只暴露 **gateway:3000**。`usercenter`、`order`、`docs`、`upload`、`wechat`、`agents` 通过 MQTT 通信，多个同名实例用 `$share` 共享订阅做负载均衡。
+对外只暴露 **gateway:3000**。`usercenter`、`order`、`docs`、`upload`、`wechat`、`agents`、`recycle`、`notify` 通过 MQTT 通信，多个同名实例用 `$share` 共享订阅做负载均衡。
 
 数据层使用 **PostgreSQL**（主库）和 **Redis**（缓存 / 会话），MQTT 用 Mosquitto。三种依赖都支持 **脚本安装** 和 **docker-compose**。
 
@@ -20,7 +20,7 @@
 npm run infra:up
 ```
 
-再启动 gateway、usercenter、order、docs、upload、wechat、agents：
+再启动 gateway、usercenter、order、docs、upload、wechat、agents、recycle、notify：
 
 ```bash
 npm run start:dev
@@ -79,7 +79,7 @@ sudo REDIS_BIND=0.0.0.0 ./scripts/infra/install-redis.sh
 
 ## Docker Compose（推荐）
 
-一次拉起 PostgreSQL、Redis、Mosquitto，以及 gateway、usercenter、order、docs、upload、wechat、recycle、agents 各 1 个实例。请求地址始终是 `http://localhost:3000`。用户中心要多实例时再加 `--scale usercenter=3`。裁剪场景用 `deploy/<场景>/docker-compose.yml`。
+一次拉起 PostgreSQL、Redis、Mosquitto，以及 gateway、usercenter、order、docs、upload、wechat、recycle、notify、agents 各 1 个实例。请求地址始终是 `http://localhost:3000`。用户中心要多实例时再加 `--scale usercenter=3`。裁剪场景用 `deploy/<场景>/docker-compose.yml`。
 
 ```bash
 npm run docker:up
@@ -321,10 +321,43 @@ Excel「功能点」表头：`模块 / 功能编码 / 功能名称 / 描述 / �
 - `GET|POST|PATCH /wechat/miniprograms` — `wechat.manage`，多套 appId / secret
 - `POST /wechat/qrcode` — `wechat.qrcode`，返回 PNG
 - `POST /wechat/phone` — 登录后按已登记小程序换手机号
-- `GET /health` — 聚合 gateway / usercenter / order / docs / upload / wechat / agents 状态与版本
+- `GET /health` — 聚合 gateway / usercenter / order / docs / upload / wechat / agents / notify 状态与版本
+- `GET /notifications` / `GET /notifications/unread-count` / `GET /notifications/:id` — 登录后看当前业务下本人的通知
+- `POST /notifications/:id/read` / `POST /notifications/read-all` — 标记已读，并推 socket
+- `POST /notifications` — `notify.send`，管理端投递通知
+- `GET|POST /todos`、`POST /todos/:id/done`、`POST /todos/:id/cancel` — 本人待办
+- `POST /todos/assign` — `todo.assign`，指派待办
+- `GET /notifications/socket` — WebSocket，查询参数 `token` 与 `bizCode`
 - `GET /orders` / `GET /orders/:id` — 无需登录
 - `GET /agents/health` / `GET /agents/chat/status` — 探活与是否已配置模型（不回密钥）
 - `POST /agents/chat` — `sync` 默认 true 返回 `{ reply }`；`sync: false` 时 SSE 流式（`data: {"delta":"..."}`）
+
+## 消息通知
+
+独立进程 `notify`，独立库 `notify`。分成两类：
+
+- **通知**：只读收件箱，已读后仍保留。功能点 `notify.inbox`。
+- **待办**：`open / done / cancelled`。本人可新建、完成、取消。功能点 `todo.inbox`。管理端用 `todo.assign` 调 `POST /todos/assign` 指派给别人。
+
+HTTP 都走网关，需要登录和 `X-Biz-Code`。创建、已读、完成、取消后，网关把事件推到 WebSocket：
+
+`ws://127.0.0.1:3000/notifications/socket?token=<accessToken>&bizCode=<业务>`
+
+连上后先收到 `{ "type": "ready" }`，之后是 `{ "type": "event", "kind": "notice"|"todo", "action": "created"|"updated"|"read-all", "item": ... }`。浏览器不能自定义头，所以 token 和业务放在查询参数里。
+
+其它微服务注入 `NotifyClientModule`：`send(...)` 发通知，`createTodo(...)` 建待办。内部密钥是 `NOTIFY_INTERNAL_KEY`。
+
+```bash
+curl http://localhost:3000/notifications \
+  -H 'X-Biz-Code: blog' \
+  -H "Authorization: Bearer <token>"
+
+curl -X POST http://localhost:3000/todos \
+  -H 'X-Biz-Code: blog' \
+  -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"补资料","content":"请上传合同","dueAt":"2026-12-01T00:00:00.000Z"}'
+```
 
 ## 管理后台
 

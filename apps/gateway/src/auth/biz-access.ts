@@ -1,5 +1,6 @@
-import { PLATFORM_BIZ_CODE, routeKey } from '@app/common';
-import type { BusinessRegistryEntry, GatewayRoute } from '@app/common';
+import { PLATFORM_BIZ_CODE } from '@app/common';
+import type { BusinessRegistryEntry } from '@app/common';
+import { routeKey, type GatewayRoute } from '@app/gateway-contract';
 
 export interface BizSessionView {
   bizCode?: string;

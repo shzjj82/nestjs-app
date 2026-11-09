@@ -1,5 +1,5 @@
 /**
- * 全量部署：gateway / usercenter / order / docs / upload / wechat / recycle / agents。
+ * 全量部署：gateway / usercenter / order / docs / upload / wechat / recycle / agents / notify。
  * 裁剪场景（只跑其中一部分）放在 deploy/<场景>/ecosystem.config.cjs，不要在根目录再加一份。
  */
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://127.0.0.1:1883';
@@ -28,6 +28,9 @@ const wechatDatabaseUrl =
 const recycleDatabaseUrl =
   process.env.RECYCLE_DATABASE_URL ??
   databaseUrl.replace(/\/[^/?]+(\?|$)/, '/recycle$1');
+const notifyDatabaseUrl =
+  process.env.NOTIFY_DATABASE_URL ??
+  databaseUrl.replace(/\/[^/?]+(\?|$)/, '/notify$1');
 const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
 
 function replicate(service, count, extraEnv) {
@@ -186,6 +189,26 @@ module.exports = {
           process.env.RECYCLE_INTERNAL_KEY ?? 'dev-recycle-internal-key',
         REDIS_URL: redisUrl,
         INSTANCE_ID: 'recycle-1',
+        APP_VERSION: appVersion,
+        EXPECTED_APP_VERSION: expectedAppVersion,
+      },
+    },
+    {
+      name: 'notify',
+      script: 'dist/apps/notify/main.js',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      max_memory_restart: '300M',
+      env: {
+        NODE_ENV: 'production',
+        MQTT_URL: mqttUrl,
+        DATABASE_URL: databaseUrl,
+        NOTIFY_DATABASE_URL: notifyDatabaseUrl,
+        NOTIFY_INTERNAL_KEY:
+          process.env.NOTIFY_INTERNAL_KEY ?? 'dev-notify-internal-key',
+        REDIS_URL: redisUrl,
+        INSTANCE_ID: 'notify-1',
         APP_VERSION: appVersion,
         EXPECTED_APP_VERSION: expectedAppVersion,
       },

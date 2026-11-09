@@ -1,10 +1,10 @@
+import { PERMISSIONS } from '@app/common';
 import {
   ADMIN_ONLY_PERMISSION_CODES,
   DEFAULT_FEATURE_CATALOG,
   uncoveredBusinessApiKeys,
   platformApisByPermissionCode,
-} from '../src/feature-catalog';
-import { PERMISSIONS } from '../src/types';
+} from './src/feature-catalog';
 
 describe('feature catalog', () => {
   it('covers every business gateway route', () => {

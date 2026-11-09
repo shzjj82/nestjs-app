@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ApiDocsModule, MQTT_GROUPS, MQTT_PATTERNS, RedisInfraModule, sharePattern } from '@app/common';
-import { AppsModule } from './apps/apps.module';
+import { AccessClientsModule } from './clients/clients.module';
 import { AuthModule } from './auth/auth.module';
 import { BusinessesModule } from './businesses/businesses.module';
 import { DatabaseModule } from './database/database.module';
@@ -15,7 +15,7 @@ import { UsersModule } from './users/users.module';
     DatabaseModule,
     RedisInfraModule,
     BusinessesModule,
-    AppsModule,
+    AccessClientsModule,
     UsersModule,
     AuthModule,
     RbacModule,

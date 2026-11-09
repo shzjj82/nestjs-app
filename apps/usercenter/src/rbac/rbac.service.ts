@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ADMIN_ONLY_PERMISSION_CODES, PLATFORM_BIZ_CODE, TokenStore } from '@app/common';
+import { PLATFORM_BIZ_CODE, TokenStore } from '@app/common';
+import { ADMIN_ONLY_PERMISSION_CODES } from '@app/gateway-contract';
 import type { PermissionInfo, RoleInfo } from '@app/common';
 import { In, IsNull, Repository } from 'typeorm';
 import {

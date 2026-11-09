@@ -1,18 +1,18 @@
 {
   "name": "nestjs",
   "version": "0.0.1",
-  "description": "NestJS MQTT microservices monorepo (gateway / usercenter / order / docs / upload / wechat / agents)",
+  "description": "NestJS MQTT microservices monorepo (gateway / usercenter / order / docs / upload / wechat / agents / recycle / notify)",
   "author": "",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build gateway && nest build usercenter && nest build order && nest build docs && nest build upload && nest build wechat && nest build agents && nest build recycle",
+    "build": "nest build gateway && nest build usercenter && nest build order && nest build docs && nest build upload && nest build wechat && nest build agents && nest build recycle && nest build notify",
     "format": "prettier --write \"apps/**/*.ts\" \"libs/**/*.ts\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "start:dev": "concurrently -k -n gateway,usercenter,order,docs,upload,wechat,agents,recycle -c cyan,green,yellow,magenta,blue,white,red,gray \"nest start gateway --watch\" \"nest start usercenter --watch\" \"nest start order --watch\" \"nest start docs --watch\" \"nest start upload --watch\" \"nest start wechat --watch\" \"nest start agents --watch\" \"nest start recycle --watch\"",
+    "start:dev": "concurrently -k -n gateway,usercenter,order,docs,upload,wechat,agents,recycle,notify -c cyan,green,yellow,magenta,blue,white,red,gray,brightCyan \"nest start gateway --watch\" \"nest start usercenter --watch\" \"nest start order --watch\" \"nest start docs --watch\" \"nest start upload --watch\" \"nest start wechat --watch\" \"nest start agents --watch\" \"nest start recycle --watch\" \"nest start notify --watch\"",
     "start:debug": "nest start gateway --debug --watch",
     "start:admin": "npm --prefix web/admin run dev",
     "docker:up": "docker compose up --build",
@@ -52,6 +52,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "typeorm": "^0.3.31",
+    "ws": "^8.22.2",
     "zod": "^3.25.76",
     "zod-to-json-schema": "^3.25.2"
   },
@@ -69,6 +70,7 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/pg": "^8.23.1",
     "@types/supertest": "^7.0.0",
+    "@types/ws": "^8.18.2",
     "concurrently": "^9.2.4",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
@@ -107,7 +109,9 @@
     ],
     "moduleNameMapper": {
       "^@app/common(|/.*)$": "<rootDir>/libs/common/src/$1",
-      "^@app/bill(|/.*)$": "<rootDir>/libs/bill/src/$1"
+      "^@app/bill(|/.*)$": "<rootDir>/libs/bill/src/$1",
+      "^@app/gateway-contract(|/.*)$": "<rootDir>/libs/gateway-contract/src/$1",
+      "^@app/notify-contract(|/.*)$": "<rootDir>/libs/notify-contract/src/$1"
     }
   }
 }

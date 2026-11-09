@@ -1,14 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import {
-  AGENTS_CLIENT,
-  DOCS_CLIENT,
-  MQTT_PATTERNS,
-  ORDER_CLIENT,
-  UPLOAD_CLIENT,
-  USER_CLIENT,
-  WECHAT_CLIENT,
   appVersion,
   instanceId,
+  microserviceHealthProbes,
   unwrapData,
 } from '@app/common';
 import type { ServiceHealth } from '@app/common';
@@ -36,16 +30,17 @@ export class HealthController {
       version: appVersion(),
     };
 
-    const [usercenter, order, docs, upload, wechat, agents] = await Promise.all([
-      this.probe(USER_CLIENT, MQTT_PATTERNS.USER_HEALTH, 'usercenter'),
-      this.probe(ORDER_CLIENT, MQTT_PATTERNS.ORDER_HEALTH, 'order'),
-      this.probe(DOCS_CLIENT, MQTT_PATTERNS.DOC_HEALTH, 'docs'),
-      this.probe(UPLOAD_CLIENT, MQTT_PATTERNS.UPLOAD_HEALTH, 'upload'),
-      this.probe(WECHAT_CLIENT, MQTT_PATTERNS.WECHAT_HEALTH, 'wechat'),
-      this.probe(AGENTS_CLIENT, MQTT_PATTERNS.AGENTS_HEALTH, 'agents'),
-    ]);
+    const probes = microserviceHealthProbes();
+    const results = await Promise.all(
+      probes.map((item) => this.probe(item.client, item.pattern, item.service)),
+    );
+    const services: Record<string, ServiceHealth | (ServiceHealth & Record<string, unknown>)> = {
+      gateway,
+    };
+    probes.forEach((item, index) => {
+      services[item.service] = results[index];
+    });
 
-    const services = { gateway, usercenter, order, docs, upload, wechat, agents };
     const allUp = Object.values(services).every(
       (item) => item.status === 'up' || item.status === 'ok',
     );

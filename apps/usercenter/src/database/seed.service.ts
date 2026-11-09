@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DEFAULT_FEATURE_CATALOG, PERMISSIONS, PLATFORM_BIZ_CODE } from '@app/common';
+import { PERMISSIONS, PLATFORM_BIZ_CODE } from '@app/common';
+import { DEFAULT_FEATURE_CATALOG } from '@app/gateway-contract';
 import { hash } from 'bcrypt';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import type { ClientType } from '../entities';

@@ -8,6 +8,8 @@ import { VisionOverrideController } from './vision.controller';
 import { PermissionsFileController } from './permissions-file.controller';
 import { UploadOverrideController } from './upload.controller';
 import { LoginQrEventsController } from './login-qr-events.controller';
+import { NotifySocketController } from './notify-socket.controller';
+import { NotifySocketGateway } from './notify-socket';
 import { WechatQrcodeController } from './wechat-qrcode.controller';
 
 @Module({
@@ -21,6 +23,8 @@ import { WechatQrcodeController } from './wechat-qrcode.controller';
     UploadOverrideController,
     WechatQrcodeController,
     LoginQrEventsController,
+    NotifySocketController,
   ],
+  providers: [NotifySocketGateway],
 })
 export class OverridesModule {}

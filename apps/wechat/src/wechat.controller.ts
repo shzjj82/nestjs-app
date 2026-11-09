@@ -1,12 +1,11 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-import { MQTT_PATTERNS, serviceHealth, WechatHandleLogInterceptor } from '@app/common';
-import { wechatPattern } from './common/rpc';
+import { MQTT_PATTERNS, serviceHealth, WechatHandleLogInterceptor, sharePattern, MQTT_GROUPS } from '@app/common';
 
 @Controller()
 @UseInterceptors(WechatHandleLogInterceptor)
 export class WechatController {
-  @MessagePattern(wechatPattern(MQTT_PATTERNS.WECHAT_HEALTH))
+  @MessagePattern(sharePattern(MQTT_GROUPS.WECHAT, MQTT_PATTERNS.WECHAT_HEALTH))
   health() {
     return serviceHealth('wechat');
   }

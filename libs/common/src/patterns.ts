@@ -5,6 +5,7 @@ export const UPLOAD_CLIENT = 'UPLOAD_CLIENT';
 export const WECHAT_CLIENT = 'WECHAT_CLIENT';
 export const AGENTS_CLIENT = 'AGENTS_CLIENT';
 export const RECYCLE_CLIENT = 'RECYCLE_CLIENT';
+export const NOTIFY_CLIENT = 'NOTIFY_CLIENT';
 
 export const MQTT_GROUPS = {
   USERCENTER: 'usercenter',
@@ -14,6 +15,7 @@ export const MQTT_GROUPS = {
   WECHAT: 'wechat',
   AGENTS: 'agents',
   RECYCLE: 'recycle',
+  NOTIFY: 'notify',
 } as const;
 
 export const MQTT_PATTERNS = {
@@ -189,6 +191,30 @@ export const MQTT_PATTERNS = {
   RECYCLE_EVT_APPROVAL_REQUESTED: 'recycle.evt.approval.requested',
   /** 内部事件：审批 → 订单（不注册到网关） */
   RECYCLE_EVT_APPROVAL_DECIDED: 'recycle.evt.approval.decided',
+  NOTIFY_HEALTH: 'notify.health',
+  NOTIFY_API_DOCS: 'notify.apiDocs',
+  NOTIFY_LIST: 'notify.list',
+  NOTIFY_UNREAD_COUNT: 'notify.unreadCount',
+  NOTIFY_FIND_ONE: 'notify.findOne',
+  NOTIFY_READ: 'notify.read',
+  NOTIFY_READ_ALL: 'notify.readAll',
+  /** 管理端按用户投递一条站内通知 */
+  NOTIFY_ADMIN_SEND: 'notify.adminSend',
+  /** 内部：其它微服务投递通知（不注册到网关） */
+  NOTIFY_SEND: 'notify.send',
+  /** 网关 WebSocket 占位，实际由网关自己应答 */
+  NOTIFY_SOCKET: 'notify.socket',
+  TODO_LIST: 'todo.list',
+  TODO_OPEN_COUNT: 'todo.openCount',
+  TODO_FIND_ONE: 'todo.findOne',
+  TODO_DONE: 'todo.done',
+  TODO_CANCEL: 'todo.cancel',
+  /** 当前用户给自己建一条待办 */
+  TODO_CREATE: 'todo.create',
+  /** 管理端指派待办 */
+  TODO_ADMIN_CREATE: 'todo.adminCreate',
+  /** 内部：其它微服务创建待办（不注册到网关） */
+  TODO_SEND: 'todo.send',
 } as const;
 
 export function sharePattern(group: string, pattern: string): string {

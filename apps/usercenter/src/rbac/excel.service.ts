@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DEFAULT_FEATURE_CATALOG, parseApiKey } from '@app/common';
+import { DEFAULT_FEATURE_CATALOG, parseApiKey } from '@app/gateway-contract';
 import { Workbook, type Worksheet } from 'exceljs';
 import { requiredString, rpcFail } from '../rpc';
 import { parsePermissionWorkbook } from './excel.parser';

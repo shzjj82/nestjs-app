@@ -1,5 +1,6 @@
 import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
-import { matchRoute, ok, unwrapData } from '@app/common';
+import { ok, unwrapData } from '@app/common';
+import { matchRoute } from '@app/gateway-contract';
 import type { NextFunction, Request, Response } from 'express';
 import { AuthService } from '../auth/auth.service';
 import { BizGuard } from '../auth/biz.guard';

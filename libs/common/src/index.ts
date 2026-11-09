@@ -1,7 +1,6 @@
 export * from './api-docs';
+export * from './ensure-database';
 export * from './env';
-export * from './feature-catalog';
-export * from './gateway-routes';
 export * from './handle-log.interceptor';
 export * from './http';
 export * from './image';
@@ -12,6 +11,7 @@ export * from './patterns';
 export * from './redis';
 export * from './redis.module';
 export * from './rpc';
+export * from './service-registry';
 export * from './token';
 export * from './types';
 export * from './upload.client';

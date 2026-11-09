@@ -15,7 +15,7 @@ fi
 if [[ "${SCOPE}" == "all" ]]; then
   pm2 delete all || true
 else
-  pm2 delete gateway order upload wechat docs agents || true
+  pm2 delete gateway order upload wechat docs agents recycle notify || true
   pm2 delete /usercenter-/ || true
   pm2 delete /docs-/ || true
   pm2 delete /agents-/ || true

@@ -1,37 +1,22 @@
 import { RequestMethod } from '@nestjs/common';
 import type { RouteInfo } from '@nestjs/common/interfaces';
-import type { AuthSession } from '@app/common';
+import { microserviceProxyPrefixes, type AuthSession } from '@app/common';
 
 export const LOCAL_PATHS = new Set(['/', '/health']);
 
+/** 跨服务 / 特殊入口：不跟单一微服务前缀一一对应 */
+const SHARED_PROXY_PREFIXES = ['auth'] as const;
+
+function proxyPathsFor(prefix: string): RouteInfo[] {
+  return [
+    { path: prefix, method: RequestMethod.ALL },
+    { path: `${prefix}/{*path}`, method: RequestMethod.ALL },
+  ];
+}
+
 export const PROXY_HTTP_PATHS: RouteInfo[] = [
-  { path: 'auth', method: RequestMethod.ALL },
-  { path: 'auth/{*path}', method: RequestMethod.ALL },
-  { path: 'users', method: RequestMethod.ALL },
-  { path: 'users/{*path}', method: RequestMethod.ALL },
-  { path: 'accounts/{*path}', method: RequestMethod.ALL },
-  { path: 'businesses', method: RequestMethod.ALL },
-  { path: 'businesses/{*path}', method: RequestMethod.ALL },
-  { path: 'teams', method: RequestMethod.ALL },
-  { path: 'teams/{*path}', method: RequestMethod.ALL },
-  { path: 'clients', method: RequestMethod.ALL },
-  { path: 'clients/{*path}', method: RequestMethod.ALL },
-  { path: 'docs', method: RequestMethod.ALL },
-  { path: 'docs/{*path}', method: RequestMethod.ALL },
-  { path: 'roles', method: RequestMethod.ALL },
-  { path: 'roles/{*path}', method: RequestMethod.ALL },
-  { path: 'permissions', method: RequestMethod.ALL },
-  { path: 'permissions/{*path}', method: RequestMethod.ALL },
-  { path: 'orders', method: RequestMethod.ALL },
-  { path: 'orders/{*path}', method: RequestMethod.ALL },
-  { path: 'upload', method: RequestMethod.ALL },
-  { path: 'upload/{*path}', method: RequestMethod.ALL },
-  { path: 'wechat', method: RequestMethod.ALL },
-  { path: 'wechat/{*path}', method: RequestMethod.ALL },
-  { path: 'agents', method: RequestMethod.ALL },
-  { path: 'agents/{*path}', method: RequestMethod.ALL },
-  { path: 'recycle', method: RequestMethod.ALL },
-  { path: 'recycle/{*path}', method: RequestMethod.ALL },
+  ...SHARED_PROXY_PREFIXES.flatMap(proxyPathsFor),
+  ...microserviceProxyPrefixes().flatMap(proxyPathsFor),
 ];
 
 export function requestPathname(req: { path?: string; url: string }): string {

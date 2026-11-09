@@ -25,7 +25,11 @@
       "@app/common": ["libs/common/src"],
       "@app/common/*": ["libs/common/src/*"],
       "@app/bill": ["libs/bill/src"],
-      "@app/bill/*": ["libs/bill/src/*"]
+      "@app/bill/*": ["libs/bill/src/*"],
+      "@app/gateway-contract": ["libs/gateway-contract/src"],
+      "@app/gateway-contract/*": ["libs/gateway-contract/src/*"],
+      "@app/notify-contract": ["libs/notify-contract/src"],
+      "@app/notify-contract/*": ["libs/notify-contract/src/*"]
     }
   }
 }

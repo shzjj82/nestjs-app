@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AppsModule } from '../apps/apps.module';
+import { AccessClientsModule } from '../clients/clients.module';
 import { BusinessesModule } from '../businesses/businesses.module';
 import { AccountEntity, TeamEntity, TeamMemberEntity } from '../entities';
 import { TeamsController } from './teams.controller';
@@ -9,7 +9,7 @@ import { TeamsService } from './teams.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([TeamEntity, TeamMemberEntity, AccountEntity]),
-    AppsModule,
+    AccessClientsModule,
     BusinessesModule,
   ],
   controllers: [TeamsController],

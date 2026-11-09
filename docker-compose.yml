@@ -5,6 +5,8 @@ x-app-env: &app-env
   DOCS_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/docs
   WECHAT_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/wechat
   RECYCLE_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/recycle
+  NOTIFY_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/notify
+  NOTIFY_INTERNAL_KEY: ${NOTIFY_INTERNAL_KEY:-dev-notify-internal-key}
   REDIS_URL: redis://redis:6379
   UPLOAD_API_KEY: ${UPLOAD_API_KEY:-dev-upload-key}
   DOCS_SERVICE_KEY: ${DOCS_SERVICE_KEY:-dev-docs-key}
@@ -158,6 +160,18 @@ services:
       <<: *app-env
       INSTANCE_ID: recycle-1
       RECYCLE_INTERNAL_KEY: ${RECYCLE_INTERNAL_KEY:-dev-recycle-internal-key}
+    depends_on: *app-depends
+
+  notify:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        APP_NAME: notify
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      INSTANCE_ID: notify-1
     depends_on: *app-depends
 
   agents:

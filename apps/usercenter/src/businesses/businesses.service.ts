@@ -2,7 +2,6 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   BIZ_REGISTRY_KEY,
-  bizApiKeys,
   REDIS,
   TokenStore,
 } from '@app/common';
@@ -11,6 +10,7 @@ import type {
   BusinessMemberInfo,
   BusinessRegistryEntry,
 } from '@app/common';
+import { bizApiKeys } from '@app/gateway-contract';
 import type Redis from 'ioredis';
 import { In, Repository } from 'typeorm';
 import {
@@ -20,7 +20,7 @@ import {
   BusinessMemberEntity,
   RoleEntity,
 } from '../entities';
-import { normalizeAppCode } from '../apps/wechat-app-code';
+import { normalizeAppCode } from '../clients/wechat-app-code';
 import { optionalString, requiredString, rpcFail } from '../rpc';
 
 /** 新建业务时的默认身份角色：回收用客户，其它业务用普通用户 */

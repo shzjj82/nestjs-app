@@ -80,3 +80,61 @@ export async function subscribeMqttJson(
     bus.unsubscribe(topic);
   };
 }
+
+interface TopicEntry {
+  listeners: Set<(payload: unknown) => void>;
+  stop: () => void;
+}
+
+/**
+ * 同一 topic 多路复用：网关 WebSocket / SSE 共用一条 MQTT 订阅，
+ * 最后一个听众离开时再退订。
+ */
+export class MqttTopicHub {
+  private readonly topics = new Map<string, TopicEntry>();
+  private readonly opening = new Map<string, Promise<TopicEntry>>();
+
+  async listen(
+    topic: string,
+    listener: (payload: unknown) => void,
+  ): Promise<() => void> {
+    const entry = await this.entry(topic);
+    entry.listeners.add(listener);
+    return () => {
+      entry.listeners.delete(listener);
+      if (entry.listeners.size === 0 && this.topics.get(topic) === entry) {
+        entry.stop();
+        this.topics.delete(topic);
+      }
+    };
+  }
+
+  private async entry(topic: string): Promise<TopicEntry> {
+    const existing = this.topics.get(topic);
+    if (existing) {
+      return existing;
+    }
+    let opening = this.opening.get(topic);
+    if (!opening) {
+      opening = this.open(topic);
+      this.opening.set(topic, opening);
+    }
+    try {
+      return await opening;
+    } finally {
+      this.opening.delete(topic);
+    }
+  }
+
+  private async open(topic: string): Promise<TopicEntry> {
+    const listeners = new Set<(payload: unknown) => void>();
+    const stop = await subscribeMqttJson(topic, (payload) => {
+      for (const listener of listeners) {
+        listener(payload);
+      }
+    });
+    const entry = { listeners, stop };
+    this.topics.set(topic, entry);
+    return entry;
+  }
+}

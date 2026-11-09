@@ -1,39 +1,31 @@
-import { BadGatewayException, Inject, Injectable } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
 import {
-  AGENTS_CLIENT,
-  DOCS_CLIENT,
-  ORDER_CLIENT,
-  RECYCLE_CLIENT,
-  UPLOAD_CLIENT,
-  USER_CLIENT,
-  WECHAT_CLIENT,
-} from '@app/common';
+  BadGatewayException,
+  Injectable,
+  OnModuleInit,
+} from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import { ClientProxy } from '@nestjs/microservices';
+import { MICROSERVICES } from '@app/common';
 import { MqttProxy } from './mqtt.proxy';
 
 @Injectable()
-export class ClientHub {
-  private readonly clients: Record<string, ClientProxy>;
+export class ClientHub implements OnModuleInit {
+  private readonly clients: Record<string, ClientProxy> = {};
 
   constructor(
-    @Inject(USER_CLIENT) userClient: ClientProxy,
-    @Inject(ORDER_CLIENT) orderClient: ClientProxy,
-    @Inject(DOCS_CLIENT) docsClient: ClientProxy,
-    @Inject(UPLOAD_CLIENT) uploadClient: ClientProxy,
-    @Inject(WECHAT_CLIENT) wechatClient: ClientProxy,
-    @Inject(AGENTS_CLIENT) agentsClient: ClientProxy,
-    @Inject(RECYCLE_CLIENT) recycleClient: ClientProxy,
+    private readonly moduleRef: ModuleRef,
     private readonly mqtt: MqttProxy,
-  ) {
-    this.clients = {
-      [USER_CLIENT]: userClient,
-      [ORDER_CLIENT]: orderClient,
-      [DOCS_CLIENT]: docsClient,
-      [UPLOAD_CLIENT]: uploadClient,
-      [WECHAT_CLIENT]: wechatClient,
-      [AGENTS_CLIENT]: agentsClient,
-      [RECYCLE_CLIENT]: recycleClient,
-    };
+  ) {}
+
+  async onModuleInit() {
+    for (const entry of MICROSERVICES) {
+      this.clients[entry.client] = this.moduleRef.get<ClientProxy>(entry.client, {
+        strict: false,
+      });
+    }
+    await Promise.all(
+      Object.values(this.clients).map((client) => client.connect()),
+    );
   }
 
   get(name: string): ClientProxy {
