@@ -1,12 +1,14 @@
 import {
   notifyInternalKey,
   optionalString,
+  parseWith,
   requireSessionUserId,
   rpcFail,
   sessionUserId,
   toPage,
 } from '@app/common';
 import type { NotifyTodoStatus } from '@app/notify-contract';
+import { z } from 'zod';
 
 export { toPage };
 
@@ -15,8 +17,77 @@ export interface Actor {
 }
 
 const TOPIC_TOKEN = /^[A-Za-z0-9_-]{1,64}$/;
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const topicToken = (label: string) =>
+  z
+    .string({ required_error: `${label} 必填`, invalid_type_error: `${label} 必填` })
+    .trim()
+    .min(1, `${label} 必填`)
+    .regex(TOPIC_TOKEN, `${label} 只能包含字母、数字、下划线和中划线`);
+
+const uuidSchema = (label: string) =>
+  z
+    .string({ required_error: `${label} 无效`, invalid_type_error: `${label} 无效` })
+    .trim()
+    .uuid(`${label} 无效`);
+
+const dueAtSchema = z.preprocess((value) => {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  return value;
+}, z.union([
+  z.null(),
+  z
+    .string({ invalid_type_error: 'dueAt 无效' })
+    .trim()
+    .min(1, 'dueAt 无效')
+    .refine((text) => !Number.isNaN(new Date(text).getTime()), 'dueAt 无效')
+    .transform((text) => new Date(text)),
+]));
+
+const dataObjectSchema = z
+  .custom<Record<string, unknown>>(
+    (value) => !!value && typeof value === 'object' && !Array.isArray(value),
+    { message: 'data 必须是对象' },
+  )
+  .refine((obj) => JSON.stringify(obj).length <= 8000, 'data 过大');
+
+const dataSchema = z.preprocess((value) => {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  return value;
+}, z.union([z.null(), dataObjectSchema]));
+
+const sendSchema = (sourceFallback: string) =>
+  z.object({
+    bizCode: topicToken('bizCode'),
+    userId: topicToken('userId'),
+    title: z
+      .string({ required_error: 'title 必填且不超过 120 字', invalid_type_error: 'title 必填且不超过 120 字' })
+      .trim()
+      .min(1, 'title 必填且不超过 120 字')
+      .max(120, 'title 必填且不超过 120 字'),
+    content: z
+      .string({
+        required_error: 'content 必填且不超过 4000 字',
+        invalid_type_error: 'content 必填且不超过 4000 字',
+      })
+      .trim()
+      .min(1, 'content 必填且不超过 4000 字')
+      .max(4000, 'content 必填且不超过 4000 字'),
+    category: z.preprocess(
+      (value) => optionalString(value) ?? 'system',
+      topicToken('category'),
+    ),
+    source: z.preprocess(
+      (value) => optionalString(value) ?? sourceFallback,
+      topicToken('source'),
+    ),
+    data: dataSchema,
+    dueAt: dueAtSchema,
+  });
 
 export interface SendCommand {
   bizCode: string;
@@ -54,11 +125,7 @@ export function requireInternal(payload: Record<string, unknown>): void {
 }
 
 export function requireUuid(value: unknown, label: string): string {
-  const id = optionalString(value);
-  if (!id || !UUID.test(id)) {
-    rpcFail(400, `${label} 无效`);
-  }
-  return id;
+  return parseWith(uuidSchema(label), value);
 }
 
 export function unreadOnly(payload: Record<string, unknown>): boolean {
@@ -70,48 +137,19 @@ export function parseSend(
   payload: Record<string, unknown>,
   sourceFallback: string,
 ): SendCommand {
-  const bizCode = optionalString(payload.bizCode);
-  const userId = optionalString(payload.userId);
-  const title = optionalString(payload.title);
-  const content = optionalString(payload.content);
-  if (!bizCode || !TOPIC_TOKEN.test(bizCode)) {
-    rpcFail(400, 'bizCode 只能包含字母、数字、下划线和中划线');
-  }
-  if (!userId || !TOPIC_TOKEN.test(userId)) {
-    rpcFail(400, 'userId 只能包含字母、数字、下划线和中划线');
-  }
-  if (!title || title.length > 120) {
-    rpcFail(400, 'title 必填且不超过 120 字');
-  }
-  if (!content || content.length > 4000) {
-    rpcFail(400, 'content 必填且不超过 4000 字');
-  }
-  const category = optionalString(payload.category) ?? 'system';
-  const source = optionalString(payload.source) ?? sourceFallback;
-  if (!TOPIC_TOKEN.test(category) || !TOPIC_TOKEN.test(source)) {
-    rpcFail(400, 'category / source 只能包含字母、数字、下划线和中划线');
-  }
-  return {
-    bizCode,
-    userId,
-    title,
-    content,
-    category,
-    source,
-    data: parseData(payload.data),
-    dueAt: parseDueAt(payload.dueAt),
-  };
+  return parseWith(sendSchema(sourceFallback), payload) as SendCommand;
 }
+
+const todoStatusSchema = z.enum(['open', 'done', 'cancelled'], {
+  errorMap: () => ({ message: 'status 只能是 open、done 或 cancelled' }),
+});
 
 export function todoStatusOf(payload: Record<string, unknown>): NotifyTodoStatus | undefined {
   const status = optionalString(payload.status);
   if (!status) {
     return undefined;
   }
-  if (status !== 'open' && status !== 'done' && status !== 'cancelled') {
-    rpcFail(400, 'status 只能是 open、done 或 cancelled');
-  }
-  return status;
+  return parseWith(todoStatusSchema, status);
 }
 
 export function finishTodo(current: string, action: 'done' | 'cancel'): NotifyTodoStatus {
@@ -119,33 +157,4 @@ export function finishTodo(current: string, action: 'done' | 'cancel'): NotifyTo
     rpcFail(409, '待办已结束');
   }
   return action === 'done' ? 'done' : 'cancelled';
-}
-
-function parseDueAt(value: unknown): Date | null {
-  if (value === undefined || value === null || value === '') {
-    return null;
-  }
-  const text = optionalString(value);
-  if (!text) {
-    rpcFail(400, 'dueAt 无效');
-  }
-  const date = new Date(text);
-  if (Number.isNaN(date.getTime())) {
-    rpcFail(400, 'dueAt 无效');
-  }
-  return date;
-}
-
-function parseData(value: unknown): Record<string, unknown> | null {
-  if (value === undefined || value === null || value === '') {
-    return null;
-  }
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    rpcFail(400, 'data 必须是对象');
-  }
-  const encoded = JSON.stringify(value);
-  if (encoded.length > 8000) {
-    rpcFail(400, 'data 过大');
-  }
-  return value as Record<string, unknown>;
 }

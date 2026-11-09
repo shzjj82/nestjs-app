@@ -77,6 +77,20 @@ sudo PG_BIND=0.0.0.0 ./scripts/infra/install-postgres.sh
 sudo REDIS_BIND=0.0.0.0 ./scripts/infra/install-redis.sh
 ```
 
+### 数据库备份到阿里云 OSS
+
+每日 `pg_dump` 各业务库并上传 OSS，默认只保留最近 3 天（按对象 `LastModified` 清理）。需已配置 `OSS_*`，本机有 Node 与仓库依赖（`@aws-sdk/client-s3`）。
+
+```bash
+# 一次性试跑（经 SSH 连线上库机）
+BACKUP_SSH=root@192.168.3.98 ./scripts/infra/backup-postgres-to-oss.sh
+
+# 写入 crontab：每天 03:15
+BACKUP_SSH=root@192.168.3.98 ./scripts/infra/backup-postgres-to-oss.sh install-cron
+```
+
+对象键形如 `db-backups/nestjs-app/20261109/nestjs-….dump.gz`。变量见 `.env.example`（`BACKUP_*`）。
+
 ## Docker Compose（推荐）
 
 一次拉起 PostgreSQL、Redis、Mosquitto，以及 gateway、usercenter、order、docs、upload、wechat、recycle、notify、agents 各 1 个实例。请求地址始终是 `http://localhost:3000`。用户中心要多实例时再加 `--scale usercenter=3`。裁剪场景用 `deploy/<场景>/docker-compose.yml`。
