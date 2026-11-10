@@ -1,11 +1,15 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { HttpExceptionFilter } from './common/http-exception.filter';
 import { TransformInterceptor } from './common/transform.interceptor';
 import { GatewayModule } from './gateway.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(GatewayModule);
+  const app = await NestFactory.create<NestExpressApplication>(GatewayModule);
+  // 短录音 base64 约 8MB 文件 ≈ 11MB JSON；长音频改走 multipart /files/audio。
+  app.useBodyParser('json', { limit: '12mb' });
+  app.useBodyParser('urlencoded', { limit: '12mb', extended: true });
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());
   // Next.js / 博客只调 HTTP 网关；浏览器直连时需要 CORS，服务端 fetch 不受影响

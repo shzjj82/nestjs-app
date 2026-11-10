@@ -1,4 +1,4 @@
-import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NestMiddleware } from '@nestjs/common';
 import { matchRoute, ok, unwrapData } from '@app/common';
 import type { NextFunction, Request, Response } from 'express';
 import { AuthService } from '../auth/auth.service';
@@ -30,6 +30,14 @@ export class ProxyMiddleware implements NestMiddleware {
     }
 
     try {
+      if (req.method === 'POST' && pathname === '/medical/ai/intake-audio') {
+        const audio = typeof (req.body as { audioBase64?: unknown } | undefined)?.audioBase64 === 'string'
+          ? (req.body as { audioBase64: string }).audioBase64
+          : '';
+        if (audio.length > 11_000_000) {
+          throw new BadRequestException('音频超过 8MB，请先上传文件再转写');
+        }
+      }
       const query = (req.query ?? {}) as Record<string, unknown>;
       const isDocsList = pathname === '/docs/documents';
       const scope =

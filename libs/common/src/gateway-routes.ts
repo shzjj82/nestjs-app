@@ -276,6 +276,12 @@ function medicalRoutes(): GatewayRoute[] {
       pattern: MQTT_PATTERNS.MEDICAL_FILE_ASSIST,
       override: true,
     }),
+    medical({
+      method: 'POST',
+      path: '/medical/files/audio',
+      pattern: MQTT_PATTERNS.MEDICAL_FILE_ASSIST,
+      override: true,
+    }),
   ];
 }
 

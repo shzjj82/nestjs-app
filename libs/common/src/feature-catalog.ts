@@ -559,7 +559,7 @@ const businessFeatures: FeatureCatalogItem[] = [
     name: '舌象上传',
     description: '舌象图片与智能填写原始文件上传',
     sort: 340,
-    apis: ['POST /medical/files/tongue', 'POST /medical/files/assist'],
+    apis: ['POST /medical/files/tongue', 'POST /medical/files/assist', 'POST /medical/files/audio'],
   },
 ];
 
