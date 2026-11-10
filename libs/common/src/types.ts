@@ -407,12 +407,41 @@ export interface AgentChatInput {
   messages: Array<{ role: AgentChatRole; content: string }>;
   attachments?: AgentChatAttachment[];
   system?: string;
+  /** 已有会话 id；不传则自动建会话并回写本轮 */
+  conversationId?: string;
   /** true（默认）一次返回完整 reply；false 上游 stream，网关 SSE 转给前端 */
   sync?: boolean;
   /** true 时用当前业务下账号可见文档做 RAG 增强；未配 embedding 时忽略 */
   rag?: boolean;
   /** RAG 取回片段数，默认 6 */
   ragTopK?: number;
+}
+
+export interface AgentConversationInfo {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentConversationMessageInfo {
+  id: string;
+  role: AgentChatRole;
+  content: string;
+  attachments: AgentChatAttachment[] | null;
+  sources: AgentRagSource[] | null;
+  createdAt: string;
+}
+
+export interface AgentConversationDetail extends AgentConversationInfo {
+  messages: AgentConversationMessageInfo[];
+}
+
+export interface AgentConversationListResult {
+  items: AgentConversationInfo[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface AgentRagSource {
@@ -427,6 +456,8 @@ export interface AgentRagSource {
 
 export interface AgentChatResult {
   reply: string;
+  /** 本次对话所属会话；新建或续写都会返回 */
+  conversationId: string;
   /** rag=true 且命中时返回引用片段 */
   sources?: AgentRagSource[];
 }
@@ -444,5 +475,5 @@ export interface AgentRagSearchResult {
 
 export type AgentChatStreamEvent =
   | { delta: string }
-  | { reply: string }
+  | { reply: string; conversationId: string }
   | { error: string };

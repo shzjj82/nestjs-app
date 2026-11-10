@@ -133,6 +133,18 @@ describe('matchRoute', () => {
     expect(matchRoute('GET', '/agents/chat/status')?.auth).toEqual(['jwt']);
     expect(matchRoute('POST', '/agents/chat')?.override).toBe(true);
     expect(matchRoute('POST', '/agents/chat')?.pattern).toBe(MQTT_PATTERNS.AGENTS_CHAT);
+    expect(matchRoute('GET', '/agents/conversations')?.pattern).toBe(
+      MQTT_PATTERNS.AGENTS_CONVERSATION_LIST,
+    );
+    expect(matchRoute('GET', '/agents/conversations/c-1')?.pattern).toBe(
+      MQTT_PATTERNS.AGENTS_CONVERSATION_FIND_ONE,
+    );
+    expect(matchRoute('PATCH', '/agents/conversations/c-1')?.pattern).toBe(
+      MQTT_PATTERNS.AGENTS_CONVERSATION_UPDATE,
+    );
+    expect(matchRoute('DELETE', '/agents/conversations/c-1')?.pattern).toBe(
+      MQTT_PATTERNS.AGENTS_CONVERSATION_DELETE,
+    );
     expect(matchRoute('POST', '/agents/rag/search')?.auth).toEqual(['jwt']);
     expect(matchRoute('POST', '/agents/rag/search')?.pattern).toBe(MQTT_PATTERNS.AGENTS_RAG_SEARCH);
     expect(matchRoute('POST', '/agents/vision')?.override).toBe(true);

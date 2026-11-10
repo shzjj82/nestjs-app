@@ -6,8 +6,8 @@ import type {
   AgentChatStreamEvent,
   AgentRagSource,
 } from '@app/common';
-import { asRecord } from '../common/rpc';
-import { rpcFail } from '../common/rpc';
+import { asRecord, rpcFail } from '../common/rpc';
+import type { ConversationEntity } from '../entities/conversation.entity';
 import { RagPort } from '../rag/rag-port';
 import { aiApiBase, aiApiKey, aiConfigured, aiModel, aiTimeoutMs } from './chat-env';
 import { parseChatInput } from './chat-input';
@@ -18,15 +18,20 @@ import {
   contextAppendix,
   describeAttachments,
   ragContextAppendix,
+  type NormalizedMessage,
   type UpstreamMessage,
 } from './chat-messages';
 import { contentFromUpstreamData, splitSseBlocks } from './chat-stream';
+import { ConversationService } from './conversation.service';
 
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger('AgentsChat');
 
-  constructor(private readonly rag: RagPort) {}
+  constructor(
+    private readonly rag: RagPort,
+    private readonly conversations: ConversationService,
+  ) {}
 
   status() {
     const rag = this.rag.status();
@@ -40,13 +45,60 @@ export class ChatService {
 
   async complete(payload: unknown): Promise<AgentChatResult> {
     this.assertConfigured();
-    return this.run(parseChatInput(payload), payload);
+    const input = parseChatInput(payload);
+    const session = await this.beginSession(input, payload);
+    const prepared = await this.prepare(
+      { ...input, messages: session.messages },
+      payload,
+    );
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), aiTimeoutMs());
+    try {
+      let reply = '';
+      try {
+        reply = await this.callModel(
+          prepared.imageUrls.length ? prepared.withVision : prepared.textOnly,
+          controller.signal,
+          false,
+        );
+      } catch (err) {
+        if (prepared.imageUrls.length && isUpstreamError(err)) {
+          reply = await this.callModel(prepared.textOnly, controller.signal, false);
+        } else {
+          throw err;
+        }
+      }
+      if (!reply) {
+        rpcFail(502, 'AI_EMPTY');
+      }
+      const trimmed = reply.slice(0, 12000);
+      await this.persistTurn(session, input, trimmed, prepared.sources);
+      const result: AgentChatResult = {
+        reply: trimmed,
+        conversationId: session.conversation.id,
+      };
+      if (prepared.sources.length) {
+        result.sources = prepared.sources;
+      }
+      return result;
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        rpcFail(504, 'AI_TIMEOUT');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async *streamEvents(payload: unknown): AsyncGenerator<AgentChatStreamEvent> {
     this.assertConfigured();
     const input = parseChatInput(payload);
-    const prepared = await this.prepare(input, payload);
+    const session = await this.beginSession(input, payload);
+    const prepared = await this.prepare(
+      { ...input, messages: session.messages },
+      payload,
+    );
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), aiTimeoutMs());
     try {
@@ -72,7 +124,9 @@ export class ChatService {
       if (!reply) {
         rpcFail(502, 'AI_EMPTY');
       }
-      yield { reply: reply.slice(0, 12000) };
+      const trimmed = reply.slice(0, 12000);
+      await this.persistTurn(session, input, trimmed, prepared.sources);
+      yield { reply: trimmed, conversationId: session.conversation.id };
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         rpcFail(504, 'AI_TIMEOUT');
@@ -83,48 +137,50 @@ export class ChatService {
     }
   }
 
+  /** @deprecated 保留给旧测试；走 complete */
   async run(input: AgentChatInput, rawPayload?: unknown): Promise<AgentChatResult> {
-    this.assertConfigured();
-    const prepared = await this.prepare(input, rawPayload ?? input);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), aiTimeoutMs());
-    try {
-      let reply = '';
-      try {
-        reply = await this.callModel(
-          prepared.imageUrls.length ? prepared.withVision : prepared.textOnly,
-          controller.signal,
-          false,
-        );
-      } catch (err) {
-        if (prepared.imageUrls.length && isUpstreamError(err)) {
-          reply = await this.callModel(prepared.textOnly, controller.signal, false);
-        } else {
-          throw err;
-        }
-      }
-      if (!reply) {
-        rpcFail(502, 'AI_EMPTY');
-      }
-      const result: AgentChatResult = { reply: reply.slice(0, 12000) };
-      if (prepared.sources.length) {
-        result.sources = prepared.sources;
-      }
-      return result;
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        rpcFail(504, 'AI_TIMEOUT');
-      }
-      throw err;
-    } finally {
-      clearTimeout(timer);
-    }
+    return this.complete({ ...input, ...(asRecord(rawPayload) as object) });
   }
 
   assertConfigured() {
     if (!aiConfigured()) {
       rpcFail(503, 'AI_NOT_CONFIGURED');
     }
+  }
+
+  private async beginSession(input: AgentChatInput, rawPayload: unknown) {
+    const actor = this.conversations.requireActor(rawPayload);
+    const conversation = await this.conversations.resolveForChat({
+      conversationId: input.conversationId,
+      bizCode: actor.bizCode,
+      userId: actor.userId,
+      accountId: actor.accountId,
+    });
+    const history = await this.conversations.loadHistory(conversation.id);
+    const messages = this.conversations.mergeHistory(history, input.messages);
+    return { conversation, messages, actor };
+  }
+
+  private async persistTurn(
+    session: {
+      conversation: ConversationEntity;
+      messages: NormalizedMessage[];
+    },
+    input: AgentChatInput,
+    reply: string,
+    sources: AgentRagSource[],
+  ) {
+    const lastUser = [...session.messages].reverse().find((item) => item.role === 'user');
+    if (!lastUser) {
+      return;
+    }
+    await this.conversations.appendTurn({
+      conversation: session.conversation,
+      userContent: lastUser.content,
+      assistantContent: reply,
+      attachments: input.attachments,
+      sources,
+    });
   }
 
   private async prepare(input: AgentChatInput, rawPayload: unknown) {

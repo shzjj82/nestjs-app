@@ -122,6 +122,10 @@ export const MQTT_PATTERNS = {
   AGENTS_API_DOCS: 'agents.apiDocs',
   AGENTS_CHAT: 'agents.chat',
   AGENTS_CHAT_STATUS: 'agents.chat.status',
+  AGENTS_CONVERSATION_LIST: 'agents.conversation.list',
+  AGENTS_CONVERSATION_FIND_ONE: 'agents.conversation.findOne',
+  AGENTS_CONVERSATION_UPDATE: 'agents.conversation.update',
+  AGENTS_CONVERSATION_DELETE: 'agents.conversation.delete',
   AGENTS_VISION_PARSE: 'agents.vision.parse',
   /** 内部：docs 保存后索引文档（不注册网关） */
   AGENTS_RAG_INDEX: 'agents.rag.index',

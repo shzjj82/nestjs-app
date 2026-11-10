@@ -344,7 +344,8 @@ Excel「功能点」表头：`模块 / 功能编码 / 功能名称 / 描述 / �
 - `GET /notifications/socket` — WebSocket，查询参数 `token` 与 `bizCode`
 - `GET /orders` / `GET /orders/:id` — 无需登录
 - `GET /agents/health` / `GET /agents/chat/status` — 探活与是否已配置模型（不回密钥）
-- `POST /agents/chat` — `sync` 默认 true 返回 `{ reply }`；`sync: false` 时 SSE 流式（`data: {"delta":"..."}`）
+- `POST /agents/chat` — `sync` 默认 true 返回 `{ reply, conversationId }`；可传 `conversationId` 续写；`sync: false` 时 SSE 流式（最终 `reply` 事件含 `conversationId`）
+- `GET/PATCH/DELETE /agents/conversations` — 历史会话列表、详情（含消息）、重命名、删除
 
 ## 消息通知
 

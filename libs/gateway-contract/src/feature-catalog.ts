@@ -385,7 +385,14 @@ const businessFeatures: FeatureCatalogItem[] = [
     name: '对话助手',
     description: '聊天状态与对话',
     sort: 240,
-    apis: ['GET /agents/chat/status', 'POST /agents/chat'],
+    apis: [
+      'GET /agents/chat/status',
+      'POST /agents/chat',
+      'GET /agents/conversations',
+      'GET /agents/conversations/:id',
+      'PATCH /agents/conversations/:id',
+      'DELETE /agents/conversations/:id',
+    ],
   },
   {
     scope: 'business',
@@ -433,6 +440,7 @@ const businessFeatures: FeatureCatalogItem[] = [
       'GET /todos/open-count',
       'POST /todos',
       'GET /todos/:id',
+      'PATCH /todos/:id',
       'POST /todos/:id/done',
       'POST /todos/:id/cancel',
     ],

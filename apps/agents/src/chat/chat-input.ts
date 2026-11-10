@@ -12,10 +12,12 @@ export function parseChatInput(payload: unknown): AgentChatInput {
     rpcFail(400, 'AI_EMPTY');
   }
   const ragTopK = Number(data.ragTopK);
+  const conversationId = optionalString(data.conversationId);
   return {
     messages,
     attachments: parseAttachments(data.attachments),
     system: optionalString(data.system),
+    conversationId,
     sync: data.sync !== false,
     rag: data.rag === true,
     ragTopK:

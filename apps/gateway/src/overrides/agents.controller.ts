@@ -46,6 +46,7 @@ export class AgentsOverrideController {
       ...sanitizeBody(body),
       _bizCode: bizCode,
       _session: {
+        userId: user.id,
         accountId: user.accountId,
         appId: user.appId,
         bizCode: user.bizCode ?? bizCode ?? '',
