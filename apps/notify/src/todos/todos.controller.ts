@@ -33,6 +33,12 @@ export class TodosController {
     return this.todos.createMine(payload);
   }
 
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_UPDATE))
+  @ApiDoc({ name: '更新待办', description: '更新本人未完成待办的标题、内容与截止时间' })
+  updateMine(payload: Record<string, unknown>) {
+    return this.todos.updateMine(payload);
+  }
+
   @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_DONE))
   @ApiDoc({ name: '完成待办', description: '把本人的一条未完成待办标为 done，并经 socket 推送' })
   done(payload: Record<string, unknown>) {

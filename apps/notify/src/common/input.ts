@@ -158,3 +158,38 @@ export function finishTodo(current: string, action: 'done' | 'cancel'): NotifyTo
   }
   return action === 'done' ? 'done' : 'cancelled';
 }
+
+
+const updateMineSchema = z.object({
+  title: z
+    .string({ required_error: 'title 必填且不超过 120 字', invalid_type_error: 'title 必填且不超过 120 字' })
+    .trim()
+    .min(1, 'title 必填且不超过 120 字')
+    .max(120, 'title 必填且不超过 120 字'),
+  content: z
+    .string({
+      required_error: 'content 必填且不超过 4000 字',
+      invalid_type_error: 'content 必填且不超过 4000 字',
+    })
+    .trim()
+    .min(1, 'content 必填且不超过 4000 字')
+    .max(4000, 'content 必填且不超过 4000 字'),
+  category: z.preprocess(
+    (value) => optionalString(value) ?? 'system',
+    topicToken('category'),
+  ),
+  data: dataSchema,
+  dueAt: dueAtSchema,
+});
+
+export type UpdateMineCommand = {
+  title: string;
+  content: string;
+  category: string;
+  data: Record<string, unknown> | null;
+  dueAt: Date | null;
+};
+
+export function parseUpdateMine(payload: Record<string, unknown>): UpdateMineCommand {
+  return parseWith(updateMineSchema, payload) as UpdateMineCommand;
+}

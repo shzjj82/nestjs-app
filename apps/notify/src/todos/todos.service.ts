@@ -7,6 +7,7 @@ import {
   bizCodeOf,
   finishTodo,
   parseSend,
+  parseUpdateMine,
   requireActor,
   requireUuid,
   todoStatusOf,
@@ -15,6 +16,7 @@ import {
 } from '../common/input';
 import { pushRealtime } from '../common/push';
 import { TodoEntity } from '../entities';
+import { shanghaiDayOf } from './shanghai-day';
 
 @Injectable()
 export class TodosService {
@@ -74,6 +76,26 @@ export class TodosService {
     return this.create(command);
   }
 
+  async updateMine(payload: Record<string, unknown>) {
+    const row = await this.own(payload);
+    if (row.status !== 'open') {
+      rpcFail(409, '待办已结束');
+    }
+    const command = parseUpdateMine(payload);
+    row.title = command.title;
+    row.content = command.content;
+    row.category = command.category;
+    row.data = command.data;
+    if (shanghaiDayOf(row.dueAt) !== shanghaiDayOf(command.dueAt)) {
+      row.remindedOn = null;
+    }
+    row.dueAt = command.dueAt;
+    await this.todos.save(row);
+    const view = toView(row);
+    await pushRealtime({ kind: 'todo', action: 'updated', item: view });
+    return view;
+  }
+
   async create(command: SendCommand): Promise<NotifyTodo> {
     const saved = await this.todos.save(
       this.todos.create({
@@ -86,6 +108,7 @@ export class TodosService {
         status: 'open',
         data: command.data,
         dueAt: command.dueAt,
+        remindedOn: null,
         finishedAt: null,
       }),
     );

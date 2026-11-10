@@ -10,6 +10,7 @@ import { InboxController } from './notices/inbox.controller';
 import { NoticesService } from './notices/notices.service';
 import { SendController } from './notices/send.controller';
 import { NotifyController } from './notify.controller';
+import { TodoReminder } from './todos/todo-reminder';
 import { TodosController } from './todos/todos.controller';
 import { TodosService } from './todos/todos.service';
 
@@ -23,6 +24,6 @@ import { TodosService } from './todos/todos.service';
     }),
   ],
   controllers: [NotifyController, InboxController, SendController, TodosController],
-  providers: [NoticesService, TodosService],
+  providers: [NoticesService, TodosService, TodoReminder],
 })
 export class NotifyModule {}

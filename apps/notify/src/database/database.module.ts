@@ -4,6 +4,7 @@ import { notifyDatabaseUrl } from '@app/common';
 import { NOTIFY_ENTITIES } from '../entities';
 import { InitNotifySchema1760900000000 } from './migrations/1760900000000-init-notify-schema';
 import { SplitNoticeAndTodo1760900001000 } from './migrations/1760900001000-split-notice-and-todo';
+import { TodoRemindedOn1760900002000 } from './migrations/1760900002000-todo-reminded-on';
 
 const sync = process.env.TYPEORM_SYNC === 'true';
 
@@ -15,7 +16,11 @@ const sync = process.env.TYPEORM_SYNC === 'true';
       entities: NOTIFY_ENTITIES,
       synchronize: sync,
       migrationsRun: !sync,
-      migrations: [InitNotifySchema1760900000000, SplitNoticeAndTodo1760900001000],
+      migrations: [
+        InitNotifySchema1760900000000,
+        SplitNoticeAndTodo1760900001000,
+        TodoRemindedOn1760900002000,
+      ],
       logging: process.env.TYPEORM_LOGGING === 'true',
     }),
     TypeOrmModule.forFeature(NOTIFY_ENTITIES),

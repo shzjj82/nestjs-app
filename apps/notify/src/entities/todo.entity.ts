@@ -41,6 +41,10 @@ export class TodoEntity {
   @Column({ name: 'due_at', type: 'timestamptz', nullable: true })
   dueAt: Date | null;
 
+  /** 已按截止日发过凌晨通知的上海日历日，YYYY-MM-DD */
+  @Column({ name: 'reminded_on', type: 'date', nullable: true })
+  remindedOn: string | null;
+
   @Column({ name: 'finished_at', type: 'timestamptz', nullable: true })
   finishedAt: Date | null;
 

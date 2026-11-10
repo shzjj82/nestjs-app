@@ -209,6 +209,7 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'GET', path: '/todos/open-count', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_OPEN_COUNT, auth: ['jwt'] }),
   business({ method: 'GET', path: '/todos', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_LIST, auth: ['jwt'] }),
   business({ method: 'POST', path: '/todos', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_CREATE, auth: ['jwt'] }),
+  business({ method: 'PATCH', path: '/todos/:id', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_UPDATE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/todos/:id/done', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_DONE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/todos/:id/cancel', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_CANCEL, auth: ['jwt'] }),
   business({ method: 'GET', path: '/todos/:id', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_FIND_ONE, auth: ['jwt'] }),

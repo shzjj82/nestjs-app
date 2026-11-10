@@ -211,6 +211,8 @@ export const MQTT_PATTERNS = {
   TODO_CANCEL: 'todo.cancel',
   /** 当前用户给自己建一条待办 */
   TODO_CREATE: 'todo.create',
+  /** 当前用户更新自己的未完成待办 */
+  TODO_UPDATE: 'todo.update',
   /** 管理端指派待办 */
   TODO_ADMIN_CREATE: 'todo.adminCreate',
   /** 内部：其它微服务创建待办（不注册到网关） */
