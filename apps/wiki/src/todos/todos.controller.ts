@@ -57,6 +57,15 @@ export class TodosController {
     return this.todos.update(payload);
   }
 
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_BIND_PAGE))
+  @ApiDoc({
+    name: 'Wiki 待办绑定页面',
+    description: '给已有待办（含已完成）补绑/改绑 pageId，写入 data.page',
+  })
+  bindPage(payload: Record<string, unknown>) {
+    return this.todos.bindPage(payload);
+  }
+
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_DONE))
   @ApiDoc({ name: 'Wiki 完成待办' })
   done(payload: Record<string, unknown>) {

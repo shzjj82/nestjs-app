@@ -66,4 +66,14 @@ export class TodosController {
     requireInternal(payload);
     return this.todos.create(parseSend(payload, 'service'));
   }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_PATCH_DATA))
+  @ApiDoc({
+    name: '补丁待办 data',
+    description: '内部接口：任意状态待办只更新 data，供 wiki 回填页面关联',
+  })
+  patchData(payload: Record<string, unknown>) {
+    requireInternal(payload);
+    return this.todos.patchData(payload);
+  }
 }

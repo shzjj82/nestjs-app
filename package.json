@@ -28,6 +28,7 @@
     "recycle:reload": "bash deploy/recycle/scripts/reload.sh",
     "recycle:bootstrap": "ts-node -T -r tsconfig-paths/register deploy/recycle/scripts/bootstrap.ts",
     "wiki:bootstrap": "ts-node -T -r tsconfig-paths/register deploy/wiki/scripts/bootstrap.ts",
+    "wiki:backfill-todo-pages": "ts-node -T -r tsconfig-paths/register deploy/wiki/scripts/backfill-todo-pages.ts",
     "recycle:switch-db": "bash deploy/recycle/db/switch.sh",
     "recycle:docker:up": "docker compose -f deploy/recycle/docker-compose.yml --project-name nestjs-recycle up --build",
     "recycle:docker:down": "docker compose -f deploy/recycle/docker-compose.yml --project-name nestjs-recycle down",

@@ -5,6 +5,7 @@ import {
   NOTIFY_CLIENT,
   WIKI_BIZ_CODE,
   asRecord,
+  notifyInternalKey,
   optionalString,
   rpcFail,
   unwrapData,
@@ -73,31 +74,66 @@ export class TodosService implements OnModuleInit {
 
   async update(payload: Record<string, unknown>) {
     const pageId = optionalPageId(payload.pageId);
-    let page: WikiTodoPageRef;
-    let baseData: Record<string, unknown> | null = null;
-    if (pageId) {
-      page = await this.resolveReadablePage(payload, pageId);
-    } else {
-      const current = await this.call<Record<string, unknown>>(
-        MQTT_PATTERNS.TODO_FIND_ONE,
-        this.scoped(payload),
-      );
-      baseData = asData(current.data);
-      const existing = pageFromTodoData(current.data);
-      if (!existing) {
-        rpcFail(400, 'pageId 必填：wiki 待办须关联文章页面');
-      }
-      page = existing;
-    }
-    const body = this.scoped({
-      ...payload,
-      category: optionalString(payload.category) ?? 'page',
-      source: 'wiki',
-      data: mergeTodoData(payload.data, page, baseData),
-    });
-    return this.enrichItem(
-      await this.call<Record<string, unknown>>(MQTT_PATTERNS.TODO_UPDATE, body),
+    const current = await this.call<Record<string, unknown>>(
+      MQTT_PATTERNS.TODO_FIND_ONE,
+      this.scoped(payload),
     );
+    const baseData = asData(current.data);
+    if (pageId) {
+      const page = await this.resolveReadablePage(payload, pageId);
+      return this.enrichItem(
+        await this.call<Record<string, unknown>>(
+          MQTT_PATTERNS.TODO_UPDATE,
+          this.scoped({
+            ...payload,
+            category: optionalString(payload.category) ?? 'page',
+            source: 'wiki',
+            data: mergeTodoData(payload.data, page, baseData),
+          }),
+        ),
+      );
+    }
+    const existing = pageFromTodoData(current.data);
+    // 历史待办可能没有 page：允许只改标题等内容，但不允许新建无页关联
+    const data = existing
+      ? mergeTodoData(payload.data, existing, baseData)
+      : {
+          ...(baseData ?? {}),
+          ...(asData(payload.data) ?? {}),
+          legacyWithoutPage: true,
+        };
+    return this.enrichItem(
+      await this.call<Record<string, unknown>>(
+        MQTT_PATTERNS.TODO_UPDATE,
+        this.scoped({
+          ...payload,
+          category: optionalString(payload.category) ?? (existing ? 'page' : 'system'),
+          source: 'wiki',
+          data,
+        }),
+      ),
+    );
+  }
+
+  /** 给已有待办补绑/改绑文章（含已完成），供历史数据治理 */
+  async bindPage(payload: Record<string, unknown>) {
+    const page = await this.resolveReadablePage(payload, requirePageId(payload.pageId));
+    const current = await this.call<Record<string, unknown>>(
+      MQTT_PATTERNS.TODO_FIND_ONE,
+      this.scoped(payload),
+    );
+    const data = mergeTodoData(payload.data, page, asData(current.data));
+    delete data.legacyWithoutPage;
+    const patched = await this.call<Record<string, unknown>>(
+      MQTT_PATTERNS.TODO_PATCH_DATA,
+      {
+        id: payload.id,
+        data,
+        _bizCode: WIKI_BIZ_CODE,
+        _internal: notifyInternalKey(),
+      },
+    );
+    return this.enrichItem(patched);
   }
 
   done(payload: Record<string, unknown>) {

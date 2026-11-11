@@ -127,6 +127,25 @@ export class TodosService {
     return view;
   }
 
+  /** 内部：任意状态待办只补丁 data（wiki 给历史待办绑页面） */
+  async patchData(payload: Record<string, unknown>) {
+    const id = requireUuid(payload.id, 'id');
+    const bizCode = bizCodeOf(payload);
+    const row = await this.todos.findOne({ where: { id, bizCode } });
+    if (!row) {
+      rpcFail(404, '待办不存在');
+    }
+    const data = payload.data;
+    if (data !== null && (typeof data !== 'object' || Array.isArray(data))) {
+      rpcFail(400, 'data 必须是对象');
+    }
+    row.data = (data as Record<string, unknown> | null) ?? null;
+    await this.todos.save(row);
+    const view = toView(row);
+    await pushRealtime({ kind: 'todo', action: 'updated', item: view });
+    return view;
+  }
+
   private async own(payload: Record<string, unknown>): Promise<TodoEntity> {
     const actor = requireActor(payload);
     const id = requireUuid(payload.id, 'id');

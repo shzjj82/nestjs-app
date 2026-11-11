@@ -270,6 +270,7 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'GET', path: '/wiki/todos', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TODO_LIST, auth: ['jwt'] }),
   business({ method: 'POST', path: '/wiki/todos', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TODO_CREATE, auth: ['jwt'] }),
   business({ method: 'PATCH', path: '/wiki/todos/:id', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TODO_UPDATE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/wiki/todos/:id/page', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TODO_BIND_PAGE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/wiki/todos/:id/done', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TODO_DONE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/wiki/todos/:id/cancel', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TODO_CANCEL, auth: ['jwt'] }),
   business({ method: 'GET', path: '/wiki/todos/:id', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TODO_FIND_ONE, auth: ['jwt'] }),
