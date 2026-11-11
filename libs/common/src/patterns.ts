@@ -112,8 +112,23 @@ export const MQTT_PATTERNS = {
   WIKI_CATEGORY_CREATE: 'wiki.category.create',
   WIKI_CATEGORY_UPDATE: 'wiki.category.update',
   WIKI_CATEGORY_DELETE: 'wiki.category.delete',
+  /** 编辑器门面：登录注册走 wiki，由产品侧注入 bizCode=wiki 再转发 usercenter */
+  WIKI_AUTH_REGISTER: 'wiki.auth.register',
+  WIKI_AUTH_LOGIN: 'wiki.auth.login',
+  WIKI_AUTH_WECHAT: 'wiki.auth.wechat',
+  WIKI_AUTH_ALIPAY: 'wiki.auth.alipay',
+  WIKI_AUTH_REFRESH: 'wiki.auth.refresh',
+  WIKI_AUTH_LOGOUT: 'wiki.auth.logout',
+  WIKI_AUTH_ME: 'wiki.auth.me',
+  WIKI_AUTH_BIND_PHONE: 'wiki.auth.bindPhone',
+  WIKI_AUTH_CHANGE_PASSWORD: 'wiki.auth.changePassword',
+  WIKI_AUTH_LOGIN_QR_CREATE: 'wiki.auth.loginQr.create',
+  WIKI_AUTH_LOGIN_QR_SCAN: 'wiki.auth.loginQr.scan',
+  WIKI_AUTH_LOGIN_QR_CONFIRM: 'wiki.auth.loginQr.confirm',
+  WIKI_AUTH_LOGIN_QR_STATUS: 'wiki.auth.loginQr.status',
   /** 编辑器门面：wiki 收口后再调平台 upload / agents / notify */
   WIKI_UPLOAD_PUT: 'wiki.upload.put',
+
   WIKI_UPLOAD_ENQUEUE: 'wiki.upload.enqueue',
   WIKI_UPLOAD_JOB: 'wiki.upload.job',
   WIKI_UPLOAD_DELETE: 'wiki.upload.delete',

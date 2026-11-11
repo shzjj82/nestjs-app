@@ -4,6 +4,8 @@ import {
   AGENTS_CLIENT,
   NOTIFY_CLIENT,
   UPLOAD_CLIENT,
+  USER_CLIENT,
+  WIKI_BIZ_CODE,
   unwrapData,
 } from '@app/common';
 import { lastValueFrom } from 'rxjs';
@@ -17,6 +19,7 @@ export class PlatformProxy implements OnModuleInit {
     @Inject(UPLOAD_CLIENT) private readonly upload: ClientProxy,
     @Inject(AGENTS_CLIENT) private readonly agents: ClientProxy,
     @Inject(NOTIFY_CLIENT) private readonly notify: ClientProxy,
+    @Inject(USER_CLIENT) private readonly usercenter: ClientProxy,
   ) {}
 
   async onModuleInit() {
@@ -24,6 +27,7 @@ export class PlatformProxy implements OnModuleInit {
       this.upload.connect(),
       this.agents.connect(),
       this.notify.connect(),
+      this.usercenter.connect(),
     ]);
   }
 
@@ -37,6 +41,16 @@ export class PlatformProxy implements OnModuleInit {
 
   callNotify<T = unknown>(pattern: string, payload: unknown, ms = 15_000) {
     return this.send<T>(this.notify, pattern, payload, ms);
+  }
+
+  /** 认证转发：强制 _bizCode=wiki，前端无需带业务头 */
+  callAuth<T = unknown>(pattern: string, payload: Record<string, unknown>, ms = 15_000) {
+    return this.send<T>(
+      this.usercenter,
+      pattern,
+      { ...payload, _bizCode: WIKI_BIZ_CODE },
+      ms,
+    );
   }
 
   private async send<T>(

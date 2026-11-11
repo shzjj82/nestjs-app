@@ -311,6 +311,9 @@ export interface WechatSession {
 /** 系统保留业务：admin 控制台会话，平台管理接口只接受该业务；业务接口全部放行 */
 export const PLATFORM_BIZ_CODE = 'platform';
 
+/** wiki 编辑器单体产品：/wiki/* 由网关注入该 bizCode，前端无需带 X-Biz-Code */
+export const WIKI_BIZ_CODE = 'wiki';
+
 export interface BusinessRegistryEntry {
   code: string;
   status: number;

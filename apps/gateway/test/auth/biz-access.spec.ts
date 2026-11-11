@@ -6,10 +6,25 @@ const blog: BusinessRegistryEntry = {
   status: 1,
   apis: ['GET /docs/documents'],
 };
+const wiki: BusinessRegistryEntry = {
+  code: 'wiki',
+  status: 1,
+  apis: [],
+};
 const docsRoute = {
   scope: 'business' as const,
   method: 'GET' as const,
   path: '/docs/documents',
+};
+const wikiRoute = {
+  scope: 'business' as const,
+  method: 'GET' as const,
+  path: '/wiki/documents',
+};
+const wikiAuthRoute = {
+  scope: 'business' as const,
+  method: 'POST' as const,
+  path: '/wiki/auth/login',
 };
 
 describe('evaluateBizAccess', () => {
@@ -105,5 +120,46 @@ describe('evaluateBizAccess', () => {
     expect(
       evaluateBizAccess({ route: {}, headerCode: 'ghost', entry: undefined, session: null }),
     ).toEqual({ ok: true, bizCode: null });
+  });
+
+  it('defaults /wiki/* to wiki without X-Biz-Code and skips api whitelist', () => {
+    expect(
+      evaluateBizAccess({
+        route: wikiRoute,
+        headerCode: null,
+        entry: wiki,
+        session: null,
+      }),
+    ).toEqual({ ok: true, bizCode: 'wiki' });
+    expect(
+      evaluateBizAccess({
+        route: wikiAuthRoute,
+        headerCode: null,
+        entry: wiki,
+        session: null,
+      }),
+    ).toEqual({ ok: true, bizCode: 'wiki' });
+  });
+
+  it('forces wiki product code even if another header is sent', () => {
+    expect(
+      evaluateBizAccess({
+        route: wikiRoute,
+        headerCode: 'blog',
+        entry: wiki,
+        session: null,
+      }),
+    ).toEqual({ ok: true, bizCode: 'wiki' });
+  });
+
+  it('still rejects wiki product when wiki business is disabled', () => {
+    expect(
+      evaluateBizAccess({
+        route: wikiRoute,
+        headerCode: null,
+        entry: { ...wiki, status: 0 },
+        session: null,
+      }),
+    ).toMatchObject({ ok: false, status: 403 });
   });
 });

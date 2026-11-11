@@ -10,13 +10,80 @@ import {
 import { PlatformProxy } from './platform-proxy';
 
 /**
- * 编辑器产品门面：HTTP /wiki/* → 本服务 → 平台 upload / agents / notify。
- * 后续 wiki 专属逻辑写在这里（配额、审计、默认 prefix 等），再转发下游。
+ * 编辑器产品门面：HTTP /wiki/* → 本服务 → 平台 auth / upload / agents / notify。
+ * 认证由产品侧固定 _bizCode=wiki；其它能力可在此加配额、审计后再转发。
  */
 @Controller()
 @UseInterceptors(DocsHandleLogInterceptor)
 export class FacadeController {
   constructor(private readonly platform: PlatformProxy) {}
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AUTH_REGISTER))
+  @ApiDoc({ name: 'Wiki 注册', description: '编辑器注册，注入 bizCode=wiki 后转发 usercenter' })
+  authRegister(payload: Record<string, unknown>) {
+    return this.platform.callAuth(MQTT_PATTERNS.AUTH_REGISTER, payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AUTH_LOGIN))
+  @ApiDoc({ name: 'Wiki 登录', description: '编辑器登录，注入 bizCode=wiki 后转发 usercenter' })
+  authLogin(payload: Record<string, unknown>) {
+    return this.platform.callAuth(MQTT_PATTERNS.AUTH_LOGIN, payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AUTH_WECHAT))
+  authWechat(payload: Record<string, unknown>) {
+    return this.platform.callAuth(MQTT_PATTERNS.AUTH_WECHAT, payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AUTH_ALIPAY))
+  authAlipay(payload: Record<string, unknown>) {
+    return this.platform.callAuth(MQTT_PATTERNS.AUTH_ALIPAY, payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AUTH_REFRESH))
+  authRefresh(payload: Record<string, unknown>) {
+    return this.platform.callAuth(MQTT_PATTERNS.AUTH_REFRESH, payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AUTH_LOGOUT))
+  authLogout(payload: Record<string, unknown>) {
+    return this.platform.callAuth(MQTT_PATTERNS.AUTH_LOGOUT, payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AUTH_ME))
+  authMe(payload: Record<string, unknown>) {
+    return this.platform.callAuth(MQTT_PATTERNS.AUTH_ME, payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AUTH_BIND_PHONE))
+  authBindPhone(payload: Record<string, unknown>) {
+    return this.platform.callAuth(MQTT_PATTERNS.AUTH_BIND_PHONE, payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AUTH_CHANGE_PASSWORD))
+  authChangePassword(payload: Record<string, unknown>) {
+    return this.platform.callAuth(MQTT_PATTERNS.AUTH_CHANGE_PASSWORD, payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AUTH_LOGIN_QR_CREATE))
+  authQrCreate(payload: Record<string, unknown>) {
+    return this.platform.callAuth(MQTT_PATTERNS.AUTH_LOGIN_QR_CREATE, payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AUTH_LOGIN_QR_SCAN))
+  authQrScan(payload: Record<string, unknown>) {
+    return this.platform.callAuth(MQTT_PATTERNS.AUTH_LOGIN_QR_SCAN, payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AUTH_LOGIN_QR_CONFIRM))
+  authQrConfirm(payload: Record<string, unknown>) {
+    return this.platform.callAuth(MQTT_PATTERNS.AUTH_LOGIN_QR_CONFIRM, payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AUTH_LOGIN_QR_STATUS))
+  authQrStatus(payload: Record<string, unknown>) {
+    return this.platform.callAuth(MQTT_PATTERNS.AUTH_LOGIN_QR_STATUS, payload);
+  }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_UPLOAD_PUT))
   @ApiDoc({ name: 'Wiki 上传', description: '编辑器上传，转发 upload 服务' })

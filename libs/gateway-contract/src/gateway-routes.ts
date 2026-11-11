@@ -20,6 +20,7 @@ export type GatewayHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
  * platform：仅接受 platform 业务会话（admin 控制台），并按用户功能点鉴权；
  * business：必须带已启用业务的 X-Biz-Code，token 属于该业务，且业务开通了该接口。
  *   功能点只针对业务层开放；业务内身份（客户 / 业务员 …）由下游服务限制。
+ *   /wiki/* 例外：网关固定注入 bizCode=wiki，跳过按接口开通校验（编辑器单体产品）。
  * 未设置：不校验业务（健康检查、登出）。
  */
 export type GatewayScope = 'platform' | 'business';
@@ -70,6 +71,28 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'GET', path: '/auth/me', client: USER_CLIENT, pattern: MQTT_PATTERNS.AUTH_ME, auth: ['jwt'] }),
   business({ method: 'POST', path: '/auth/bind-phone', client: USER_CLIENT, pattern: MQTT_PATTERNS.AUTH_BIND_PHONE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/auth/change-password', client: USER_CLIENT, pattern: MQTT_PATTERNS.AUTH_CHANGE_PASSWORD, auth: ['jwt'] }),
+
+  // wiki 编辑器产品登录：前端走 /wiki/auth/*，无需 X-Biz-Code（网关注入 wiki）
+  business({ method: 'POST', path: '/wiki/auth/register', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_REGISTER }),
+  business({ method: 'POST', path: '/wiki/auth/login', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_LOGIN }),
+  business({ method: 'POST', path: '/wiki/auth/wechat', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_WECHAT }),
+  business({ method: 'POST', path: '/wiki/auth/alipay', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_ALIPAY }),
+  business({ method: 'POST', path: '/wiki/auth/refresh', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_REFRESH }),
+  { method: 'POST', path: '/wiki/auth/logout', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_LOGOUT },
+  business({ method: 'POST', path: '/wiki/auth/login/qrcode', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_LOGIN_QR_CREATE }),
+  business({ method: 'POST', path: '/wiki/auth/login/qrcode/scan', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_LOGIN_QR_SCAN }),
+  business({ method: 'POST', path: '/wiki/auth/login/qrcode/confirm', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_LOGIN_QR_CONFIRM }),
+  business({ method: 'GET', path: '/wiki/auth/login/qrcode/:ticket', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_LOGIN_QR_STATUS }),
+  business({
+    method: 'GET',
+    path: '/wiki/auth/login/qrcode/:ticket/events',
+    client: WIKI_CLIENT,
+    pattern: MQTT_PATTERNS.WIKI_AUTH_LOGIN_QR_STATUS,
+    override: true,
+  }),
+  business({ method: 'GET', path: '/wiki/auth/me', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_ME, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/wiki/auth/bind-phone', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_BIND_PHONE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/wiki/auth/change-password', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_CHANGE_PASSWORD, auth: ['jwt'] }),
 
   platform({ method: 'GET', path: '/users', client: USER_CLIENT, pattern: MQTT_PATTERNS.USER_FIND_ALL, permissions: [PERMISSIONS.USER_QUERY] }),
   platform({ method: 'GET', path: '/users/:id', client: USER_CLIENT, pattern: MQTT_PATTERNS.USER_FIND_ONE, permissions: [PERMISSIONS.USER_QUERY] }),
