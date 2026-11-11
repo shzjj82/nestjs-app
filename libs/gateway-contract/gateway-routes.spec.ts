@@ -140,6 +140,25 @@ describe('matchRoute', () => {
       'jwt',
       'upload-key',
     ]);
+    expect(matchRoute('POST', '/wiki/upload')?.override).toBe(true);
+    expect(matchRoute('POST', '/wiki/upload')?.pattern).toBe(MQTT_PATTERNS.UPLOAD_PUT);
+  });
+
+  it('exposes wiki facade aliases for editor platform APIs', () => {
+    expect(matchRoute('GET', '/wiki/todos/open-count')?.pattern).toBe(
+      MQTT_PATTERNS.TODO_OPEN_COUNT,
+    );
+    expect(matchRoute('GET', '/wiki/notifications/unread-count')?.pattern).toBe(
+      MQTT_PATTERNS.NOTIFY_UNREAD_COUNT,
+    );
+    expect(matchRoute('GET', '/wiki/agents/chat/status')?.pattern).toBe(
+      MQTT_PATTERNS.AGENTS_CHAT_STATUS,
+    );
+    expect(matchRoute('POST', '/wiki/agents/chat')?.override).toBe(true);
+    expect(matchRoute('GET', '/wiki/notifications/socket')?.override).toBe(true);
+    // 旧路径仍在
+    expect(matchRoute('POST', '/upload')?.pattern).toBe(MQTT_PATTERNS.UPLOAD_PUT);
+    expect(matchRoute('GET', '/todos')?.pattern).toBe(MQTT_PATTERNS.TODO_LIST);
   });
 
   it('protects agents chat with jwt and marks the chat post as override', () => {

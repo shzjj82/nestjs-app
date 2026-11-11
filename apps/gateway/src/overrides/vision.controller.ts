@@ -25,7 +25,7 @@ type Uploaded = {
   image?: Express.Multer.File[];
 };
 
-@Controller('agents')
+@Controller(['agents', 'wiki/agents'])
 export class VisionOverrideController {
   constructor(
     private readonly clients: ClientHub,

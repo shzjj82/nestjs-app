@@ -18,7 +18,7 @@ import { AuthService } from '../auth/auth.service';
 import { BizGuard } from '../auth/biz.guard';
 import { ClientHub } from '../mqtt/client.hub';
 
-@Controller('upload')
+@Controller(['upload', 'wiki/upload'])
 export class UploadOverrideController {
   constructor(
     private readonly clients: ClientHub,

@@ -26,7 +26,7 @@ function agentsHttpUrl() {
   return (process.env.AGENTS_HTTP_URL ?? 'http://127.0.0.1:3006').replace(/\/+$/, '');
 }
 
-@Controller('agents')
+@Controller(['agents', 'wiki/agents'])
 export class AgentsOverrideController {
   constructor(
     private readonly clients: ClientHub,

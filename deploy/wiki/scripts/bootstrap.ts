@@ -44,6 +44,7 @@ const BASELINE_EXTRA_APIS = [
   'POST /auth/logout',
   'GET /auth/me',
   'POST /auth/change-password',
+  // 平台原路径（其它业务 / 服务间仍可用）
   'POST /upload',
   'GET /agents/chat/status',
   'POST /agents/chat',
@@ -61,6 +62,24 @@ const BASELINE_EXTRA_APIS = [
   'PATCH /todos/:id',
   'POST /todos/:id/done',
   'POST /todos/:id/cancel',
+  // 编辑器门面 /wiki/*
+  'POST /wiki/upload',
+  'GET /wiki/agents/chat/status',
+  'POST /wiki/agents/chat',
+  'POST /wiki/agents/rag/search',
+  'GET /wiki/notifications',
+  'GET /wiki/notifications/unread-count',
+  'GET /wiki/notifications/socket',
+  'GET /wiki/notifications/:id',
+  'POST /wiki/notifications/:id/read',
+  'POST /wiki/notifications/read-all',
+  'GET /wiki/todos',
+  'GET /wiki/todos/open-count',
+  'POST /wiki/todos',
+  'GET /wiki/todos/:id',
+  'PATCH /wiki/todos/:id',
+  'POST /wiki/todos/:id/done',
+  'POST /wiki/todos/:id/cancel',
 ];
 
 function env(key: string, fallback?: string): string | undefined {

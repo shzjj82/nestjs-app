@@ -145,6 +145,11 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   { method: 'GET', path: '/upload/health', client: UPLOAD_CLIENT, pattern: MQTT_PATTERNS.UPLOAD_HEALTH },
   business({ method: 'GET', path: '/upload/jobs/:id', client: UPLOAD_CLIENT, pattern: MQTT_PATTERNS.UPLOAD_JOB, auth: ['jwt', 'upload-key'] }),
   business({ method: 'DELETE', path: '/upload/objects', client: UPLOAD_CLIENT, pattern: MQTT_PATTERNS.UPLOAD_DELETE, auth: ['jwt', 'upload-key'] }),
+  // 编辑器门面：同 pattern，旧路径保留
+  business({ method: 'POST', path: '/wiki/upload', client: UPLOAD_CLIENT, pattern: MQTT_PATTERNS.UPLOAD_PUT, auth: ['jwt', 'upload-key'], override: true }),
+  business({ method: 'POST', path: '/wiki/upload/async', client: UPLOAD_CLIENT, pattern: MQTT_PATTERNS.UPLOAD_ENQUEUE, auth: ['jwt', 'upload-key'], override: true }),
+  business({ method: 'GET', path: '/wiki/upload/jobs/:id', client: UPLOAD_CLIENT, pattern: MQTT_PATTERNS.UPLOAD_JOB, auth: ['jwt', 'upload-key'] }),
+  business({ method: 'DELETE', path: '/wiki/upload/objects', client: UPLOAD_CLIENT, pattern: MQTT_PATTERNS.UPLOAD_DELETE, auth: ['jwt', 'upload-key'] }),
 
   { method: 'GET', path: '/wechat/health', client: WECHAT_CLIENT, pattern: MQTT_PATTERNS.WECHAT_HEALTH },
   platform({ method: 'GET', path: '/wechat/miniprograms', client: WECHAT_CLIENT, pattern: MQTT_PATTERNS.WECHAT_MP_FIND_ALL, permissions: [PERMISSIONS.WECHAT_QUERY, PERMISSIONS.WECHAT_MANAGE] }),
@@ -222,6 +227,12 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'GET', path: '/notifications/:id', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_FIND_ONE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/notifications/:id/read', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_READ, auth: ['jwt'] }),
   platform({ method: 'POST', path: '/notifications', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_ADMIN_SEND, permissions: [PERMISSIONS.NOTIFY_SEND] }),
+  business({ method: 'GET', path: '/wiki/notifications/socket', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_SOCKET, auth: ['jwt'], override: true }),
+  business({ method: 'GET', path: '/wiki/notifications/unread-count', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_UNREAD_COUNT, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/wiki/notifications/read-all', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_READ_ALL, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/wiki/notifications', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_LIST, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/wiki/notifications/:id', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_FIND_ONE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/wiki/notifications/:id/read', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.NOTIFY_READ, auth: ['jwt'] }),
 
   business({ method: 'GET', path: '/todos/open-count', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_OPEN_COUNT, auth: ['jwt'] }),
   business({ method: 'GET', path: '/todos', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_LIST, auth: ['jwt'] }),
@@ -231,6 +242,13 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'POST', path: '/todos/:id/cancel', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_CANCEL, auth: ['jwt'] }),
   business({ method: 'GET', path: '/todos/:id', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_FIND_ONE, auth: ['jwt'] }),
   platform({ method: 'POST', path: '/todos/assign', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_ADMIN_CREATE, permissions: [PERMISSIONS.TODO_ASSIGN] }),
+  business({ method: 'GET', path: '/wiki/todos/open-count', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_OPEN_COUNT, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/wiki/todos', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_LIST, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/wiki/todos', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_CREATE, auth: ['jwt'] }),
+  business({ method: 'PATCH', path: '/wiki/todos/:id', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_UPDATE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/wiki/todos/:id/done', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_DONE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/wiki/todos/:id/cancel', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_CANCEL, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/wiki/todos/:id', client: NOTIFY_CLIENT, pattern: MQTT_PATTERNS.TODO_FIND_ONE, auth: ['jwt'] }),
 
   { method: 'GET', path: '/agents/health', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_HEALTH },
   business({ method: 'GET', path: '/agents/chat/status', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CHAT_STATUS, auth: ['jwt'] }),
@@ -241,6 +259,14 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'DELETE', path: '/agents/conversations/:id', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CONVERSATION_DELETE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/agents/rag/search', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_RAG_SEARCH, auth: ['jwt'] }),
   business({ method: 'POST', path: '/agents/vision', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_VISION_PARSE, auth: ['jwt'], override: true }),
+  business({ method: 'GET', path: '/wiki/agents/chat/status', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CHAT_STATUS, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/wiki/agents/chat', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CHAT, auth: ['jwt'], override: true }),
+  business({ method: 'GET', path: '/wiki/agents/conversations', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CONVERSATION_LIST, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/wiki/agents/conversations/:id', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CONVERSATION_FIND_ONE, auth: ['jwt'] }),
+  business({ method: 'PATCH', path: '/wiki/agents/conversations/:id', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CONVERSATION_UPDATE, auth: ['jwt'] }),
+  business({ method: 'DELETE', path: '/wiki/agents/conversations/:id', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CONVERSATION_DELETE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/wiki/agents/rag/search', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_RAG_SEARCH, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/wiki/agents/vision', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_VISION_PARSE, auth: ['jwt'], override: true }),
 ];
 
 function docsContentRoutes(prefix: '/docs/documents'): GatewayRoute[] {

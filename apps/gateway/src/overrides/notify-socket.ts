@@ -8,7 +8,7 @@ import type { Request } from 'express';
 import { AuthService } from '../auth/auth.service';
 import { BizGuard } from '../auth/biz.guard';
 
-const SOCKET_PATH = '/notifications/socket';
+const SOCKET_PATHS = new Set(['/notifications/socket', '/wiki/notifications/socket']);
 
 @Injectable()
 export class NotifySocketGateway implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -28,7 +28,7 @@ export class NotifySocketGateway implements OnApplicationBootstrap, OnApplicatio
     httpServer.on('upgrade', (req, socket, head) => {
       void this.upgrade(req, socket, head);
     });
-    this.logger.log(`WebSocket 已挂载 ${SOCKET_PATH}`);
+    this.logger.log(`WebSocket 已挂载 ${[...SOCKET_PATHS].join(' / ')}`);
   }
 
   onApplicationShutdown() {
@@ -37,7 +37,7 @@ export class NotifySocketGateway implements OnApplicationBootstrap, OnApplicatio
 
   private async upgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
     const url = new URL(req.url ?? '/', 'http://localhost');
-    if (url.pathname !== SOCKET_PATH) {
+    if (!SOCKET_PATHS.has(url.pathname)) {
       socket.destroy();
       return;
     }
@@ -57,7 +57,7 @@ export class NotifySocketGateway implements OnApplicationBootstrap, OnApplicatio
         return;
       }
       const acceptedBiz = await this.biz.check(
-        { method: 'GET', path: SOCKET_PATH, scope: 'business' },
+        { method: 'GET', path: url.pathname, scope: 'business' },
         fake,
         user,
       );
