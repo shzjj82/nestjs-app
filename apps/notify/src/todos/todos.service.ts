@@ -85,7 +85,9 @@ export class TodosService {
     const row = await this.own(payload);
     const command = parseUpdateMine(payload);
     row.title = command.title;
-    row.content = command.content;
+    if (command.content !== undefined) {
+      row.content = command.content;
+    }
     row.category = command.category;
     row.data = command.data;
     if (command.startsAt !== undefined) {

@@ -97,14 +97,13 @@ const sendSchema = (sourceFallback: string) =>
       .trim()
       .min(1, 'title 必填且不超过 120 字')
       .max(120, 'title 必填且不超过 120 字'),
-    content: z
-      .string({
-        required_error: 'content 必填且不超过 4000 字',
-        invalid_type_error: 'content 必填且不超过 4000 字',
-      })
-      .trim()
-      .min(1, 'content 必填且不超过 4000 字')
-      .max(4000, 'content 必填且不超过 4000 字'),
+    content: z.preprocess(
+      (value) => (value === undefined || value === null ? '' : value),
+      z
+        .string({ invalid_type_error: 'content 须为字符串' })
+        .trim()
+        .max(4000, 'content 不超过 4000 字'),
+    ),
     category: z.preprocess(
       (value) => optionalString(value) ?? 'system',
       topicToken('category'),
@@ -202,14 +201,16 @@ const updateMineSchema = z.object({
     .trim()
     .min(1, 'title 必填且不超过 120 字')
     .max(120, 'title 必填且不超过 120 字'),
-  content: z
-    .string({
-      required_error: 'content 必填且不超过 4000 字',
-      invalid_type_error: 'content 必填且不超过 4000 字',
-    })
+  content: z.preprocess((value) => {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+    return value;
+  }, z
+    .string({ invalid_type_error: 'content 须为字符串' })
     .trim()
-    .min(1, 'content 必填且不超过 4000 字')
-    .max(4000, 'content 必填且不超过 4000 字'),
+    .max(4000, 'content 不超过 4000 字')
+    .optional()),
   category: z.preprocess(
     (value) => optionalString(value) ?? 'system',
     topicToken('category'),
@@ -229,7 +230,7 @@ const updateMineSchema = z.object({
 
 export type UpdateMineCommand = {
   title: string;
-  content: string;
+  content?: string;
   category: string;
   data: Record<string, unknown> | null;
   dueAt: Date | null;

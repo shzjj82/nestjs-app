@@ -1,4 +1,11 @@
-import { finishTodo, parseSend, requireInternal, toPage, unreadOnly } from './input';
+import {
+  finishTodo,
+  parseSend,
+  parseUpdateMine,
+  requireInternal,
+  toPage,
+  unreadOnly,
+} from './input';
 
 describe('notify input', () => {
   const original = process.env.NOTIFY_INTERNAL_KEY;
@@ -80,5 +87,19 @@ describe('notify input', () => {
     expect(toPage('2', '1000')).toEqual({ page: 2, pageSize: 100, skip: 100 });
     expect(unreadOnly({ unread: '1' })).toBe(true);
     expect(unreadOnly({})).toBe(false);
+  });
+
+  it('allows update without content', () => {
+    const command = parseUpdateMine({
+      title: '通知消息',
+      category: 'page',
+      dueAt: '2026-10-27T23:59:59.000Z',
+      startsAt: '2026-10-27',
+      data: { notify: true, start: '2026-10-27', end: '2026-10-27' },
+    });
+    expect(command.title).toBe('通知消息');
+    expect(command.category).toBe('page');
+    expect(command.startsAt).toBe('2026-10-27');
+    expect(command.content).toBeUndefined();
   });
 });
