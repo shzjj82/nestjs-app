@@ -11,7 +11,7 @@ import { PlatformProxy } from './platform-proxy';
 
 /**
  * 编辑器产品门面：HTTP /wiki/* → 本服务 → 平台 auth / upload / agents / notify。
- * 认证由产品侧固定 _bizCode=wiki；其它能力可在此加配额、审计后再转发。
+ * 待办不在此透传，见 TodosModule（页面关联是 wiki 自有能力）。
  */
 @Controller()
 @UseInterceptors(DocsHandleLogInterceptor)
@@ -188,40 +188,5 @@ export class FacadeController {
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_NOTIFY_READ_ALL))
   notifyReadAll(payload: Record<string, unknown>) {
     return this.platform.callNotify(MQTT_PATTERNS.NOTIFY_READ_ALL, payload);
-  }
-
-  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_LIST))
-  todoList(payload: Record<string, unknown>) {
-    return this.platform.callNotify(MQTT_PATTERNS.TODO_LIST, payload);
-  }
-
-  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_OPEN_COUNT))
-  todoOpenCount(payload: Record<string, unknown>) {
-    return this.platform.callNotify(MQTT_PATTERNS.TODO_OPEN_COUNT, payload);
-  }
-
-  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_FIND_ONE))
-  todoFindOne(payload: Record<string, unknown>) {
-    return this.platform.callNotify(MQTT_PATTERNS.TODO_FIND_ONE, payload);
-  }
-
-  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_CREATE))
-  todoCreate(payload: Record<string, unknown>) {
-    return this.platform.callNotify(MQTT_PATTERNS.TODO_CREATE, payload);
-  }
-
-  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_UPDATE))
-  todoUpdate(payload: Record<string, unknown>) {
-    return this.platform.callNotify(MQTT_PATTERNS.TODO_UPDATE, payload);
-  }
-
-  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_DONE))
-  todoDone(payload: Record<string, unknown>) {
-    return this.platform.callNotify(MQTT_PATTERNS.TODO_DONE, payload);
-  }
-
-  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_CANCEL))
-  todoCancel(payload: Record<string, unknown>) {
-    return this.platform.callNotify(MQTT_PATTERNS.TODO_CANCEL, payload);
   }
 }

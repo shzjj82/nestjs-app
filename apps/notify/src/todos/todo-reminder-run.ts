@@ -9,6 +9,8 @@ interface DueTodoRow {
   userId: string;
   title: string;
   content: string;
+  /** 创建时写入的扩展数据（如 wiki 的 data.page），到期通知原样带回供跳转 */
+  data?: Record<string, unknown> | null;
 }
 
 export interface DueTodoDeps {
@@ -70,7 +72,8 @@ function dueSql(mode: RemindMode): string {
            biz_code AS "bizCode",
            user_id AS "userId",
            title,
-           content
+           content,
+           data
     FROM nt_todos
     WHERE status = 'open'
       AND due_at IS NOT NULL
@@ -90,6 +93,10 @@ function dueParams(today: string, now: Date, mode: RemindMode): string[] {
 
 function noticeOf(row: DueTodoRow): SendCommand {
   const content = `今天是截止日。${row.content}`.slice(0, 4000);
+  const linked =
+    row.data && typeof row.data === 'object' && !Array.isArray(row.data)
+      ? row.data
+      : {};
   return {
     bizCode: row.bizCode,
     userId: row.userId,
@@ -97,7 +104,7 @@ function noticeOf(row: DueTodoRow): SendCommand {
     content: content || '今天是截止日。',
     category: 'todo',
     source: 'system',
-    data: { todoId: row.id },
+    data: { ...linked, todoId: row.id },
     dueAt: null,
   };
 }

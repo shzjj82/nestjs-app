@@ -7,6 +7,7 @@ import { WikiController } from './wiki.controller';
 import { DocumentsModule } from './documents/documents.module';
 import { FacadeModule } from './facade/facade.module';
 import { TeamsModule } from './teams/teams.module';
+import { TodosModule } from './todos/todos.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { TeamsModule } from './teams/teams.module';
     CategoriesModule,
     DocumentsModule,
     TeamsModule,
+    TodosModule,
     FacadeModule,
     ApiDocsModule.forService({
       service: 'wiki',

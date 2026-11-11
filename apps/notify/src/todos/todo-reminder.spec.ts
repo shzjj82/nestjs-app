@@ -38,6 +38,40 @@ describe('TodoReminder', () => {
     });
   });
 
+  it('forwards todo.data (e.g. wiki page link) into the due notice', async () => {
+    const page = {
+      id: '22222222-2222-2222-2222-222222222222',
+      slug: 'week-report',
+      title: '周报',
+      appCode: 'wiki',
+      kind: 'article',
+    };
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          id: '11111111-1111-1111-1111-111111111111',
+          bizCode: 'wiki',
+          userId: 'user-1',
+          title: '写周报',
+          content: '周五前交',
+          data: { pageId: page.id, page },
+        },
+      ])
+      .mockResolvedValueOnce([{ id: '11111111-1111-1111-1111-111111111111' }]);
+    const send = jest.fn().mockResolvedValue({ id: 'notice-1' });
+    await remind(query, send, 'midnight');
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          pageId: page.id,
+          page,
+          todoId: '11111111-1111-1111-1111-111111111111',
+        },
+      }),
+    );
+  });
+
   it('catch-up only includes todos created before midnight', async () => {
     const query = jest.fn().mockResolvedValueOnce([]);
     await remind(query, jest.fn(), 'catch-up');

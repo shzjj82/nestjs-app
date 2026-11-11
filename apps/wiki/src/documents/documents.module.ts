@@ -24,6 +24,6 @@ import { TeamAccess } from './team-access';
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService, TeamAccess, RagNotify],
-  exports: [DocumentsService],
+  exports: [DocumentsService, TeamAccess],
 })
 export class DocumentsModule {}
