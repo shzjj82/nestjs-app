@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import type { NotifyTodo } from '@app/notify-contract';
 import type { Repository } from 'typeorm';
+import { pushRealtime } from '../common/push';
 import { NoticesService } from '../notices/notices.service';
 import { TodoEntity } from '../entities';
 import { msUntilNextShanghaiMidnight } from './shanghai-day';
@@ -30,9 +32,7 @@ export class TodoReminder implements OnApplicationBootstrap, OnApplicationShutdo
   }
 
   /**
-   * 截止日的上海时间 00:00 给待办所属用户发一条通知。
-   * NoticesService 会写入通知并经 MQTT 推到 /notifications/socket。
-   * catch-up 只补凌晨前就已存在、但当时没发出去的待办。
+   * 每日上海日：wiki 待办 started / progress / overdue；非 wiki 保留截止日当天提醒。
    */
   async remind(now: Date, mode: RemindMode): Promise<number> {
     const sent = await deliverDueTodos(
@@ -40,12 +40,19 @@ export class TodoReminder implements OnApplicationBootstrap, OnApplicationShutdo
         query: (sql, params) => this.todos.query(sql, params),
         send: (command) => this.notices.send(command),
         warn: (message) => this.logger.warn(message),
+        pushTodo: async (item) => {
+          await pushRealtime({
+            kind: 'todo',
+            action: 'updated',
+            item: item as unknown as NotifyTodo,
+          });
+        },
       },
       now,
       mode,
     );
     if (sent > 0) {
-      this.logger.log(`已发送 ${sent} 条待办到期通知`);
+      this.logger.log(`已发送 ${sent} 条待办定时通知`);
     }
     return sent;
   }

@@ -1,47 +1,254 @@
+import type { NotifyTodoNoticeKind } from '@app/notify-contract';
 import type { SendCommand } from '../common/input';
-import { shanghaiDate, shanghaiStart } from './shanghai-day';
+import { shanghaiDate, shanghaiDayOf, shanghaiStart } from './shanghai-day';
 
 export type RemindMode = 'midnight' | 'catch-up';
 
-interface DueTodoRow {
+interface WikiTodoRow {
   id: string;
   bizCode: string;
   userId: string;
   title: string;
   content: string;
-  /** 创建时写入的扩展数据（如 wiki 的 data.page），到期通知原样带回供跳转 */
+  status: string;
+  startsAt: string | null;
+  dueAt: Date | string | null;
+  data: Record<string, unknown> | null;
+}
+
+interface LegacyDueRow {
+  id: string;
+  bizCode: string;
+  userId: string;
+  title: string;
+  content: string;
   data?: Record<string, unknown> | null;
 }
 
 export interface DueTodoDeps {
-  query: (sql: string, params: string[]) => Promise<unknown>;
+  query: (sql: string, params: unknown[]) => Promise<unknown>;
   send: (command: SendCommand) => Promise<unknown>;
   warn: (message: string) => void;
+  /** wiki 自动开始后推 socket todo.updated */
+  pushTodo?: (item: Record<string, unknown>) => Promise<void>;
 }
 
-/** 找出当天到期的未完成待办，占住提醒日后再发通知。发送失败会放开占位，下次还能补发。 */
+/** wiki 三则通知 + 非 wiki 旧到期提醒 */
 export async function deliverDueTodos(
   deps: DueTodoDeps,
   now: Date,
   mode: RemindMode,
 ): Promise<number> {
   const today = shanghaiDate(now);
-  const rows = await deps.query(dueSql(mode), dueParams(today, now, mode));
   let sent = 0;
-  for (const row of asRows(rows)) {
-    if (await sendOne(deps, row, today)) {
+  sent += await deliverWikiStarted(deps, today, now, mode);
+  sent += await deliverWikiOverdue(deps, today, now, mode);
+  sent += await deliverWikiProgress(deps, today, now, mode);
+  sent += await deliverLegacyDueTodos(deps, today, now, mode);
+  return sent;
+}
+
+async function deliverWikiStarted(
+  deps: DueTodoDeps,
+  today: string,
+  now: Date,
+  mode: RemindMode,
+): Promise<number> {
+  const rows = asWikiRows(
+    await deps.query(wikiStartedSql(mode), wikiDayParams(today, now, mode)),
+  );
+  let sent = 0;
+  for (const row of rows) {
+    if (await sendStarted(deps, row, now)) {
       sent += 1;
     }
   }
   return sent;
 }
 
-async function sendOne(deps: DueTodoDeps, row: DueTodoRow, today: string): Promise<boolean> {
+async function deliverWikiProgress(
+  deps: DueTodoDeps,
+  today: string,
+  now: Date,
+  mode: RemindMode,
+): Promise<number> {
+  const rows = asWikiRows(
+    await deps.query(wikiProgressSql(mode), wikiDayParams(today, now, mode)),
+  );
+  let sent = 0;
+  for (const row of rows) {
+    if (
+      await claimAndSend(deps, {
+        row,
+        today,
+        kind: 'todo.progress',
+        title: `请更新完成进度：${row.title}`.slice(0, 120),
+        content: `请更新「${row.title}」的完成进度。${row.content}`.slice(0, 4000),
+        claimSql: `
+          UPDATE nt_todos
+          SET last_progress_notice_on = $1::date
+          WHERE id = $2
+            AND status = 'in_progress'
+            AND (last_progress_notice_on IS NULL OR last_progress_notice_on <> $1::date)
+          RETURNING id`,
+        releaseSql: `
+          UPDATE nt_todos
+          SET last_progress_notice_on = NULL
+          WHERE id = $1 AND last_progress_notice_on = $2::date`,
+      })
+    ) {
+      sent += 1;
+    }
+  }
+  return sent;
+}
+
+async function deliverWikiOverdue(
+  deps: DueTodoDeps,
+  today: string,
+  now: Date,
+  mode: RemindMode,
+): Promise<number> {
+  const rows = asWikiRows(
+    await deps.query(wikiOverdueSql(mode), wikiDayParams(today, now, mode)),
+  );
+  let sent = 0;
+  for (const row of rows) {
+    if (
+      await claimAndSend(deps, {
+        row,
+        today,
+        kind: 'todo.overdue',
+        title: `催办：${row.title}`.slice(0, 120),
+        content: `催办：未在预计结束日完成 — ${row.title}。${row.content}`.slice(0, 4000),
+        claimSql: `
+          UPDATE nt_todos
+          SET last_overdue_notice_on = $1::date
+          WHERE id = $2
+            AND status IN ('pending', 'in_progress', 'open')
+            AND (last_overdue_notice_on IS NULL OR last_overdue_notice_on <> $1::date)
+          RETURNING id`,
+        releaseSql: `
+          UPDATE nt_todos
+          SET last_overdue_notice_on = NULL
+          WHERE id = $1 AND last_overdue_notice_on = $2::date`,
+      })
+    ) {
+      sent += 1;
+    }
+  }
+  return sent;
+}
+
+async function deliverLegacyDueTodos(
+  deps: DueTodoDeps,
+  today: string,
+  now: Date,
+  mode: RemindMode,
+): Promise<number> {
+  const rows = asLegacyRows(
+    await deps.query(legacyDueSql(mode), wikiDayParams(today, now, mode)),
+  );
+  let sent = 0;
+  for (const row of rows) {
+    if (await sendLegacyDue(deps, row, today)) {
+      sent += 1;
+    }
+  }
+  return sent;
+}
+
+async function sendStarted(
+  deps: DueTodoDeps,
+  row: WikiTodoRow,
+  now: Date,
+): Promise<boolean> {
+  const claimed = await deps.query(
+    `
+      UPDATE nt_todos
+      SET status = 'in_progress',
+          started_at = COALESCE(started_at, $1::timestamptz),
+          started_notice_at = $1::timestamptz
+      WHERE id = $2
+        AND status IN ('pending', 'open')
+        AND started_notice_at IS NULL
+      RETURNING id, biz_code AS "bizCode", user_id AS "userId", title, content, category,
+                source, status, data, starts_at AS "startsAt", due_at AS "dueAt",
+                started_at AS "startedAt", finished_at AS "finishedAt",
+                cancelled_at AS "cancelledAt",
+                started_notice_at AS "startedNoticeAt",
+                last_progress_notice_on AS "lastProgressNoticeOn",
+                last_overdue_notice_on AS "lastOverdueNoticeOn",
+                created_at AS "createdAt", updated_at AS "updatedAt"
+    `,
+    [now.toISOString(), row.id],
+  );
+  const updated = Array.isArray(claimed) ? claimed[0] : null;
+  if (!updated) {
+    return false;
+  }
+  try {
+    await deps.send(
+      noticeOf(row, 'todo.started', '待办已开始', `待办已开始：${row.title}。${row.content}`),
+    );
+    if (deps.pushTodo) {
+      await deps.pushTodo(toTodoPush(updated as Record<string, unknown>));
+    }
+    return true;
+  } catch (err) {
+    await deps.query(
+      `
+        UPDATE nt_todos
+        SET status = 'pending',
+            started_at = NULL,
+            started_notice_at = NULL
+        WHERE id = $1 AND started_notice_at IS NOT NULL
+      `,
+      [row.id],
+    );
+    const message = err instanceof Error ? err.message : 'send failed';
+    deps.warn(`待办 ${row.id} 开始通知失败: ${message}`);
+    return false;
+  }
+}
+
+async function claimAndSend(
+  deps: DueTodoDeps,
+  input: {
+    row: WikiTodoRow;
+    today: string;
+    kind: NotifyTodoNoticeKind;
+    title: string;
+    content: string;
+    claimSql: string;
+    releaseSql: string;
+  },
+): Promise<boolean> {
+  const claimed = await deps.query(input.claimSql, [input.today, input.row.id]);
+  if (!Array.isArray(claimed) || claimed.length === 0) {
+    return false;
+  }
+  try {
+    await deps.send(noticeOf(input.row, input.kind, input.title, input.content));
+    return true;
+  } catch (err) {
+    await deps.query(input.releaseSql, [input.row.id, input.today]);
+    const message = err instanceof Error ? err.message : 'send failed';
+    deps.warn(`待办 ${input.row.id} ${input.kind} 通知失败: ${message}`);
+    return false;
+  }
+}
+
+async function sendLegacyDue(
+  deps: DueTodoDeps,
+  row: LegacyDueRow,
+  today: string,
+): Promise<boolean> {
   const claimed = await deps.query(
     `UPDATE nt_todos
      SET reminded_on = $1::date
      WHERE id = $2
-       AND status = 'open'
+       AND status IN ('pending', 'in_progress', 'open')
        AND (reminded_on IS NULL OR reminded_on <> $1::date)
      RETURNING id`,
     [today, row.id],
@@ -50,7 +257,23 @@ async function sendOne(deps: DueTodoDeps, row: DueTodoRow, today: string): Promi
     return false;
   }
   try {
-    await deps.send(noticeOf(row));
+    const content = `今天是截止日。${row.content}`.slice(0, 4000);
+    const linked =
+      row.data && typeof row.data === 'object' && !Array.isArray(row.data)
+        ? row.data
+        : {};
+    await deps.send({
+      bizCode: row.bizCode,
+      userId: row.userId,
+      title: (`待办到期：${row.title}`).slice(0, 120),
+      content: content || '今天是截止日。',
+      category: 'todo',
+      source: 'system',
+      status: 'pending',
+      data: { ...linked, todoId: row.id },
+      dueAt: null,
+      startsAt: null,
+    });
     return true;
   } catch (err) {
     await deps.query(
@@ -65,7 +288,127 @@ async function sendOne(deps: DueTodoDeps, row: DueTodoRow, today: string): Promi
   }
 }
 
-function dueSql(mode: RemindMode): string {
+function noticeOf(
+  row: WikiTodoRow,
+  kind: NotifyTodoNoticeKind,
+  title: string,
+  content: string,
+): SendCommand {
+  const data = row.data && typeof row.data === 'object' ? row.data : {};
+  const pageId =
+    typeof data.pageId === 'string'
+      ? data.pageId
+      : data.page && typeof data.page === 'object' && !Array.isArray(data.page)
+        ? String((data.page as Record<string, unknown>).id ?? '')
+        : '';
+  const localItemId =
+    typeof data.localItemId === 'string' ? data.localItemId : undefined;
+  return {
+    bizCode: row.bizCode,
+    userId: row.userId,
+    title: title.slice(0, 120),
+    content: (content || title).slice(0, 4000),
+    category: 'todo',
+    source: 'system',
+    status: 'pending',
+    data: {
+      ...data,
+      kind,
+      todoId: row.id,
+      ...(pageId ? { pageId } : {}),
+      ...(localItemId ? { localItemId } : {}),
+    },
+    dueAt: null,
+    startsAt: null,
+  };
+}
+
+function wikiScope(mode: RemindMode): string {
+  const createdBeforeMidnight = mode === 'catch-up' ? 'AND created_at < $2::timestamptz' : '';
+  return `
+    source = 'wiki'
+    AND COALESCE((data->>'notify')::boolean, false) = true
+    ${createdBeforeMidnight}
+  `;
+}
+
+function endDateExpr(): string {
+  return `
+    COALESCE(
+      NULLIF(TRIM(data->>'end'), ''),
+      (due_at AT TIME ZONE 'Asia/Shanghai')::date::text
+    )
+  `;
+}
+
+function wikiStartedSql(mode: RemindMode): string {
+  return `
+    SELECT id,
+           biz_code AS "bizCode",
+           user_id AS "userId",
+           title,
+           content,
+           status,
+           starts_at::text AS "startsAt",
+           due_at AS "dueAt",
+           data
+    FROM nt_todos
+    WHERE ${wikiScope(mode)}
+      AND status IN ('pending', 'open')
+      AND starts_at IS NOT NULL
+      AND starts_at <= $1::date
+      AND started_notice_at IS NULL
+    ORDER BY created_at ASC
+  `;
+}
+
+function wikiProgressSql(mode: RemindMode): string {
+  return `
+    SELECT id,
+           biz_code AS "bizCode",
+           user_id AS "userId",
+           title,
+           content,
+           status,
+           starts_at::text AS "startsAt",
+           due_at AS "dueAt",
+           data
+    FROM nt_todos
+    WHERE ${wikiScope(mode)}
+      AND status = 'in_progress'
+      AND starts_at IS NOT NULL
+      AND starts_at <= $1::date
+      AND (
+        ${endDateExpr()} IS NULL
+        OR ${endDateExpr()} >= $1::text
+      )
+      AND (last_progress_notice_on IS NULL OR last_progress_notice_on <> $1::date)
+    ORDER BY created_at ASC
+  `;
+}
+
+function wikiOverdueSql(mode: RemindMode): string {
+  return `
+    SELECT id,
+           biz_code AS "bizCode",
+           user_id AS "userId",
+           title,
+           content,
+           status,
+           starts_at::text AS "startsAt",
+           due_at AS "dueAt",
+           data
+    FROM nt_todos
+    WHERE ${wikiScope(mode)}
+      AND status IN ('pending', 'in_progress', 'open')
+      AND ${endDateExpr()} IS NOT NULL
+      AND ${endDateExpr()} < $1::text
+      AND (last_overdue_notice_on IS NULL OR last_overdue_notice_on <> $1::date)
+    ORDER BY created_at ASC
+  `;
+}
+
+function legacyDueSql(mode: RemindMode): string {
   const createdBeforeMidnight = mode === 'catch-up' ? 'AND created_at < $2::timestamptz' : '';
   return `
     SELECT id,
@@ -75,7 +418,8 @@ function dueSql(mode: RemindMode): string {
            content,
            data
     FROM nt_todos
-    WHERE status = 'open'
+    WHERE source <> 'wiki'
+      AND status IN ('pending', 'in_progress', 'open')
       AND due_at IS NOT NULL
       AND (due_at AT TIME ZONE 'Asia/Shanghai')::date = $1::date
       AND (reminded_on IS NULL OR reminded_on <> $1::date)
@@ -84,36 +428,64 @@ function dueSql(mode: RemindMode): string {
   `;
 }
 
-function dueParams(today: string, now: Date, mode: RemindMode): string[] {
+function wikiDayParams(today: string, now: Date, mode: RemindMode): unknown[] {
   if (mode === 'catch-up') {
     return [today, shanghaiStart(now).toISOString()];
   }
   return [today];
 }
 
-function noticeOf(row: DueTodoRow): SendCommand {
-  const content = `今天是截止日。${row.content}`.slice(0, 4000);
-  const linked =
-    row.data && typeof row.data === 'object' && !Array.isArray(row.data)
-      ? row.data
-      : {};
+function toTodoPush(row: Record<string, unknown>): Record<string, unknown> {
+  const dueAt = row.dueAt instanceof Date ? row.dueAt.toISOString() : row.dueAt;
+  const startedAt =
+    row.startedAt instanceof Date ? row.startedAt.toISOString() : row.startedAt;
+  const finishedAt =
+    row.finishedAt instanceof Date ? row.finishedAt.toISOString() : row.finishedAt;
+  const cancelledAt =
+    row.cancelledAt instanceof Date ? row.cancelledAt.toISOString() : row.cancelledAt;
+  const startedNoticeAt =
+    row.startedNoticeAt instanceof Date
+      ? row.startedNoticeAt.toISOString()
+      : row.startedNoticeAt;
+  const createdAt =
+    row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt;
+  const updatedAt =
+    row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt;
   return {
-    bizCode: row.bizCode,
-    userId: row.userId,
-    title: noticeTitle(row.title),
-    content: content || '今天是截止日。',
-    category: 'todo',
-    source: 'system',
-    data: { ...linked, todoId: row.id },
-    dueAt: null,
+    ...row,
+    dueAt: dueAt ?? null,
+    startedAt: startedAt ?? null,
+    finishedAt: finishedAt ?? null,
+    cancelledAt: cancelledAt ?? null,
+    startedNoticeAt: startedNoticeAt ?? null,
+    createdAt,
+    updatedAt,
   };
 }
 
-function noticeTitle(title: string): string {
-  const text = `待办到期：${title}`;
-  return text.length <= 120 ? text : text.slice(0, 120);
+function asWikiRows(value: unknown): WikiTodoRow[] {
+  return Array.isArray(value) ? (value as WikiTodoRow[]) : [];
 }
 
-function asRows(value: unknown): DueTodoRow[] {
-  return Array.isArray(value) ? (value as DueTodoRow[]) : [];
+function asLegacyRows(value: unknown): LegacyDueRow[] {
+  return Array.isArray(value) ? (value as LegacyDueRow[]) : [];
+}
+
+/** 供测试：结束日解析 */
+export function endDateOf(row: {
+  dueAt?: Date | string | null;
+  data?: Record<string, unknown> | null;
+}): string | null {
+  const end = row.data && typeof row.data.end === 'string' ? row.data.end.trim() : '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+    return end;
+  }
+  if (row.dueAt instanceof Date) {
+    return shanghaiDayOf(row.dueAt);
+  }
+  if (typeof row.dueAt === 'string' && row.dueAt) {
+    const parsed = new Date(row.dueAt);
+    return Number.isNaN(parsed.getTime()) ? null : shanghaiDayOf(parsed);
+  }
+  return null;
 }

@@ -60,8 +60,10 @@ const BASELINE_EXTRA_APIS = [
   'POST /todos',
   'GET /todos/:id',
   'PATCH /todos/:id',
+  'POST /todos/:id/start',
   'POST /todos/:id/done',
   'POST /todos/:id/cancel',
+  'POST /todos/:id/reopen',
   // 编辑器门面 /wiki/*
   'POST /wiki/upload',
   'GET /wiki/agents/chat/status',
@@ -78,8 +80,10 @@ const BASELINE_EXTRA_APIS = [
   'POST /wiki/todos',
   'GET /wiki/todos/:id',
   'PATCH /wiki/todos/:id',
+  'POST /wiki/todos/:id/start',
   'POST /wiki/todos/:id/done',
   'POST /wiki/todos/:id/cancel',
+  'POST /wiki/todos/:id/reopen',
 ];
 
 function env(key: string, fallback?: string): string | undefined {

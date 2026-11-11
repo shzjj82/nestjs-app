@@ -10,13 +10,19 @@ export class TodosController {
   constructor(private readonly todos: TodosService) {}
 
   @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_LIST))
-  @ApiDoc({ name: '我的待办', description: '当前业务下本人的待办，可用 status=open|done|cancelled 过滤' })
+  @ApiDoc({
+    name: '我的待办',
+    description: '当前业务下本人的待办，可用 status=pending,in_progress,done,cancelled 过滤（兼容 open）',
+  })
   list(payload: Record<string, unknown>) {
     return this.todos.list(payload);
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_OPEN_COUNT))
-  @ApiDoc({ name: '未完成数量', description: '当前业务下本人 status=open 的待办数' })
+  @ApiDoc({
+    name: '未完成数量',
+    description: '当前业务下本人 pending + in_progress 的待办数（含过渡 open）',
+  })
   openCount(payload: Record<string, unknown>) {
     return this.todos.openCount(payload);
   }
@@ -34,21 +40,39 @@ export class TodosController {
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_UPDATE))
-  @ApiDoc({ name: '更新待办', description: '更新本人未完成待办的标题、内容与截止时间' })
+  @ApiDoc({
+    name: '更新待办',
+    description: '更新本人待办的标题、内容、开始/截止日与 status',
+  })
   updateMine(payload: Record<string, unknown>) {
     return this.todos.updateMine(payload);
   }
 
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_START))
+  @ApiDoc({ name: '开始待办', description: 'pending → in_progress，写入 startedAt' })
+  start(payload: Record<string, unknown>) {
+    return this.todos.start(payload);
+  }
+
   @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_DONE))
-  @ApiDoc({ name: '完成待办', description: '把本人的一条未完成待办标为 done，并经 socket 推送' })
+  @ApiDoc({ name: '完成待办', description: '把本人的一条活跃待办标为 done，并经 socket 推送' })
   done(payload: Record<string, unknown>) {
     return this.todos.finish(payload, 'done');
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_CANCEL))
-  @ApiDoc({ name: '取消待办', description: '把本人的一条未完成待办标为 cancelled，并经 socket 推送' })
+  @ApiDoc({ name: '取消待办', description: '把本人的一条活跃待办标为 cancelled，并经 socket 推送' })
   cancel(payload: Record<string, unknown>) {
     return this.todos.finish(payload, 'cancel');
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_REOPEN))
+  @ApiDoc({
+    name: '重新打开待办',
+    description: 'done/cancelled → pending 或 in_progress（按 startsAt 与今天）',
+  })
+  reopen(payload: Record<string, unknown>) {
+    return this.todos.reopen(payload);
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_ADMIN_CREATE))

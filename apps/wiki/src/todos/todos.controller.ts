@@ -66,6 +66,12 @@ export class TodosController {
     return this.todos.bindPage(payload);
   }
 
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_START))
+  @ApiDoc({ name: 'Wiki 开始待办', description: 'pending → in_progress' })
+  start(payload: Record<string, unknown>) {
+    return this.todos.start(payload);
+  }
+
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_DONE))
   @ApiDoc({ name: 'Wiki 完成待办' })
   done(payload: Record<string, unknown>) {
@@ -76,5 +82,14 @@ export class TodosController {
   @ApiDoc({ name: 'Wiki 取消待办' })
   cancel(payload: Record<string, unknown>) {
     return this.todos.cancel(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_REOPEN))
+  @ApiDoc({
+    name: 'Wiki 重新打开待办',
+    description: 'done/cancelled → pending 或 in_progress（按 startsAt）',
+  })
+  reopen(payload: Record<string, unknown>) {
+    return this.todos.reopen(payload);
   }
 }

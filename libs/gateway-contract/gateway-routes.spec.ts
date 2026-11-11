@@ -155,6 +155,16 @@ describe('matchRoute', () => {
     expect(matchRoute('GET', '/wiki/todos/open-count')?.pattern).toBe(
       MQTT_PATTERNS.WIKI_TODO_OPEN_COUNT,
     );
+    expect(matchRoute('POST', '/wiki/todos/t-1/start')?.pattern).toBe(
+      MQTT_PATTERNS.WIKI_TODO_START,
+    );
+    expect(matchRoute('POST', '/wiki/todos/t-1/reopen')?.pattern).toBe(
+      MQTT_PATTERNS.WIKI_TODO_REOPEN,
+    );
+    expect(matchRoute('POST', '/todos/t-1/start')?.client).toBe('NOTIFY_CLIENT');
+    expect(matchRoute('POST', '/todos/t-1/reopen')?.pattern).toBe(
+      MQTT_PATTERNS.TODO_REOPEN,
+    );
     expect(matchRoute('GET', '/wiki/notifications/unread-count')?.pattern).toBe(
       MQTT_PATTERNS.WIKI_NOTIFY_UNREAD_COUNT,
     );

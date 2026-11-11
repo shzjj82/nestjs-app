@@ -152,6 +152,8 @@ export const MQTT_PATTERNS = {
   WIKI_TODO_UPDATE: 'wiki.todo.update',
   WIKI_TODO_DONE: 'wiki.todo.done',
   WIKI_TODO_CANCEL: 'wiki.todo.cancel',
+  WIKI_TODO_START: 'wiki.todo.start',
+  WIKI_TODO_REOPEN: 'wiki.todo.reopen',
   /** 给已有待办补绑 / 改绑文章页（含已完成历史数据） */
   WIKI_TODO_BIND_PAGE: 'wiki.todo.bindPage',
   UPLOAD_HEALTH: 'upload.health',
@@ -272,6 +274,8 @@ export const MQTT_PATTERNS = {
   TODO_FIND_ONE: 'todo.findOne',
   TODO_DONE: 'todo.done',
   TODO_CANCEL: 'todo.cancel',
+  TODO_START: 'todo.start',
+  TODO_REOPEN: 'todo.reopen',
   /** 当前用户给自己建一条待办 */
   TODO_CREATE: 'todo.create',
   /** 当前用户更新自己的未完成待办 */

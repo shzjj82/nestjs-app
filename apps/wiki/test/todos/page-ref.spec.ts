@@ -21,8 +21,34 @@ describe('wiki todo page-ref', () => {
   });
 
   it('merges page into todo data for notify / jump', () => {
-    expect(mergeTodoData({ foo: 1 }, page)).toEqual({
+    expect(
+      mergeTodoData(
+        { notify: true, localItemId: 'li-1', start: '2026-11-11', end: '2026-11-20', foo: 1 },
+        page,
+      ),
+    ).toEqual({
+      notify: true,
+      localItemId: 'li-1',
+      start: '2026-11-11',
+      end: '2026-11-20',
       foo: 1,
+      pageId: page.id,
+      page,
+    });
+  });
+
+  it('keeps notify/localItemId/start/end when rebinding page over base data', () => {
+    expect(
+      mergeTodoData(
+        { end: '2026-11-25' },
+        page,
+        { notify: true, localItemId: 'li-9', start: '2026-11-11', end: '2026-11-20' },
+      ),
+    ).toEqual({
+      notify: true,
+      localItemId: 'li-9',
+      start: '2026-11-11',
+      end: '2026-11-25',
       pageId: page.id,
       page,
     });

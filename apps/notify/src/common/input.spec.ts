@@ -30,8 +30,10 @@ describe('notify input', () => {
       content: '回收款已到账',
       category: 'system',
       source: 'service',
+      status: 'pending',
       data: null,
       dueAt: null,
+      startsAt: null,
     });
   });
 
@@ -63,12 +65,15 @@ describe('notify input', () => {
         title: '补资料',
         content: '请上传合同',
         dueAt: '2026-12-01T00:00:00.000Z',
+        startsAt: '2026-11-20',
       },
       'service',
     );
     expect(command.dueAt?.toISOString()).toBe('2026-12-01T00:00:00.000Z');
+    expect(command.startsAt).toBe('2026-11-20');
     expect(finishTodo('open', 'cancel')).toBe('cancelled');
-    expect(() => finishTodo('done', 'cancel')).toThrow(/已结束/);
+    expect(finishTodo('pending', 'done')).toBe('done');
+    expect(() => finishTodo('done', 'cancel')).toThrow(/活跃待办/);
   });
 
   it('pages and unread flags', () => {

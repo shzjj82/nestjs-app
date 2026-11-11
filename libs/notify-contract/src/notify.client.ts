@@ -24,7 +24,18 @@ export interface NotifyMessage {
   createdAt: string;
 }
 
-export type NotifyTodoStatus = 'open' | 'done' | 'cancelled';
+/** 四态；兼容读出旧值 `open` 时应归一为 `pending` */
+export type NotifyTodoStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'done'
+  | 'cancelled'
+  | 'open';
+
+export type NotifyTodoNoticeKind =
+  | 'todo.started'
+  | 'todo.progress'
+  | 'todo.overdue';
 
 export interface NotifyTodo {
   id: string;
@@ -36,8 +47,17 @@ export interface NotifyTodo {
   source: string;
   status: NotifyTodoStatus;
   data: Record<string, unknown> | null;
+  /** YYYY-MM-DD */
+  startsAt: string | null;
   dueAt: string | null;
+  startedAt: string | null;
   finishedAt: string | null;
+  cancelledAt: string | null;
+  startedNoticeAt: string | null;
+  /** YYYY-MM-DD */
+  lastProgressNoticeOn: string | null;
+  /** YYYY-MM-DD */
+  lastOverdueNoticeOn: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -63,6 +83,8 @@ export interface NotifySendInput {
 
 export interface NotifyTodoInput extends NotifySendInput {
   dueAt?: string | null;
+  startsAt?: string | null;
+  status?: NotifyTodoStatus;
 }
 
 /** 通过 MQTT 调通知服务，各业务服务共用 */

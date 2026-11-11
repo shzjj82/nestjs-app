@@ -9,14 +9,22 @@ import {
 } from '@app/common';
 import type { NotifyTodoStatus } from '@app/notify-contract';
 import { z } from 'zod';
+import {
+  applyStatusTransition,
+  normalizeTodoStatus,
+  parseStatusFilter,
+  type CanonicalTodoStatus,
+} from '../todos/todo-status';
 
 export { toPage };
+export { parseStatusFilter, normalizeTodoStatus };
 
 export interface Actor {
   userId: string;
 }
 
 const TOPIC_TOKEN = /^[A-Za-z0-9_-]{1,64}$/;
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 const topicToken = (label: string) =>
   z
@@ -46,6 +54,19 @@ const dueAtSchema = z.preprocess((value) => {
     .transform((text) => new Date(text)),
 ]));
 
+const startsAtSchema = z.preprocess((value) => {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  return value;
+}, z.union([
+  z.null(),
+  z
+    .string({ invalid_type_error: 'startsAt 无效' })
+    .trim()
+    .regex(DATE_ONLY, 'startsAt 须为 YYYY-MM-DD'),
+]));
+
 const dataObjectSchema = z
   .custom<Record<string, unknown>>(
     (value) => !!value && typeof value === 'object' && !Array.isArray(value),
@@ -59,6 +80,13 @@ const dataSchema = z.preprocess((value) => {
   }
   return value;
 }, z.union([z.null(), dataObjectSchema]));
+
+const createStatusSchema = z.preprocess((value) => {
+  if (value === undefined || value === null || value === '') {
+    return 'pending';
+  }
+  return normalizeTodoStatus(String(value));
+}, z.enum(['pending', 'in_progress', 'done', 'cancelled']));
 
 const sendSchema = (sourceFallback: string) =>
   z.object({
@@ -85,8 +113,10 @@ const sendSchema = (sourceFallback: string) =>
       (value) => optionalString(value) ?? sourceFallback,
       topicToken('source'),
     ),
+    status: createStatusSchema,
     data: dataSchema,
     dueAt: dueAtSchema,
+    startsAt: startsAtSchema,
   });
 
 export interface SendCommand {
@@ -96,8 +126,10 @@ export interface SendCommand {
   content: string;
   category: string;
   source: string;
+  status: CanonicalTodoStatus;
   data: Record<string, unknown> | null;
   dueAt: Date | null;
+  startsAt: string | null;
 }
 
 export function actorOf(payload: Record<string, unknown>): Actor | null {
@@ -137,28 +169,32 @@ export function parseSend(
   payload: Record<string, unknown>,
   sourceFallback: string,
 ): SendCommand {
-  return parseWith(sendSchema(sourceFallback), payload) as SendCommand;
+  const parsed = parseWith(sendSchema(sourceFallback), payload) as SendCommand;
+  if (!parsed.startsAt && parsed.data && typeof parsed.data.start === 'string') {
+    const start = parsed.data.start.trim();
+    if (DATE_ONLY.test(start)) {
+      parsed.startsAt = start;
+    }
+  }
+  return parsed;
 }
 
-const todoStatusSchema = z.enum(['open', 'done', 'cancelled'], {
-  errorMap: () => ({ message: 'status 只能是 open、done 或 cancelled' }),
-});
-
+/** 单状态过滤（兼容）；多状态请用 parseStatusFilter */
 export function todoStatusOf(payload: Record<string, unknown>): NotifyTodoStatus | undefined {
-  const status = optionalString(payload.status);
-  if (!status) {
+  const list = parseStatusFilter(payload.status);
+  if (!list?.length) {
     return undefined;
   }
-  return parseWith(todoStatusSchema, status);
+  return list[0];
 }
 
-export function finishTodo(current: string, action: 'done' | 'cancel'): NotifyTodoStatus {
-  if (current !== 'open') {
-    rpcFail(409, '待办已结束');
-  }
-  return action === 'done' ? 'done' : 'cancelled';
+export function finishTodo(
+  current: string,
+  action: 'done' | 'cancel',
+): CanonicalTodoStatus {
+  const next = action === 'done' ? 'done' : 'cancelled';
+  return applyStatusTransition({ current, next, startsAt: null }).status;
 }
-
 
 const updateMineSchema = z.object({
   title: z
@@ -180,6 +216,15 @@ const updateMineSchema = z.object({
   ),
   data: dataSchema,
   dueAt: dueAtSchema,
+  startsAt: startsAtSchema.optional(),
+  status: z
+    .preprocess((value) => {
+      if (value === undefined || value === null || value === '') {
+        return undefined;
+      }
+      return normalizeTodoStatus(String(value));
+    }, z.enum(['pending', 'in_progress', 'done', 'cancelled']).optional())
+    .optional(),
 });
 
 export type UpdateMineCommand = {
@@ -188,6 +233,8 @@ export type UpdateMineCommand = {
   category: string;
   data: Record<string, unknown> | null;
   dueAt: Date | null;
+  startsAt?: string | null;
+  status?: CanonicalTodoStatus;
 };
 
 export function parseUpdateMine(payload: Record<string, unknown>): UpdateMineCommand {

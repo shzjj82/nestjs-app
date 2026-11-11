@@ -136,6 +136,12 @@ export class TodosService implements OnModuleInit {
     return this.enrichItem(patched);
   }
 
+  start(payload: Record<string, unknown>) {
+    return this.call(MQTT_PATTERNS.TODO_START, this.scoped(payload)).then((item) =>
+      this.enrichItem(item as Record<string, unknown>),
+    );
+  }
+
   done(payload: Record<string, unknown>) {
     return this.call(MQTT_PATTERNS.TODO_DONE, this.scoped(payload)).then((item) =>
       this.enrichItem(item as Record<string, unknown>),
@@ -144,6 +150,12 @@ export class TodosService implements OnModuleInit {
 
   cancel(payload: Record<string, unknown>) {
     return this.call(MQTT_PATTERNS.TODO_CANCEL, this.scoped(payload)).then((item) =>
+      this.enrichItem(item as Record<string, unknown>),
+    );
+  }
+
+  reopen(payload: Record<string, unknown>) {
+    return this.call(MQTT_PATTERNS.TODO_REOPEN, this.scoped(payload)).then((item) =>
       this.enrichItem(item as Record<string, unknown>),
     );
   }

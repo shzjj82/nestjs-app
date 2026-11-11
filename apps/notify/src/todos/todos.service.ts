@@ -2,21 +2,26 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { rpcFail } from '@app/common';
 import type { NotifyTodo } from '@app/notify-contract';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   bizCodeOf,
-  finishTodo,
   parseSend,
+  parseStatusFilter,
   parseUpdateMine,
   requireActor,
   requireUuid,
-  todoStatusOf,
   toPage,
   type SendCommand,
 } from '../common/input';
 import { pushRealtime } from '../common/push';
 import { TodoEntity } from '../entities';
 import { shanghaiDayOf } from './shanghai-day';
+import {
+  applyStatusTransition,
+  normalizeTodoStatus,
+  reopenTargetStatus,
+  type CanonicalTodoStatus,
+} from './todo-status';
 
 @Injectable()
 export class TodosService {
@@ -28,20 +33,20 @@ export class TodosService {
   async list(payload: Record<string, unknown>) {
     const actor = requireActor(payload);
     const page = toPage(payload.page, payload.pageSize);
-    const where: FindOptionsWhere<TodoEntity> = {
-      bizCode: bizCodeOf(payload),
-      userId: actor.userId,
-    };
-    const status = todoStatusOf(payload);
-    if (status) {
-      where.status = status;
+    const statuses = parseStatusFilter(payload.status);
+    const qb = this.todos
+      .createQueryBuilder('todo')
+      .where('todo.biz_code = :bizCode', { bizCode: bizCodeOf(payload) })
+      .andWhere('todo.user_id = :userId', { userId: actor.userId })
+      .orderBy('todo.created_at', 'DESC')
+      .skip(page.skip)
+      .take(page.pageSize);
+    if (statuses?.length) {
+      qb.andWhere('todo.status IN (:...statuses)', {
+        statuses: expandStatusQuery(statuses),
+      });
     }
-    const [rows, total] = await this.todos.findAndCount({
-      where,
-      order: { createdAt: 'DESC' },
-      skip: page.skip,
-      take: page.pageSize,
-    });
+    const [rows, total] = await qb.getManyAndCount();
     return {
       items: rows.map(toView),
       total,
@@ -56,7 +61,7 @@ export class TodosService {
       where: {
         bizCode: bizCodeOf(payload),
         userId: actor.userId,
-        status: 'open',
+        status: In(['pending', 'in_progress', 'open']),
       },
     });
     return { count };
@@ -78,18 +83,26 @@ export class TodosService {
 
   async updateMine(payload: Record<string, unknown>) {
     const row = await this.own(payload);
-    if (row.status !== 'open') {
-      rpcFail(409, '待办已结束');
-    }
     const command = parseUpdateMine(payload);
     row.title = command.title;
     row.content = command.content;
     row.category = command.category;
     row.data = command.data;
+    if (command.startsAt !== undefined) {
+      row.startsAt = command.startsAt;
+    } else if (command.data && typeof command.data.start === 'string') {
+      const start = command.data.start.trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(start)) {
+        row.startsAt = start;
+      }
+    }
     if (shanghaiDayOf(row.dueAt) !== shanghaiDayOf(command.dueAt)) {
       row.remindedOn = null;
     }
     row.dueAt = command.dueAt;
+    if (command.status) {
+      this.applyTransition(row, command.status);
+    }
     await this.todos.save(row);
     const view = toView(row);
     await pushRealtime({ kind: 'todo', action: 'updated', item: view });
@@ -97,6 +110,8 @@ export class TodosService {
   }
 
   async create(command: SendCommand): Promise<NotifyTodo> {
+    const now = new Date();
+    const status = command.status;
     const saved = await this.todos.save(
       this.todos.create({
         bizCode: command.bizCode,
@@ -105,11 +120,17 @@ export class TodosService {
         content: command.content,
         category: command.category,
         source: command.source,
-        status: 'open',
+        status,
         data: command.data,
+        startsAt: command.startsAt,
         dueAt: command.dueAt,
+        startedAt: status === 'in_progress' ? now : null,
         remindedOn: null,
-        finishedAt: null,
+        finishedAt: status === 'done' ? now : null,
+        cancelledAt: status === 'cancelled' ? now : null,
+        startedNoticeAt: null,
+        lastProgressNoticeOn: null,
+        lastOverdueNoticeOn: null,
       }),
     );
     const view = toView(saved);
@@ -117,10 +138,31 @@ export class TodosService {
     return view;
   }
 
+  async start(payload: Record<string, unknown>) {
+    const row = await this.own(payload);
+    this.applyTransition(row, 'in_progress');
+    await this.todos.save(row);
+    const view = toView(row);
+    await pushRealtime({ kind: 'todo', action: 'updated', item: view });
+    return view;
+  }
+
   async finish(payload: Record<string, unknown>, action: 'done' | 'cancel') {
     const row = await this.own(payload);
-    row.status = finishTodo(row.status, action);
-    row.finishedAt = new Date();
+    this.applyTransition(row, action === 'done' ? 'done' : 'cancelled');
+    await this.todos.save(row);
+    const view = toView(row);
+    await pushRealtime({ kind: 'todo', action: 'updated', item: view });
+    return view;
+  }
+
+  async reopen(payload: Record<string, unknown>) {
+    const row = await this.own(payload);
+    const current = normalizeTodoStatus(row.status);
+    if (current !== 'done' && current !== 'cancelled') {
+      rpcFail(400, '仅已完成或已终止的待办可重新打开');
+    }
+    this.applyTransition(row, reopenTargetStatus(row.startsAt));
     await this.todos.save(row);
     const view = toView(row);
     await pushRealtime({ kind: 'todo', action: 'updated', item: view });
@@ -146,6 +188,30 @@ export class TodosService {
     return view;
   }
 
+  private applyTransition(row: TodoEntity, next: CanonicalTodoStatus) {
+    const result = applyStatusTransition({
+      current: row.status,
+      next,
+      startsAt: row.startsAt,
+    });
+    row.status = result.status;
+    if (result.startedAt) {
+      row.startedAt = row.startedAt ?? result.startedAt;
+    }
+    if (result.finishedAt !== undefined) {
+      row.finishedAt = result.finishedAt;
+    }
+    if (result.cancelledAt !== undefined) {
+      row.cancelledAt = result.cancelledAt;
+    }
+    if (result.clearFinished) {
+      row.finishedAt = null;
+    }
+    if (result.clearCancelled) {
+      row.cancelledAt = null;
+    }
+  }
+
   private async own(payload: Record<string, unknown>): Promise<TodoEntity> {
     const actor = requireActor(payload);
     const id = requireUuid(payload.id, 'id');
@@ -159,6 +225,14 @@ export class TodosService {
   }
 }
 
+function expandStatusQuery(statuses: CanonicalTodoStatus[]): string[] {
+  const set = new Set<string>(statuses);
+  if (set.has('pending')) {
+    set.add('open');
+  }
+  return [...set];
+}
+
 function toView(row: TodoEntity): NotifyTodo {
   return {
     id: row.id,
@@ -168,10 +242,16 @@ function toView(row: TodoEntity): NotifyTodo {
     content: row.content,
     category: row.category,
     source: row.source,
-    status: row.status,
+    status: normalizeTodoStatus(row.status),
     data: row.data,
+    startsAt: row.startsAt,
     dueAt: row.dueAt ? row.dueAt.toISOString() : null,
+    startedAt: row.startedAt ? row.startedAt.toISOString() : null,
     finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
+    cancelledAt: row.cancelledAt ? row.cancelledAt.toISOString() : null,
+    startedNoticeAt: row.startedNoticeAt ? row.startedNoticeAt.toISOString() : null,
+    lastProgressNoticeOn: row.lastProgressNoticeOn,
+    lastOverdueNoticeOn: row.lastOverdueNoticeOn,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
