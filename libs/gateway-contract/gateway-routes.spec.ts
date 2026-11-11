@@ -141,24 +141,31 @@ describe('matchRoute', () => {
       'upload-key',
     ]);
     expect(matchRoute('POST', '/wiki/upload')?.override).toBe(true);
-    expect(matchRoute('POST', '/wiki/upload')?.pattern).toBe(MQTT_PATTERNS.UPLOAD_PUT);
+    expect(matchRoute('POST', '/wiki/upload')?.pattern).toBe(
+      MQTT_PATTERNS.WIKI_UPLOAD_PUT,
+    );
   });
 
-  it('exposes wiki facade aliases for editor platform APIs', () => {
+  it('routes wiki facade through WIKI_CLIENT (not direct platform clients)', () => {
+    expect(matchRoute('POST', '/wiki/upload')?.client).toBe('WIKI_CLIENT');
+    expect(matchRoute('POST', '/wiki/upload')?.pattern).toBe(
+      MQTT_PATTERNS.WIKI_UPLOAD_PUT,
+    );
+    expect(matchRoute('GET', '/wiki/todos/open-count')?.client).toBe('WIKI_CLIENT');
     expect(matchRoute('GET', '/wiki/todos/open-count')?.pattern).toBe(
-      MQTT_PATTERNS.TODO_OPEN_COUNT,
+      MQTT_PATTERNS.WIKI_TODO_OPEN_COUNT,
     );
     expect(matchRoute('GET', '/wiki/notifications/unread-count')?.pattern).toBe(
-      MQTT_PATTERNS.NOTIFY_UNREAD_COUNT,
+      MQTT_PATTERNS.WIKI_NOTIFY_UNREAD_COUNT,
     );
     expect(matchRoute('GET', '/wiki/agents/chat/status')?.pattern).toBe(
-      MQTT_PATTERNS.AGENTS_CHAT_STATUS,
+      MQTT_PATTERNS.WIKI_AGENTS_CHAT_STATUS,
     );
+    expect(matchRoute('POST', '/wiki/agents/chat')?.client).toBe('WIKI_CLIENT');
     expect(matchRoute('POST', '/wiki/agents/chat')?.override).toBe(true);
-    expect(matchRoute('GET', '/wiki/notifications/socket')?.override).toBe(true);
-    // 旧路径仍在
-    expect(matchRoute('POST', '/upload')?.pattern).toBe(MQTT_PATTERNS.UPLOAD_PUT);
-    expect(matchRoute('GET', '/todos')?.pattern).toBe(MQTT_PATTERNS.TODO_LIST);
+    // 旧路径仍直连平台
+    expect(matchRoute('POST', '/upload')?.client).toBe('UPLOAD_CLIENT');
+    expect(matchRoute('GET', '/todos')?.client).toBe('NOTIFY_CLIENT');
   });
 
   it('protects agents chat with jwt and marks the chat post as override', () => {

@@ -8,7 +8,14 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { AGENTS_CLIENT, MQTT_PATTERNS, fail, ok, unwrapData } from '@app/common';
+import {
+  AGENTS_CLIENT,
+  MQTT_PATTERNS,
+  WIKI_CLIENT,
+  fail,
+  ok,
+  unwrapData,
+} from '@app/common';
 import type { AgentChatInput, AgentChatResult, ServiceEnvelope } from '@app/common';
 import type { Request, Response } from 'express';
 import { BizGuard } from '../auth/biz.guard';
@@ -16,6 +23,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { GatewayUser } from '../auth/auth.types';
 import { ClientHub } from '../mqtt/client.hub';
+import { requestPathname } from '../proxy/proxy.routes';
 
 function agentsMqttTimeoutMs() {
   const n = Number(process.env.AGENTS_MQTT_TIMEOUT_MS ?? 90_000);
@@ -53,13 +61,15 @@ export class AgentsOverrideController {
       },
     };
     if (body?.sync === false) {
+      // 流式仍直连 agents HTTP；同步路径走 wiki 门面便于加业务
       await this.pipeStream(res, payload);
       return;
     }
+    const wiki = requestPathname(req).startsWith('/wiki/agents');
     try {
       const raw = await this.clients.send<ServiceEnvelope<AgentChatResult>>(
-        AGENTS_CLIENT,
-        MQTT_PATTERNS.AGENTS_CHAT,
+        wiki ? WIKI_CLIENT : AGENTS_CLIENT,
+        wiki ? MQTT_PATTERNS.WIKI_AGENTS_CHAT : MQTT_PATTERNS.AGENTS_CHAT,
         payload,
         agentsMqttTimeoutMs(),
       );

@@ -9,13 +9,20 @@ import {
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import { AGENTS_CLIENT, MQTT_PATTERNS, UPLOAD_CLIENT, unwrapData } from '@app/common';
+import {
+  AGENTS_CLIENT,
+  MQTT_PATTERNS,
+  UPLOAD_CLIENT,
+  WIKI_CLIENT,
+  unwrapData,
+} from '@app/common';
 import type { Request } from 'express';
 import { BizGuard } from '../auth/biz.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { GatewayUser } from '../auth/auth.types';
 import { ClientHub } from '../mqtt/client.hub';
+import { requestPathname } from '../proxy/proxy.routes';
 
 const VISION_MAX_BYTES = 8 * 1024 * 1024;
 const VISION_MAX_FILES = 9;
@@ -81,9 +88,10 @@ export class VisionOverrideController {
       uploaded.push({ url: stored.url, key: stored.key });
     }
 
+    const wiki = requestPathname(req).startsWith('/wiki/agents');
     return this.clients.send(
-      AGENTS_CLIENT,
-      MQTT_PATTERNS.AGENTS_VISION_PARSE,
+      wiki ? WIKI_CLIENT : AGENTS_CLIENT,
+      wiki ? MQTT_PATTERNS.WIKI_AGENTS_VISION : MQTT_PATTERNS.AGENTS_VISION_PARSE,
       {
         prompt,
         text,

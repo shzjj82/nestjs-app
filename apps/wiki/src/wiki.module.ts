@@ -5,6 +5,7 @@ import { DatabaseModule } from './database/database.module';
 import { SeedService } from './database/seed.service';
 import { WikiController } from './wiki.controller';
 import { DocumentsModule } from './documents/documents.module';
+import { FacadeModule } from './facade/facade.module';
 import { TeamsModule } from './teams/teams.module';
 
 @Module({
@@ -13,6 +14,7 @@ import { TeamsModule } from './teams/teams.module';
     CategoriesModule,
     DocumentsModule,
     TeamsModule,
+    FacadeModule,
     ApiDocsModule.forService({
       service: 'wiki',
       label: 'Wiki 模块',

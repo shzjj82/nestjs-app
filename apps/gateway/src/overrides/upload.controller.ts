@@ -11,12 +11,14 @@ import { memoryStorage } from 'multer';
 import {
   MQTT_PATTERNS,
   UPLOAD_CLIENT,
+  WIKI_CLIENT,
   uploadMaxBytes,
 } from '@app/common';
 import type { Request } from 'express';
 import { AuthService } from '../auth/auth.service';
 import { BizGuard } from '../auth/biz.guard';
 import { ClientHub } from '../mqtt/client.hub';
+import { requestPathname } from '../proxy/proxy.routes';
 
 @Controller(['upload', 'wiki/upload'])
 export class UploadOverrideController {
@@ -38,9 +40,10 @@ export class UploadOverrideController {
     @UploadedFile() file: Express.Multer.File | undefined,
   ) {
     const bizCode = await this.authorize(req);
+    const wiki = isWikiUpload(req);
     return this.clients.send(
-      UPLOAD_CLIENT,
-      MQTT_PATTERNS.UPLOAD_PUT,
+      wiki ? WIKI_CLIENT : UPLOAD_CLIENT,
+      wiki ? MQTT_PATTERNS.WIKI_UPLOAD_PUT : MQTT_PATTERNS.UPLOAD_PUT,
       this.filePayload(req, file, bizCode),
     );
   }
@@ -57,9 +60,10 @@ export class UploadOverrideController {
     @UploadedFile() file: Express.Multer.File | undefined,
   ) {
     const bizCode = await this.authorize(req);
+    const wiki = isWikiUpload(req);
     return this.clients.send(
-      UPLOAD_CLIENT,
-      MQTT_PATTERNS.UPLOAD_ENQUEUE,
+      wiki ? WIKI_CLIENT : UPLOAD_CLIENT,
+      wiki ? MQTT_PATTERNS.WIKI_UPLOAD_ENQUEUE : MQTT_PATTERNS.UPLOAD_ENQUEUE,
       this.filePayload(req, file, bizCode),
     );
   }
@@ -89,4 +93,8 @@ export class UploadOverrideController {
       _bizCode: bizCode,
     };
   }
+}
+
+function isWikiUpload(req: Request) {
+  return requestPathname(req).startsWith('/wiki/upload');
 }
