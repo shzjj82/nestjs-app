@@ -1,9 +1,10 @@
 # wiki
 
-编辑器（wiki）专属文档微服务：文档树、分类、团队授权、RAG 通知。  
+编辑器（wiki）专属微服务：文档树、分类、团队、RAG 通知。  
 博客仍走 `apps/docs`（`/docs/*`）；本服务对外是 `/wiki/*`。
 
-团队 / 待办 / 通知不在这里：分别是 usercenter、notify。
+文档表 `doc_*` 与 docs **共用同一库**（默认 `docs`，靠 `app_code` 区分产品）；团队表 `wiki_teams*` 也落在该库。  
+待办 / 通知仍在 notify；登录在 usercenter。
 
 ## 网关 HTTP
 

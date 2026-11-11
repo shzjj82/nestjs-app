@@ -2,9 +2,13 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { dropLegacySharedDocTables, openSharedDatabase } from './ensure-database';
 
+/**
+ * wiki 与 docs 共用 doc_* 表：不再做 docs→wiki 文档拷贝。
+ * 仅保留：旧 nestjs 共享库残留 doc_* 的一次性迁入，以及 uc_teams → wiki_teams。
+ */
 @Injectable()
 export class SeedService implements OnModuleInit {
-  private readonly logger = new Logger('DocsSeed');
+  private readonly logger = new Logger('WikiSeed');
 
   constructor(private readonly dataSource: DataSource) {}
 
@@ -17,7 +21,7 @@ export class SeedService implements OnModuleInit {
     if (Number(local[0]?.n ?? 0) > 0) {
       await dropLegacySharedDocTables(this.logger);
     }
-    this.logger.log('文档服务已就绪');
+    this.logger.log('Wiki 文档库已就绪（与 docs 共用 doc_*）');
   }
 
   /** wiki_teams 为空时，从 usercenter 库 uc_teams / uc_team_members 一次性拷贝（保留 id，幂等） */
@@ -155,8 +159,8 @@ export class SeedService implements OnModuleInit {
           `INSERT INTO doc_documents
             (id, app_code, slug, title, kind, category, category_id, parent_id, tree_sort,
              summary, cover_url, props, body_format, body, visibility, published_at, author_id,
-             created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+             team_id, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
            ON CONFLICT (id) DO NOTHING`,
           [
             row.id,
@@ -175,6 +179,7 @@ export class SeedService implements OnModuleInit {
             visibility,
             row.published_at ?? null,
             row.author_id ?? null,
+            row.team_id ?? null,
             row.created_at,
             row.updated_at,
           ],
@@ -191,7 +196,7 @@ export class SeedService implements OnModuleInit {
         );
       }
       this.logger.log(
-        `已从共享库迁入分类 ${copiedCategories}、文档 ${copiedDocs.length}，跳过 ${skipped}（缺 app_code 或非 article）`,
+        `已从共享库迁入分类 ${copiedCategories}、文档 ${copiedDocs.length}，跳过 ${skipped}`,
       );
     } finally {
       await src.destroy();

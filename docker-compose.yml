@@ -3,7 +3,7 @@ x-app-env: &app-env
   MQTT_URL: mqtt://mosquitto:1883
   DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/${POSTGRES_DB:-nestjs}
   DOCS_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/docs
-  WIKI_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/wiki
+  WIKI_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/docs
   WECHAT_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/wechat
   RECYCLE_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/recycle
   NOTIFY_DATABASE_URL: postgres://${POSTGRES_USER:-nestjs}:${POSTGRES_PASSWORD:-nestjs}@postgres:5432/notify

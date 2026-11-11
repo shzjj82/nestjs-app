@@ -60,9 +60,15 @@ export function docsDatabaseUrl(): string {
   return namedDatabaseUrl('DOCS_DATABASE_URL', 'docs');
 }
 
-/** wiki（编辑器）默认独立库 `wiki`；可用 WIKI_DATABASE_URL 覆盖 */
+/**
+ * wiki 与 docs 共用文档表所在库（默认 docs）。
+ * 仅当显式设置 WIKI_DATABASE_URL 时才覆盖；不要默认再拆一个 wiki 库。
+ */
 export function wikiDatabaseUrl(): string {
-  return namedDatabaseUrl('WIKI_DATABASE_URL', 'wiki');
+  if (process.env.WIKI_DATABASE_URL) {
+    return process.env.WIKI_DATABASE_URL;
+  }
+  return docsDatabaseUrl();
 }
 
 /** recycle 默认独立库 `recycle`；可用 RECYCLE_DATABASE_URL 覆盖 */

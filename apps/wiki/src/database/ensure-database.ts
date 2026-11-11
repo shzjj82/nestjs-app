@@ -7,10 +7,11 @@ import {
 } from '@app/common';
 import { DataSource } from 'typeorm';
 
+/** 确保文档共用库存在（默认即 docs） */
 export async function ensureWikiDatabase() {
   await ensureNamedDatabase({
     targetUrl: wikiDatabaseUrl(),
-    fallbackName: 'wiki',
+    fallbackName: 'docs',
     loggerContext: 'WikiDatabase',
   });
 }
@@ -18,7 +19,7 @@ export async function ensureWikiDatabase() {
 export function isSharedSameAsWiki(): boolean {
   return (
     databaseNameFromUrl(databaseUrl(), 'nestjs') ===
-    databaseNameFromUrl(wikiDatabaseUrl(), 'wiki')
+    databaseNameFromUrl(wikiDatabaseUrl(), 'docs')
   );
 }
 

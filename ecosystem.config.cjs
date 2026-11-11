@@ -23,9 +23,8 @@ const databaseUrl =
 const docsDatabaseUrl =
   process.env.DOCS_DATABASE_URL ??
   databaseUrl.replace(/\/[^/?]+(\?|$)/, '/docs$1');
-const wikiDatabaseUrl =
-  process.env.WIKI_DATABASE_URL ??
-  databaseUrl.replace(/\/[^/?]+(\?|$)/, '/wiki$1');
+/** wiki 默认与 docs 共用文档库 */
+const wikiDatabaseUrl = process.env.WIKI_DATABASE_URL ?? docsDatabaseUrl;
 const wechatDatabaseUrl =
   process.env.WECHAT_DATABASE_URL ??
   databaseUrl.replace(/\/[^/?]+(\?|$)/, '/wechat$1');
