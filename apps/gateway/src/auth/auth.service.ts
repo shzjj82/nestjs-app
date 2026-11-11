@@ -4,7 +4,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { GatewayAuth } from '@app/gateway-contract';
-import { docsServiceKey, TokenStore, uploadServiceKey } from '@app/common';
+import {
+  docsServiceKey,
+  TokenStore,
+  uploadServiceKey,
+  wikiServiceKey,
+} from '@app/common';
 import type { Request } from 'express';
 import type { GatewayUser } from './auth.types';
 
@@ -25,6 +30,19 @@ export class AuthService {
   hasValidDocsKey(req: Request): boolean {
     const key = this.docsKey(req);
     return !!key && key === docsServiceKey();
+  }
+
+  wikiKey(req: Request): string | null {
+    const header = req.headers['x-wiki-key'];
+    if (typeof header === 'string' && header.trim()) {
+      return header.trim();
+    }
+    return null;
+  }
+
+  hasValidWikiKey(req: Request): boolean {
+    const key = this.wikiKey(req);
+    return !!key && key === wikiServiceKey();
   }
 
   uploadKey(req: Request): string | null {
@@ -80,12 +98,14 @@ export class AuthService {
     permissions?: string[],
   ): Promise<GatewayUser | null> {
     const allowDocsKey = auth?.includes('docs-key');
+    const allowWikiKey = auth?.includes('wiki-key');
     const allowUploadKey = auth?.includes('upload-key');
-    const allowServiceKey = allowDocsKey || allowUploadKey;
+    const allowServiceKey = allowDocsKey || allowWikiKey || allowUploadKey;
     const allowJwt =
       auth?.includes('jwt') || auth?.includes('admin') || !!permissions?.length;
     const keyOk =
       (allowDocsKey && this.hasValidDocsKey(req)) ||
+      (allowWikiKey && this.hasValidWikiKey(req)) ||
       (allowUploadKey && this.hasValidUploadKey(req));
 
     if (allowServiceKey && allowJwt) {
@@ -109,13 +129,24 @@ export class AuthService {
       throw new UnauthorizedException(
         allowUploadKey
           ? '需要登录或上传服务密钥：x-upload-key'
-          : '需要登录或文档服务密钥：x-docs-key',
+          : allowWikiKey
+            ? '需要登录或 Wiki 服务密钥：x-wiki-key'
+            : '需要登录或文档服务密钥：x-docs-key',
       );
     }
 
     if (allowDocsKey) {
       if (!this.hasValidDocsKey(req)) {
         throw new UnauthorizedException('需要文档服务密钥：x-docs-key');
+      }
+      if (!allowJwt) {
+        return null;
+      }
+    }
+
+    if (allowWikiKey) {
+      if (!this.hasValidWikiKey(req)) {
+        throw new UnauthorizedException('需要 Wiki 服务密钥：x-wiki-key');
       }
       if (!allowJwt) {
         return null;

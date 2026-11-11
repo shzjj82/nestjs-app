@@ -1,5 +1,5 @@
 /**
- * 全量部署：gateway / usercenter / order / docs / upload / wechat / recycle / agents / notify。
+ * 全量部署：gateway / usercenter / order / docs / wiki / upload / wechat / recycle / agents / notify。
  * 裁剪场景（只跑其中一部分）放在 deploy/<场景>/ecosystem.config.cjs，不要在根目录再加一份。
  */
 const mqttUrl = process.env.MQTT_URL ?? 'mqtt://127.0.0.1:1883';
@@ -12,6 +12,7 @@ function replicaCount(name, fallback) {
 
 const usercenterReplicas = replicaCount('USERCENTER_REPLICAS', 1);
 const docsReplicas = replicaCount('DOCS_REPLICAS', 1);
+const wikiReplicas = replicaCount('WIKI_REPLICAS', 1);
 const agentsReplicas = replicaCount('AGENTS_REPLICAS', 1);
 const agentsHttpPort = Number(process.env.AGENTS_HTTP_PORT ?? 3006);
 const appVersion = process.env.APP_VERSION ?? '0.0.1';
@@ -22,6 +23,9 @@ const databaseUrl =
 const docsDatabaseUrl =
   process.env.DOCS_DATABASE_URL ??
   databaseUrl.replace(/\/[^/?]+(\?|$)/, '/docs$1');
+const wikiDatabaseUrl =
+  process.env.WIKI_DATABASE_URL ??
+  databaseUrl.replace(/\/[^/?]+(\?|$)/, '/wiki$1');
 const wechatDatabaseUrl =
   process.env.WECHAT_DATABASE_URL ??
   databaseUrl.replace(/\/[^/?]+(\?|$)/, '/wechat$1');
@@ -64,6 +68,12 @@ const docsApps = replicate('docs', docsReplicas, () => ({
   DATABASE_URL: databaseUrl,
   DOCS_DATABASE_URL: docsDatabaseUrl,
   DOCS_SERVICE_KEY: process.env.DOCS_SERVICE_KEY ?? 'dev-docs-key',
+}));
+
+const wikiApps = replicate('wiki', wikiReplicas, () => ({
+  DATABASE_URL: databaseUrl,
+  WIKI_DATABASE_URL: wikiDatabaseUrl,
+  WIKI_SERVICE_KEY: process.env.WIKI_SERVICE_KEY ?? 'dev-wiki-key',
 }));
 
 const agentsApps = replicate('agents', agentsReplicas, (id) => ({
@@ -120,6 +130,7 @@ module.exports = {
       },
     },
     ...docsApps,
+    ...wikiApps,
     {
       name: 'upload',
       script: 'dist/apps/upload/main.js',

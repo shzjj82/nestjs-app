@@ -46,6 +46,15 @@
         "tsConfigPath": "apps/docs/tsconfig.app.json"
       }
     },
+    "wiki": {
+      "type": "application",
+      "root": "apps/wiki",
+      "entryFile": "main",
+      "sourceRoot": "apps/wiki/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/wiki/tsconfig.app.json"
+      }
+    },
     "upload": {
       "type": "application",
       "root": "apps/upload",

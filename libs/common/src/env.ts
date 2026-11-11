@@ -60,6 +60,11 @@ export function docsDatabaseUrl(): string {
   return namedDatabaseUrl('DOCS_DATABASE_URL', 'docs');
 }
 
+/** wiki（编辑器）默认独立库 `wiki`；可用 WIKI_DATABASE_URL 覆盖 */
+export function wikiDatabaseUrl(): string {
+  return namedDatabaseUrl('WIKI_DATABASE_URL', 'wiki');
+}
+
 /** recycle 默认独立库 `recycle`；可用 RECYCLE_DATABASE_URL 覆盖 */
 export function recycleDatabaseUrl(): string {
   return namedDatabaseUrl('RECYCLE_DATABASE_URL', 'recycle');
@@ -95,6 +100,10 @@ export function redisConfig() {
 
 export function docsServiceKey(): string {
   return readEnv('DOCS_SERVICE_KEY', 'dev-docs-key');
+}
+
+export function wikiServiceKey(): string {
+  return readEnv('WIKI_SERVICE_KEY', 'dev-wiki-key');
 }
 
 export function uploadServiceKey(): string {

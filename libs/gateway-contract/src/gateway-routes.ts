@@ -8,11 +8,12 @@ import {
   UPLOAD_CLIENT,
   USER_CLIENT,
   WECHAT_CLIENT,
+  WIKI_CLIENT,
   microserviceApiDocs,
   PERMISSIONS,
 } from '@app/common';
 
-export type GatewayAuth = 'jwt' | 'admin' | 'docs-key' | 'upload-key';
+export type GatewayAuth = 'jwt' | 'admin' | 'docs-key' | 'wiki-key' | 'upload-key';
 export type GatewayHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /**
@@ -122,6 +123,14 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'POST', path: '/docs/categories', client: DOCS_CLIENT, pattern: MQTT_PATTERNS.DOC_CATEGORY_CREATE, auth: ['jwt', 'docs-key'] }),
   business({ method: 'PUT', path: '/docs/categories/:id', client: DOCS_CLIENT, pattern: MQTT_PATTERNS.DOC_CATEGORY_UPDATE, auth: ['jwt', 'docs-key'] }),
   business({ method: 'DELETE', path: '/docs/categories/:id', client: DOCS_CLIENT, pattern: MQTT_PATTERNS.DOC_CATEGORY_DELETE, auth: ['jwt', 'docs-key'] }),
+
+  ...wikiContentRoutes('/wiki/documents'),
+  { method: 'GET', path: '/wiki/health', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_HEALTH },
+  business({ method: 'GET', path: '/wiki/categories', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_CATEGORY_FIND_ALL }),
+  business({ method: 'GET', path: '/wiki/categories/:slug', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_CATEGORY_FIND_SLUG }),
+  business({ method: 'POST', path: '/wiki/categories', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_CATEGORY_CREATE, auth: ['jwt', 'wiki-key'] }),
+  business({ method: 'PUT', path: '/wiki/categories/:id', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_CATEGORY_UPDATE, auth: ['jwt', 'wiki-key'] }),
+  business({ method: 'DELETE', path: '/wiki/categories/:id', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_CATEGORY_DELETE, auth: ['jwt', 'wiki-key'] }),
 
   business({ method: 'POST', path: '/upload', client: UPLOAD_CLIENT, pattern: MQTT_PATTERNS.UPLOAD_PUT, auth: ['jwt', 'upload-key'], override: true }),
   business({ method: 'POST', path: '/upload/async', client: UPLOAD_CLIENT, pattern: MQTT_PATTERNS.UPLOAD_ENQUEUE, auth: ['jwt', 'upload-key'], override: true }),
@@ -239,6 +248,22 @@ function docsContentRoutes(prefix: '/docs/documents'): GatewayRoute[] {
     docs({ method: 'POST', path: prefix, pattern: MQTT_PATTERNS.DOC_POST_CREATE, auth }),
     docs({ method: 'PUT', path: `${prefix}/:id`, pattern: MQTT_PATTERNS.DOC_POST_UPDATE, auth }),
     docs({ method: 'DELETE', path: `${prefix}/:id`, pattern: MQTT_PATTERNS.DOC_POST_DELETE, auth }),
+  ];
+}
+
+function wikiContentRoutes(prefix: '/wiki/documents'): GatewayRoute[] {
+  const auth: GatewayAuth[] = ['jwt', 'wiki-key'];
+  const wiki = (route: Omit<RouteInput, 'client'>) =>
+    business({ ...route, client: WIKI_CLIENT });
+  return [
+    wiki({ method: 'GET', path: `${prefix}/id/:id`, pattern: MQTT_PATTERNS.WIKI_POST_FIND_ID, auth }),
+    wiki({ method: 'POST', path: `${prefix}/id/:id/children`, pattern: MQTT_PATTERNS.WIKI_POST_CHILDREN, auth }),
+    wiki({ method: 'PUT', path: `${prefix}/id/:id/parent`, pattern: MQTT_PATTERNS.WIKI_POST_REPARENT, auth }),
+    wiki({ method: 'GET', path: prefix, pattern: MQTT_PATTERNS.WIKI_POST_FIND_ALL }),
+    wiki({ method: 'GET', path: `${prefix}/:slug`, pattern: MQTT_PATTERNS.WIKI_POST_FIND_SLUG }),
+    wiki({ method: 'POST', path: prefix, pattern: MQTT_PATTERNS.WIKI_POST_CREATE, auth }),
+    wiki({ method: 'PUT', path: `${prefix}/:id`, pattern: MQTT_PATTERNS.WIKI_POST_UPDATE, auth }),
+    wiki({ method: 'DELETE', path: `${prefix}/:id`, pattern: MQTT_PATTERNS.WIKI_POST_DELETE, auth }),
   ];
 }
 

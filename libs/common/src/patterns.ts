@@ -1,6 +1,7 @@
 export const USER_CLIENT = 'USER_CLIENT';
 export const ORDER_CLIENT = 'ORDER_CLIENT';
 export const DOCS_CLIENT = 'DOCS_CLIENT';
+export const WIKI_CLIENT = 'WIKI_CLIENT';
 export const UPLOAD_CLIENT = 'UPLOAD_CLIENT';
 export const WECHAT_CLIENT = 'WECHAT_CLIENT';
 export const AGENTS_CLIENT = 'AGENTS_CLIENT';
@@ -11,6 +12,7 @@ export const MQTT_GROUPS = {
   USERCENTER: 'usercenter',
   ORDER: 'order',
   DOCS: 'docs',
+  WIKI: 'wiki',
   UPLOAD: 'upload',
   WECHAT: 'wechat',
   AGENTS: 'agents',
@@ -95,6 +97,21 @@ export const MQTT_PATTERNS = {
   DOC_CATEGORY_CREATE: 'doc.category.create',
   DOC_CATEGORY_UPDATE: 'doc.category.update',
   DOC_CATEGORY_DELETE: 'doc.category.delete',
+  WIKI_HEALTH: 'wiki.health',
+  WIKI_API_DOCS: 'wiki.apiDocs',
+  WIKI_POST_FIND_ALL: 'wiki.post.findAll',
+  WIKI_POST_FIND_SLUG: 'wiki.post.findSlug',
+  WIKI_POST_FIND_ID: 'wiki.post.findId',
+  WIKI_POST_CREATE: 'wiki.post.create',
+  WIKI_POST_UPDATE: 'wiki.post.update',
+  WIKI_POST_DELETE: 'wiki.post.delete',
+  WIKI_POST_CHILDREN: 'wiki.post.children',
+  WIKI_POST_REPARENT: 'wiki.post.reparent',
+  WIKI_CATEGORY_FIND_ALL: 'wiki.category.findAll',
+  WIKI_CATEGORY_FIND_SLUG: 'wiki.category.findSlug',
+  WIKI_CATEGORY_CREATE: 'wiki.category.create',
+  WIKI_CATEGORY_UPDATE: 'wiki.category.update',
+  WIKI_CATEGORY_DELETE: 'wiki.category.delete',
   UPLOAD_HEALTH: 'upload.health',
   UPLOAD_API_DOCS: 'upload.apiDocs',
   UPLOAD_PUT: 'upload.put',

@@ -9,6 +9,7 @@ import {
   UPLOAD_CLIENT,
   USER_CLIENT,
   WECHAT_CLIENT,
+  WIKI_CLIENT,
 } from './patterns';
 
 export interface MicroserviceEntry {
@@ -70,6 +71,15 @@ export const MICROSERVICES: readonly MicroserviceEntry[] = [
     apiDocs: MQTT_PATTERNS.DOC_API_DOCS,
     gatewayClientId: 'gateway-docs',
     proxyPrefixes: ['docs'],
+  },
+  {
+    name: 'wiki',
+    client: WIKI_CLIENT,
+    group: MQTT_GROUPS.WIKI,
+    health: MQTT_PATTERNS.WIKI_HEALTH,
+    apiDocs: MQTT_PATTERNS.WIKI_API_DOCS,
+    gatewayClientId: 'gateway-wiki',
+    proxyPrefixes: ['wiki'],
   },
   {
     name: 'upload',

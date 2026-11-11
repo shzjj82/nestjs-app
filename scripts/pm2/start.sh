@@ -70,6 +70,7 @@ if [[ "${need_build}" -eq 1 ]]; then
     npx nest build usercenter
     npx nest build order
     npx nest build docs
+    npx nest build wiki
     npx nest build upload
     npx nest build wechat
     npx nest build agents
@@ -96,6 +97,7 @@ case "${SCOPE}" in
         ...names('usercenter', 'USERCENTER_REPLICAS', 1),
         'order',
         ...names('docs', 'DOCS_REPLICAS', 1),
+        ...names('wiki', 'WIKI_REPLICAS', 1),
         'upload',
         'wechat',
         'recycle',

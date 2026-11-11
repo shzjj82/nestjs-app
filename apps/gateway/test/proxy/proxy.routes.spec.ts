@@ -20,4 +20,9 @@ describe('buildProxyPayload', () => {
     const payload = buildProxyPayload({ body: { _docsPrivileged: true } }, {}, null, null, null);
     expect(payload._docsPrivileged).toBe(false);
   });
+
+  it('never trusts client supplied _wikiPrivileged', () => {
+    const payload = buildProxyPayload({ body: { _wikiPrivileged: true } }, {}, null, null, null);
+    expect(payload._wikiPrivileged).toBe(false);
+  });
 });

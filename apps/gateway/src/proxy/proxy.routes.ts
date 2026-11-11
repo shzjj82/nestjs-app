@@ -48,6 +48,7 @@ export function buildProxyPayload(
     _bizCode: _ignoredBizCode,
     _appCode: _ignoredAppCodeField,
     _docsPrivileged: _ignoredPrivileged,
+    _wikiPrivileged: _ignoredWikiPrivileged,
     appCode: _ignoredAppCode,
     ...rest
   } = merged;
@@ -59,6 +60,7 @@ export function buildProxyPayload(
     _bizCode: bizCode ?? null,
     _appCode: appCode ?? null,
     _docsPrivileged: false,
+    _wikiPrivileged: false,
   };
 }
 

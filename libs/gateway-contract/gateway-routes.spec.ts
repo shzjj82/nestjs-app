@@ -102,6 +102,15 @@ describe('matchRoute', () => {
     expect(matchRoute('PUT', '/docs/categories/abc')?.auth).toEqual(['jwt', 'docs-key']);
   });
 
+  it('exposes wiki routes separately from docs', () => {
+    expect(matchRoute('GET', '/wiki/documents')?.pattern).toBe(
+      MQTT_PATTERNS.WIKI_POST_FIND_ALL,
+    );
+    expect(matchRoute('POST', '/wiki/documents')?.auth).toEqual(['jwt', 'wiki-key']);
+    expect(matchRoute('GET', '/wiki/documents/id/abc')?.client).toBe('WIKI_CLIENT');
+    expect(matchRoute('PUT', '/wiki/categories/abc')?.auth).toEqual(['jwt', 'wiki-key']);
+  });
+
   it('registers team routes for the signed-in account', () => {
     expect(matchRoute('POST', '/teams')?.pattern).toBe(MQTT_PATTERNS.TEAM_CREATE);
     expect(matchRoute('POST', '/teams/join')?.pattern).toBe(MQTT_PATTERNS.TEAM_JOIN);

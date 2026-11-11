@@ -29,6 +29,7 @@ if pm2 describe gateway >/dev/null 2>&1; then
       pm2 restart /usercenter-/ || true
       pm2 restart order upload wechat recycle notify || true
       pm2 restart /docs-/ || true
+      pm2 restart /wiki-/ || true
       pm2 restart /agents-/ || true
       ;;
     *) pm2 restart all ;;

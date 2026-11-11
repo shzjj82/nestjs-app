@@ -33,13 +33,20 @@ export class ProxyMiddleware implements NestMiddleware {
     try {
       const query = (req.query ?? {}) as Record<string, unknown>;
       const isDocsList = pathname === '/docs/documents';
+      const isWikiList = pathname === '/wiki/documents';
       const scope =
         typeof query.scope === 'string' ? query.scope.trim().toLowerCase() : '';
-      const needsPrivilege = isDocsList && (scope === 'mine' || scope === 'all');
-      // mine 必须用户 JWT；all 可用 docs-key。二者都先抬升鉴权，docs 服务再按 scope 细判。
-      let auth = needsPrivilege
-        ? [...new Set([...(route.auth ?? []), 'jwt' as const, 'docs-key' as const])]
-        : route.auth;
+      const needsDocsPrivilege =
+        isDocsList && (scope === 'mine' || scope === 'all');
+      const needsWikiPrivilege =
+        isWikiList && (scope === 'mine' || scope === 'all');
+      // mine 必须用户 JWT；all 可用服务密钥。二者都先抬升鉴权，下游再按 scope 细判。
+      let auth = route.auth;
+      if (needsDocsPrivilege) {
+        auth = [...new Set([...(auth ?? []), 'jwt' as const, 'docs-key' as const])];
+      } else if (needsWikiPrivilege) {
+        auth = [...new Set([...(auth ?? []), 'jwt' as const, 'wiki-key' as const])];
+      }
       // 业务接口：功能点只表示该 X-Biz-Code 开没开（BizGuard / apis），
       // 不按用户勾选。登录用户享有该业务已开通的全部接口；身份限制在下游服务。
       const userPermissions =
@@ -85,6 +92,7 @@ export class ProxyMiddleware implements NestMiddleware {
         appCode,
       );
       payload._docsPrivileged = this.auth.hasValidDocsKey(req);
+      payload._wikiPrivileged = this.auth.hasValidWikiKey(req);
       const result = await this.clients.send(
         route.client,
         route.pattern,
