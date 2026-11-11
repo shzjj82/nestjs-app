@@ -2,7 +2,7 @@ import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
-import { MQTT_PATTERNS, USER_CLIENT, type TeamRole } from '@app/common';
+import { MQTT_PATTERNS, WIKI_CLIENT, type TeamRole } from '@app/common';
 import { rpcFail } from '../common/rpc';
 
 export interface TeamGrant {
@@ -12,10 +12,10 @@ export interface TeamGrant {
 
 @Injectable()
 export class TeamAccess implements OnModuleInit {
-  constructor(@Inject(USER_CLIENT) private readonly users: ClientProxy) {}
+  constructor(@Inject(WIKI_CLIENT) private readonly wiki: ClientProxy) {}
 
   async onModuleInit() {
-    await this.users.connect();
+    await this.wiki.connect();
   }
 
   async grants(input: {
@@ -24,7 +24,7 @@ export class TeamAccess implements OnModuleInit {
     bizCode: string;
   }): Promise<TeamGrant[]> {
     const raw = await this.send<{ items?: TeamGrant[] }>(
-      MQTT_PATTERNS.TEAM_MEMBERSHIPS,
+      MQTT_PATTERNS.WIKI_TEAM_MEMBERSHIPS,
       input,
     );
     return Array.isArray(raw?.items) ? raw.items : [];
@@ -33,7 +33,7 @@ export class TeamAccess implements OnModuleInit {
   private async send<T>(pattern: string, data: unknown): Promise<T> {
     try {
       return await lastValueFrom(
-        this.users.send<T>(pattern, data).pipe(timeout(8000)),
+        this.wiki.send<T>(pattern, data).pipe(timeout(8000)),
       );
     } catch (err) {
       const status = rpcStatus(err);

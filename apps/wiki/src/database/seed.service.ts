@@ -10,6 +10,7 @@ export class SeedService implements OnModuleInit {
 
   async onModuleInit() {
     await this.copyFromSharedDatabase();
+    await this.copyTeamsFromUsercenter();
     const local = await this.dataSource.query(
       `SELECT count(*)::int AS n FROM doc_documents`,
     );
@@ -17,6 +18,74 @@ export class SeedService implements OnModuleInit {
       await dropLegacySharedDocTables(this.logger);
     }
     this.logger.log('文档服务已就绪');
+  }
+
+  /** wiki_teams 为空时，从 usercenter 库 uc_teams / uc_team_members 一次性拷贝（保留 id，幂等） */
+  private async copyTeamsFromUsercenter() {
+    const local = await this.dataSource.query(
+      `SELECT count(*)::int AS n FROM wiki_teams`,
+    );
+    if (Number(local[0]?.n ?? 0) > 0) {
+      return;
+    }
+    const src = await openSharedDatabase();
+    if (!src) {
+      return;
+    }
+    try {
+      const exists = await src.query(
+        `SELECT to_regclass('public.uc_teams') AS name`,
+      );
+      if (!exists[0]?.name) {
+        return;
+      }
+      const remote = await src.query(`SELECT count(*)::int AS n FROM uc_teams`);
+      if (Number(remote[0]?.n ?? 0) === 0) {
+        return;
+      }
+      const teams = await src.query(`SELECT * FROM uc_teams`);
+      for (const row of teams) {
+        await this.dataSource.query(
+          `INSERT INTO wiki_teams
+            (id, app_code, biz_code, code, name, description, status, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            row.id,
+            row.app_code,
+            row.biz_code,
+            row.code,
+            row.name,
+            row.description ?? null,
+            row.status ?? 1,
+            row.created_at,
+            row.updated_at,
+          ],
+        );
+      }
+      const members = await src.query(`SELECT * FROM uc_team_members`);
+      for (const row of members) {
+        await this.dataSource.query(
+          `INSERT INTO wiki_team_members
+            (id, team_id, account_id, role, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            row.id,
+            row.team_id,
+            row.account_id,
+            row.role,
+            row.created_at,
+            row.updated_at,
+          ],
+        );
+      }
+      this.logger.log(
+        `已从 usercenter 迁入团队 ${teams.length}、成员 ${members.length}`,
+      );
+    } finally {
+      await src.destroy();
+    }
   }
 
   private async copyFromSharedDatabase() {

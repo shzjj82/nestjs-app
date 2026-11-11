@@ -128,7 +128,12 @@ const businessFeatures: FeatureCatalogItem[] = [
     name: '查询团队',
     description: '查看团队列表与详情',
     sort: 40,
-    apis: ['GET /teams', 'GET /teams/:id'],
+    apis: [
+      'GET /wiki/teams',
+      'GET /wiki/teams/:id',
+      'GET /teams',
+      'GET /teams/:id',
+    ],
   },
   {
     scope: 'business',
@@ -138,6 +143,11 @@ const businessFeatures: FeatureCatalogItem[] = [
     description: '创建、加入、刷新邀请码、退出、调整成员',
     sort: 50,
     apis: [
+      'POST /wiki/teams',
+      'POST /wiki/teams/join',
+      'POST /wiki/teams/:id/code',
+      'POST /wiki/teams/:id/leave',
+      'PATCH /wiki/teams/:id/members/:accountId',
       'POST /teams',
       'POST /teams/join',
       'POST /teams/:id/code',

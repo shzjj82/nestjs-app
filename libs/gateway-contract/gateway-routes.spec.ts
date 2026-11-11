@@ -111,10 +111,15 @@ describe('matchRoute', () => {
     expect(matchRoute('PUT', '/wiki/categories/abc')?.auth).toEqual(['jwt', 'wiki-key']);
   });
 
-  it('registers team routes for the signed-in account', () => {
-    expect(matchRoute('POST', '/teams')?.pattern).toBe(MQTT_PATTERNS.TEAM_CREATE);
-    expect(matchRoute('POST', '/teams/join')?.pattern).toBe(MQTT_PATTERNS.TEAM_JOIN);
-    expect(matchRoute('POST', '/teams/team-1/code')?.pattern).toBe(MQTT_PATTERNS.TEAM_REFRESH_CODE);
+  it('registers team routes on wiki (including /teams alias)', () => {
+    expect(matchRoute('POST', '/teams')?.client).toBe('WIKI_CLIENT');
+    expect(matchRoute('POST', '/teams')?.pattern).toBe(MQTT_PATTERNS.WIKI_TEAM_CREATE);
+    expect(matchRoute('POST', '/teams/join')?.pattern).toBe(MQTT_PATTERNS.WIKI_TEAM_JOIN);
+    expect(matchRoute('POST', '/teams/team-1/code')?.pattern).toBe(
+      MQTT_PATTERNS.WIKI_TEAM_REFRESH_CODE,
+    );
+    expect(matchRoute('GET', '/wiki/teams')?.client).toBe('WIKI_CLIENT');
+    expect(matchRoute('POST', '/wiki/teams')?.pattern).toBe(MQTT_PATTERNS.WIKI_TEAM_CREATE);
     expect(matchRoute('PATCH', '/teams/team-1/members/acc-1')?.params).toEqual({
       id: 'team-1',
       accountId: 'acc-1',

@@ -9,8 +9,6 @@ export type { AccountType } from './account.entity';
 import { PermissionEntity } from './permission.entity';
 import { RoleEntity } from './role.entity';
 import { RolePermissionEntity } from './role-permission.entity';
-import { TeamEntity } from './team.entity';
-import { TeamMemberEntity } from './team-member.entity';
 import { UserEntity } from './user.entity';
 
 export const USERCENTER_ENTITIES = [
@@ -24,8 +22,6 @@ export const USERCENTER_ENTITIES = [
   AccountRoleEntity,
   BusinessMemberEntity,
   BusinessPermissionEntity,
-  TeamEntity,
-  TeamMemberEntity,
 ];
 
 export {
@@ -38,7 +34,5 @@ export {
   PermissionEntity,
   RoleEntity,
   RolePermissionEntity,
-  TeamEntity,
-  TeamMemberEntity,
   UserEntity,
 };

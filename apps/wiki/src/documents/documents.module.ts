@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AGENTS_CLIENT, mqttClientOptions, USER_CLIENT } from '@app/common';
+import { AGENTS_CLIENT, mqttClientOptions } from '@app/common';
 import { CategoriesModule } from '../categories/categories.module';
 import { DocumentEntity } from '../entities';
+import { TeamsModule } from '../teams/teams.module';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { RagNotify } from './rag-notify';
@@ -13,11 +14,8 @@ import { TeamAccess } from './team-access';
   imports: [
     TypeOrmModule.forFeature([DocumentEntity]),
     CategoriesModule,
+    TeamsModule,
     ClientsModule.register([
-      {
-        name: USER_CLIENT,
-        ...mqttClientOptions('wiki-user'),
-      },
       {
         name: AGENTS_CLIENT,
         ...mqttClientOptions('wiki-agents'),

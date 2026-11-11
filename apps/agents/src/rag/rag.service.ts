@@ -7,7 +7,7 @@ import { timeout } from 'rxjs/operators';
 import { DataSource } from 'typeorm';
 import {
   MQTT_PATTERNS,
-  USER_CLIENT,
+  WIKI_CLIENT,
   type AgentRagSource,
 } from '@app/common';
 import { asRecord, optionalString, requiredString, rpcFail } from '../common/rpc';
@@ -42,13 +42,13 @@ export class RagService extends RagPort implements OnModuleInit {
   constructor(
     private readonly embedding: EmbeddingService,
     @InjectDataSource() private readonly db: DataSource,
-    @Inject(USER_CLIENT) private readonly users: ClientProxy,
+    @Inject(WIKI_CLIENT) private readonly wiki: ClientProxy,
   ) {
     super();
   }
 
   async onModuleInit() {
-    await this.users.connect();
+    await this.wiki.connect();
   }
 
   status() {
@@ -312,8 +312,11 @@ export class RagService extends RagPort implements OnModuleInit {
   }): Promise<string[]> {
     try {
       const raw = await lastValueFrom(
-        this.users
-          .send<{ items?: Array<{ teamId?: string }> }>(MQTT_PATTERNS.TEAM_MEMBERSHIPS, input)
+        this.wiki
+          .send<{ items?: Array<{ teamId?: string }> }>(
+            MQTT_PATTERNS.WIKI_TEAM_MEMBERSHIPS,
+            input,
+          )
           .pipe(timeout(8000)),
       );
       return (raw?.items ?? [])

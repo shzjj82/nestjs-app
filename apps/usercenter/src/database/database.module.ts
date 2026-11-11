@@ -4,7 +4,6 @@ import { databaseUrl } from '@app/common';
 import { DataSource, type DataSourceOptions } from 'typeorm';
 import { USERCENTER_ENTITIES } from '../entities';
 import { captureLegacyPasswords, migrateLegacyAccounts } from './legacy-accounts';
-import { backfillTeamCodes } from './team-codes';
 import { SeedService } from './seed.service';
 
 @Module({
@@ -21,7 +20,6 @@ import { SeedService } from './seed.service';
       dataSourceFactory: async (options) => {
         const ds = await new DataSource(options as DataSourceOptions).initialize();
         await captureLegacyPasswords(ds);
-        await backfillTeamCodes(ds);
         if (process.env.TYPEORM_SYNC !== 'false') {
           await ds.synchronize();
         }

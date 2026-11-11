@@ -9,38 +9,32 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import type { TeamRole } from '@app/common';
-import { AccountEntity } from './account.entity';
 import { TeamEntity } from './team.entity';
 
-/** 团队成员挂在账户上，不挂在用户上 */
-@Entity('uc_team_members')
+/** 团队成员只存 accountId，账户详情按需向 usercenter 查询 */
+@Entity('wiki_team_members')
 @Index(['teamId', 'accountId'], { unique: true })
 @Index(['accountId'])
 export class TeamMemberEntity {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ name: 'team_id', type: 'uuid' })
-  teamId: string;
+  teamId!: string;
 
   @Column({ name: 'account_id', type: 'uuid' })
-  accountId: string;
+  accountId!: string;
 
-  /** owner 拥有者 / developer 开发者 / user 使用者 */
   @Column({ type: 'varchar', length: 16 })
-  role: TeamRole;
+  role!: TeamRole;
 
   @ManyToOne(() => TeamEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'team_id' })
-  team: TeamEntity;
-
-  @ManyToOne(() => AccountEntity, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'account_id' })
-  account: AccountEntity;
+  team!: TeamEntity;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
-  updatedAt: Date;
+  updatedAt!: Date;
 }

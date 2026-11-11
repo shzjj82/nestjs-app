@@ -5,12 +5,14 @@ import { DatabaseModule } from './database/database.module';
 import { SeedService } from './database/seed.service';
 import { WikiController } from './wiki.controller';
 import { DocumentsModule } from './documents/documents.module';
+import { TeamsModule } from './teams/teams.module';
 
 @Module({
   imports: [
     DatabaseModule,
     CategoriesModule,
     DocumentsModule,
+    TeamsModule,
     ApiDocsModule.forService({
       service: 'wiki',
       label: 'Wiki 模块',

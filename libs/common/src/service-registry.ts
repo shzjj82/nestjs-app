@@ -48,7 +48,6 @@ export const MICROSERVICES: readonly MicroserviceEntry[] = [
       'users',
       'accounts',
       'businesses',
-      'teams',
       'clients',
       'roles',
       'permissions',
