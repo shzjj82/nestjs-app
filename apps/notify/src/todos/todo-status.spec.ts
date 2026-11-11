@@ -11,9 +11,10 @@ describe('todo-status', () => {
     expect(normalizeTodoStatus('pending')).toBe('pending');
   });
 
-  it('parses comma status filters and maps open', () => {
+  it('parses comma status filters; open means all active', () => {
     expect(parseStatusFilter('pending,in_progress')).toEqual(['pending', 'in_progress']);
-    expect(parseStatusFilter('open')).toEqual(['pending']);
+    expect(parseStatusFilter('open')).toEqual(['pending', 'in_progress']);
+    expect(parseStatusFilter('open,done')).toEqual(['pending', 'in_progress', 'done']);
   });
 
   it('allows pending → in_progress and active → done/cancelled', () => {

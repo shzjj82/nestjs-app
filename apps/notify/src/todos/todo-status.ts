@@ -22,6 +22,10 @@ export function isActiveStatus(status: string): boolean {
   return ACTIVE.includes(normalized as CanonicalTodoStatus);
 }
 
+/**
+ * 列表过滤。旧客户端 `status=open` 表示「未结束」= pending + in_progress
+ * （不是仅 pending）；done / cancelled 才被排除。
+ */
 export function parseStatusFilter(raw: unknown): CanonicalTodoStatus[] | undefined {
   if (raw === undefined || raw === null || raw === '') {
     return undefined;
@@ -33,7 +37,16 @@ export function parseStatusFilter(raw: unknown): CanonicalTodoStatus[] | undefin
   if (!text.length) {
     return undefined;
   }
-  return text.map((part) => normalizeTodoStatus(part));
+  const out = new Set<CanonicalTodoStatus>();
+  for (const part of text) {
+    if (part === 'open') {
+      out.add('pending');
+      out.add('in_progress');
+      continue;
+    }
+    out.add(normalizeTodoStatus(part));
+  }
+  return [...out];
 }
 
 export function applyStatusTransition(input: {
