@@ -102,4 +102,16 @@ describe('notify input', () => {
     expect(command.startsAt).toBe('2026-10-27');
     expect(command.content).toBeUndefined();
   });
+
+  it('maps PATCH status=open to data.localStatus', () => {
+    const command = parseUpdateMine({
+      title: '实时语音',
+      category: 'page',
+      dueAt: '2026-10-27T23:59:59.000Z',
+      startsAt: '2026-10-27',
+      status: 'open',
+      data: { localStatus: 'in_progress', notify: true },
+    });
+    expect(command.status).toBe('in_progress');
+  });
 });

@@ -3,6 +3,7 @@ import {
   normalizeTodoStatus,
   parseStatusFilter,
   reopenTargetStatus,
+  resolvePatchStatus,
 } from './todo-status';
 
 describe('todo-status', () => {
@@ -48,5 +49,17 @@ describe('todo-status', () => {
         now,
       }).status,
     ).toBe('in_progress');
+  });
+
+  it('allows in_progress → pending', () => {
+    expect(
+      applyStatusTransition({ current: 'in_progress', next: 'pending', startsAt: null }).status,
+    ).toBe('pending');
+  });
+
+  it('resolves PATCH open via data.localStatus', () => {
+    expect(resolvePatchStatus('open', { localStatus: 'in_progress' })).toBe('in_progress');
+    expect(resolvePatchStatus('open', {})).toBeUndefined();
+    expect(resolvePatchStatus('done', null)).toBe('done');
   });
 });

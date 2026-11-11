@@ -13,6 +13,7 @@ import {
   applyStatusTransition,
   normalizeTodoStatus,
   parseStatusFilter,
+  resolvePatchStatus,
   type CanonicalTodoStatus,
 } from '../todos/todo-status';
 
@@ -175,6 +176,10 @@ export function parseSend(
       parsed.startsAt = start;
     }
   }
+  // 编辑器兼容：status=open 时细态看 data.localStatus
+  if (String(payload.status ?? '') === 'open') {
+    parsed.status = resolvePatchStatus('open', parsed.data) ?? 'pending';
+  }
   return parsed;
 }
 
@@ -218,14 +223,7 @@ const updateMineSchema = z.object({
   data: dataSchema,
   dueAt: dueAtSchema,
   startsAt: startsAtSchema.optional(),
-  status: z
-    .preprocess((value) => {
-      if (value === undefined || value === null || value === '') {
-        return undefined;
-      }
-      return normalizeTodoStatus(String(value));
-    }, z.enum(['pending', 'in_progress', 'done', 'cancelled']).optional())
-    .optional(),
+  status: z.string().optional(),
 });
 
 export type UpdateMineCommand = {
@@ -239,5 +237,22 @@ export type UpdateMineCommand = {
 };
 
 export function parseUpdateMine(payload: Record<string, unknown>): UpdateMineCommand {
-  return parseWith(updateMineSchema, payload) as UpdateMineCommand;
+  const parsed = parseWith(updateMineSchema, payload) as {
+    title: string;
+    content?: string;
+    category: string;
+    data: Record<string, unknown> | null;
+    dueAt: Date | null;
+    startsAt?: string | null;
+    status?: string;
+  };
+  return {
+    title: parsed.title,
+    content: parsed.content,
+    category: parsed.category,
+    data: parsed.data,
+    dueAt: parsed.dueAt,
+    startsAt: parsed.startsAt,
+    status: resolvePatchStatus(parsed.status ?? payload.status, parsed.data),
+  };
 }

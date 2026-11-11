@@ -107,7 +107,10 @@ export function applyStatusTransition(input: {
     };
   }
 
-  // reopen → pending
+  // next === pending：活跃态可回退；结束态则 reopen
+  if (current === 'pending' || current === 'in_progress') {
+    return { status: 'pending' };
+  }
   if (current !== 'done' && current !== 'cancelled') {
     rpcFail(400, '仅已完成或已终止的待办可重新打开');
   }
@@ -116,6 +119,36 @@ export function applyStatusTransition(input: {
     clearFinished: true,
     clearCancelled: true,
   };
+}
+
+/**
+ * 编辑器兼容：顶层 status=open 只表示「未结束」，细态在 data.localStatus。
+ * - open + localStatus → 用 localStatus
+ * - 仅 open → 不改状态（undefined）
+ */
+export function resolvePatchStatus(
+  rawStatus: unknown,
+  data: Record<string, unknown> | null | undefined,
+): CanonicalTodoStatus | undefined {
+  if (rawStatus === undefined || rawStatus === null || rawStatus === '') {
+    return undefined;
+  }
+  const raw = String(rawStatus).trim();
+  if (raw === 'open') {
+    const local =
+      data && typeof data.localStatus === 'string' ? data.localStatus.trim() : '';
+    if (
+      local === 'pending' ||
+      local === 'in_progress' ||
+      local === 'done' ||
+      local === 'cancelled' ||
+      local === 'open'
+    ) {
+      return normalizeTodoStatus(local === 'open' ? 'pending' : local);
+    }
+    return undefined;
+  }
+  return normalizeTodoStatus(raw);
 }
 
 /** reopen：按 startsAt 与今天决定 pending / in_progress */
