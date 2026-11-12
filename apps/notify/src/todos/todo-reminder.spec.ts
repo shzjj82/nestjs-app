@@ -12,7 +12,7 @@ describe('TodoReminder', () => {
     query.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
   }
 
-  it('auto-starts a wiki pending todo and sends todo.started once', async () => {
+  it('sends todo.started on start day without changing status', async () => {
     const row = {
       id: '11111111-1111-1111-1111-111111111111',
       bizCode: 'wiki',
@@ -27,29 +27,21 @@ describe('TodoReminder', () => {
     const query = jest
       .fn()
       .mockResolvedValueOnce([row]) // started select
-      .mockResolvedValueOnce([
-        {
-          ...row,
-          status: 'in_progress',
-          startedAt: now,
-          startedNoticeAt: now,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ]) // claim
+      .mockResolvedValueOnce([{ id: row.id }]) // claim started_notice_at only
       .mockResolvedValueOnce([]) // overdue
       .mockResolvedValueOnce([]) // progress
       .mockResolvedValueOnce([]); // legacy
     const send = jest.fn().mockResolvedValue({ id: 'notice-1' });
-    const pushTodo = jest.fn().mockResolvedValue(undefined);
     const sent = await deliverDueTodos(
-      { query, send, warn: () => undefined, pushTodo },
+      { query, send, warn: () => undefined },
       now,
       'midnight',
     );
 
     expect(sent).toBe(1);
     expect(String(query.mock.calls[0][0])).toContain("source = 'wiki'");
+    expect(String(query.mock.calls[1][0])).toContain('SET started_notice_at');
+    expect(String(query.mock.calls[1][0])).not.toContain("status = 'in_progress'");
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
         title: '待办已开始',
@@ -61,7 +53,6 @@ describe('TodoReminder', () => {
         }),
       }),
     );
-    expect(pushTodo).toHaveBeenCalled();
   });
 
   it('sends progress for in_progress wiki todos within the window', async () => {

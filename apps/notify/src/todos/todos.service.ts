@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { rpcFail } from '@app/common';
 import type { NotifyTodo } from '@app/notify-contract';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import {
   bizCodeOf,
   parseSend,
@@ -38,6 +38,8 @@ export class TodosService {
       .createQueryBuilder('todo')
       .where('todo.biz_code = :bizCode', { bizCode: bizCodeOf(payload) })
       .andWhere('todo.user_id = :userId', { userId: actor.userId })
+      // 列表壳 kind=list 不是任务；铃铛/待办栏只看 task（或缺省旧数据）
+      .andWhere(`(todo.data->>'kind' IS NULL OR todo.data->>'kind' <> 'list')`)
       .orderBy('todo.created_at', 'DESC')
       .skip(page.skip)
       .take(page.pageSize);
@@ -57,13 +59,15 @@ export class TodosService {
 
   async openCount(payload: Record<string, unknown>) {
     const actor = requireActor(payload);
-    const count = await this.todos.count({
-      where: {
-        bizCode: bizCodeOf(payload),
-        userId: actor.userId,
-        status: In(['pending', 'in_progress', 'open']),
-      },
-    });
+    const count = await this.todos
+      .createQueryBuilder('todo')
+      .where('todo.biz_code = :bizCode', { bizCode: bizCodeOf(payload) })
+      .andWhere('todo.user_id = :userId', { userId: actor.userId })
+      .andWhere('todo.status IN (:...statuses)', {
+        statuses: ['pending', 'in_progress', 'open'],
+      })
+      .andWhere(`(todo.data->>'kind' IS NULL OR todo.data->>'kind' <> 'list')`)
+      .getCount();
     return { count };
   }
 

@@ -1,8 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { NotifyTodo } from '@app/notify-contract';
 import type { Repository } from 'typeorm';
-import { pushRealtime } from '../common/push';
 import { NoticesService } from '../notices/notices.service';
 import { TodoEntity } from '../entities';
 import { msUntilNextShanghaiMidnight } from './shanghai-day';
@@ -27,12 +25,13 @@ export class TodoReminder implements OnApplicationBootstrap, OnApplicationShutdo
   onApplicationShutdown() {
     if (this.timer) {
       clearTimeout(this.timer);
-      this.timer = null;
     }
+    this.timer = null;
   }
 
   /**
-   * 每日上海日：wiki 待办 started / progress / overdue；非 wiki 保留截止日当天提醒。
+   * 每日上海日：wiki 待办 started / progress / overdue 通知；
+   * 开始日只发通知，不自动改 status。非 wiki 保留截止日当天提醒。
    */
   async remind(now: Date, mode: RemindMode): Promise<number> {
     const sent = await deliverDueTodos(
@@ -40,13 +39,6 @@ export class TodoReminder implements OnApplicationBootstrap, OnApplicationShutdo
         query: (sql, params) => this.todos.query(sql, params),
         send: (command) => this.notices.send(command),
         warn: (message) => this.logger.warn(message),
-        pushTodo: async (item) => {
-          await pushRealtime({
-            kind: 'todo',
-            action: 'updated',
-            item: item as unknown as NotifyTodo,
-          });
-        },
       },
       now,
       mode,

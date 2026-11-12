@@ -29,8 +29,6 @@ export interface DueTodoDeps {
   query: (sql: string, params: unknown[]) => Promise<unknown>;
   send: (command: SendCommand) => Promise<unknown>;
   warn: (message: string) => void;
-  /** wiki 自动开始后推 socket todo.updated */
-  pushTodo?: (item: Record<string, unknown>) => Promise<void>;
 }
 
 /** wiki 三则通知 + 非 wiki 旧到期提醒 */
@@ -163,45 +161,31 @@ async function sendStarted(
   row: WikiTodoRow,
   now: Date,
 ): Promise<boolean> {
+  // 只记「开始日通知已发」，不改 status（pending → in_progress 由用户手动开始）
   const claimed = await deps.query(
     `
       UPDATE nt_todos
-      SET status = 'in_progress',
-          started_at = COALESCE(started_at, $1::timestamptz),
-          started_notice_at = $1::timestamptz
+      SET started_notice_at = $1::timestamptz
       WHERE id = $2
         AND status IN ('pending', 'open')
         AND started_notice_at IS NULL
-      RETURNING id, biz_code AS "bizCode", user_id AS "userId", title, content, category,
-                source, status, data, starts_at AS "startsAt", due_at AS "dueAt",
-                started_at AS "startedAt", finished_at AS "finishedAt",
-                cancelled_at AS "cancelledAt",
-                started_notice_at AS "startedNoticeAt",
-                last_progress_notice_on AS "lastProgressNoticeOn",
-                last_overdue_notice_on AS "lastOverdueNoticeOn",
-                created_at AS "createdAt", updated_at AS "updatedAt"
+      RETURNING id
     `,
     [now.toISOString(), row.id],
   );
-  const updated = Array.isArray(claimed) ? claimed[0] : null;
-  if (!updated) {
+  if (!Array.isArray(claimed) || claimed.length === 0) {
     return false;
   }
   try {
     await deps.send(
       noticeOf(row, 'todo.started', '待办已开始', `待办已开始：${row.title}。${row.content}`),
     );
-    if (deps.pushTodo) {
-      await deps.pushTodo(toTodoPush(updated as Record<string, unknown>));
-    }
     return true;
   } catch (err) {
     await deps.query(
       `
         UPDATE nt_todos
-        SET status = 'pending',
-            started_at = NULL,
-            started_notice_at = NULL
+        SET started_notice_at = NULL
         WHERE id = $1 AND started_notice_at IS NOT NULL
       `,
       [row.id],
@@ -433,34 +417,6 @@ function wikiDayParams(today: string, now: Date, mode: RemindMode): unknown[] {
     return [today, shanghaiStart(now).toISOString()];
   }
   return [today];
-}
-
-function toTodoPush(row: Record<string, unknown>): Record<string, unknown> {
-  const dueAt = row.dueAt instanceof Date ? row.dueAt.toISOString() : row.dueAt;
-  const startedAt =
-    row.startedAt instanceof Date ? row.startedAt.toISOString() : row.startedAt;
-  const finishedAt =
-    row.finishedAt instanceof Date ? row.finishedAt.toISOString() : row.finishedAt;
-  const cancelledAt =
-    row.cancelledAt instanceof Date ? row.cancelledAt.toISOString() : row.cancelledAt;
-  const startedNoticeAt =
-    row.startedNoticeAt instanceof Date
-      ? row.startedNoticeAt.toISOString()
-      : row.startedNoticeAt;
-  const createdAt =
-    row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt;
-  const updatedAt =
-    row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt;
-  return {
-    ...row,
-    dueAt: dueAt ?? null,
-    startedAt: startedAt ?? null,
-    finishedAt: finishedAt ?? null,
-    cancelledAt: cancelledAt ?? null,
-    startedNoticeAt: startedNoticeAt ?? null,
-    createdAt,
-    updatedAt,
-  };
 }
 
 function asWikiRows(value: unknown): WikiTodoRow[] {
