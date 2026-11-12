@@ -12,7 +12,8 @@ export class TodosController {
   @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_LIST))
   @ApiDoc({
     name: '我的待办',
-    description: '当前业务下本人的待办，可用 status=pending,in_progress,done,cancelled 过滤（兼容 open）',
+    description:
+      '当前业务下本人的待办；status 支持多值：pending,in_progress 或重复 query；也兼容旧 open（=pending+in_progress）',
   })
   list(payload: Record<string, unknown>) {
     return this.todos.list(payload);

@@ -23,22 +23,18 @@ export function isActiveStatus(status: string): boolean {
 }
 
 /**
- * 列表过滤。旧客户端 `status=open` 表示「未结束」= pending + in_progress
- * （不是仅 pending）；done / cancelled 才被排除。
+ * 列表过滤，支持：
+ * - `status=pending,in_progress`（逗号分隔）
+ * - `status=pending&status=in_progress` / 数组
+ * 旧客户端 `status=open` 表示「未结束」= pending + in_progress（不是仅 pending）。
  */
 export function parseStatusFilter(raw: unknown): CanonicalTodoStatus[] | undefined {
-  if (raw === undefined || raw === null || raw === '') {
-    return undefined;
-  }
-  const text = String(raw)
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean);
-  if (!text.length) {
+  const parts = flattenStatusParts(raw);
+  if (!parts.length) {
     return undefined;
   }
   const out = new Set<CanonicalTodoStatus>();
-  for (const part of text) {
+  for (const part of parts) {
     if (part === 'open') {
       out.add('pending');
       out.add('in_progress');
@@ -47,6 +43,20 @@ export function parseStatusFilter(raw: unknown): CanonicalTodoStatus[] | undefin
     out.add(normalizeTodoStatus(part));
   }
   return [...out];
+}
+
+/** 把 query 里的 string / string[] / 逗号串摊平成 token */
+function flattenStatusParts(raw: unknown): string[] {
+  if (raw === undefined || raw === null || raw === '') {
+    return [];
+  }
+  if (Array.isArray(raw)) {
+    return raw.flatMap((item) => flattenStatusParts(item));
+  }
+  return String(raw)
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 export function applyStatusTransition(input: {

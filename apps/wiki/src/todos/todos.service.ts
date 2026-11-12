@@ -42,9 +42,12 @@ export class TodosService implements OnModuleInit {
   }
 
   list(payload: Record<string, unknown>) {
-    return this.call(MQTT_PATTERNS.TODO_LIST, this.scoped(payload)).then((result) =>
-      this.enrichList(result, optionalString(payload.pageId)),
-    );
+    // 规范成逗号串，兼容 status=a,b 与 status=a&status=b，交给 notify 做 IN 过滤
+    const status = normalizeStatusQuery(payload.status);
+    return this.call(
+      MQTT_PATTERNS.TODO_LIST,
+      this.scoped(status === undefined ? payload : { ...payload, status }),
+    ).then((result) => this.enrichList(result, optionalString(payload.pageId)));
   }
 
   openCount(payload: Record<string, unknown>) {
@@ -271,4 +274,19 @@ function rpcStatus(err: unknown): { code: number; message: string } | null {
     return { code: source.status, message: String(source.message) };
   }
   return null;
+}
+
+/** 列表 status：数组或逗号串都收成 `pending,in_progress` 形式 */
+function normalizeStatusQuery(raw: unknown): string | undefined {
+  if (raw === undefined || raw === null || raw === '') {
+    return undefined;
+  }
+  const parts = (Array.isArray(raw) ? raw : [raw])
+    .flatMap((item) => String(item).split(','))
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (!parts.length) {
+    return undefined;
+  }
+  return [...new Set(parts)].join(',');
 }

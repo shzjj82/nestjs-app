@@ -21,7 +21,8 @@ export class TodosController {
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_LIST))
   @ApiDoc({
     name: 'Wiki 我的待办',
-    description: 'wiki 业务下本人待办；可传 pageId 只看某篇文章相关的待办',
+    description:
+      'wiki 业务下本人待办；status 支持多值（pending,in_progress 或重复 query）；可传 pageId 只看某篇文章相关的待办',
   })
   list(payload: Record<string, unknown>) {
     return this.todos.list(payload);

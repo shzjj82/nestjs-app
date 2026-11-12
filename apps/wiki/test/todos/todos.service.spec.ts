@@ -64,4 +64,42 @@ describe('wiki TodosService start/reopen', () => {
       expect.objectContaining({ id: 'todo-1', _bizCode: WIKI_BIZ_CODE }),
     );
   });
+
+  it('forwards multi status filter as comma string to TODO_LIST', async () => {
+    const send = jest.fn();
+    const notify = {
+      connect: jest.fn().mockResolvedValue(undefined),
+      send: (...args: unknown[]) => {
+        send(...args);
+        return of({ items: [], total: 0, page: 1, pageSize: 100 });
+      },
+    };
+    const service = new TodosService({} as never, {} as never, notify as never);
+
+    await service.list({
+      status: ['pending', 'in_progress'],
+      page: 1,
+      pageSize: 100,
+      _session: { userId: 'u1', accountId: 'a1' },
+    });
+    expect(send).toHaveBeenCalledWith(
+      MQTT_PATTERNS.TODO_LIST,
+      expect.objectContaining({
+        status: 'pending,in_progress',
+        page: 1,
+        pageSize: 100,
+        _bizCode: WIKI_BIZ_CODE,
+      }),
+    );
+
+    send.mockClear();
+    await service.list({
+      status: 'pending,in_progress',
+      _session: { userId: 'u1', accountId: 'a1' },
+    });
+    expect(send).toHaveBeenCalledWith(
+      MQTT_PATTERNS.TODO_LIST,
+      expect.objectContaining({ status: 'pending,in_progress' }),
+    );
+  });
 });
