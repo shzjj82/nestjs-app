@@ -16,6 +16,7 @@ import {
 import { pushRealtime } from '../common/push';
 import { TodoEntity } from '../entities';
 import { shanghaiDayOf } from './shanghai-day';
+import { asPageIds } from './todo-page-ids';
 import {
   applyStatusTransition,
   normalizeTodoStatus,
@@ -192,6 +193,36 @@ export class TodosService {
     const view = toView(row);
     await pushRealtime({ kind: 'todo', action: 'updated', item: view });
     return view;
+  }
+
+  /** 内部：文档删除时按 pageId 物理删除 wiki 待办 */
+  async deleteByPages(payload: Record<string, unknown>) {
+    const bizCode = bizCodeOf(payload);
+    const pageIds = asPageIds(payload.pageIds ?? payload.pageId);
+    if (!pageIds.length) {
+      rpcFail(400, 'pageIds 必填');
+    }
+    const rows = (await this.todos.query(
+      `
+        DELETE FROM nt_todos
+        WHERE biz_code = $1
+          AND source = 'wiki'
+          AND (
+            data->>'pageId' = ANY($2::text[])
+            OR COALESCE(data->'page'->>'id', '') = ANY($2::text[])
+          )
+        RETURNING id, biz_code AS "bizCode", user_id AS "userId"
+      `,
+      [bizCode, pageIds],
+    )) as Array<{ id: string; bizCode: string; userId: string }>;
+    for (const row of rows) {
+      await pushRealtime({
+        kind: 'todo',
+        action: 'deleted',
+        item: { id: row.id, bizCode: row.bizCode, userId: row.userId },
+      });
+    }
+    return { deleted: rows.length, ids: rows.map((row) => row.id) };
   }
 
   private applyTransition(row: TodoEntity, next: CanonicalTodoStatus) {

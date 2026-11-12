@@ -69,7 +69,12 @@ export type NotifyRealtimeEvent =
       action: 'read-all';
       item: { bizCode: string; userId: string; updated: number };
     }
-  | { kind: 'todo'; action: 'created' | 'updated'; item: NotifyTodo };
+  | { kind: 'todo'; action: 'created' | 'updated'; item: NotifyTodo }
+  | {
+      kind: 'todo';
+      action: 'deleted';
+      item: { id: string; bizCode: string; userId: string };
+    };
 
 export interface NotifySendInput {
   bizCode: string;

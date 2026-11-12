@@ -101,4 +101,14 @@ export class TodosController {
     requireInternal(payload);
     return this.todos.patchData(payload);
   }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_DELETE_BY_PAGES))
+  @ApiDoc({
+    name: '按页面删除待办',
+    description: '内部接口：文档删除时物理删除 source=wiki 且关联这些 pageId 的待办',
+  })
+  deleteByPages(payload: Record<string, unknown>) {
+    requireInternal(payload);
+    return this.todos.deleteByPages(payload);
+  }
 }

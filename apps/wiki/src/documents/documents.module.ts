@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AGENTS_CLIENT, mqttClientOptions } from '@app/common';
+import { AGENTS_CLIENT, NOTIFY_CLIENT, mqttClientOptions } from '@app/common';
 import { CategoriesModule } from '../categories/categories.module';
 import { DocumentEntity } from '../entities';
 import { TeamsModule } from '../teams/teams.module';
@@ -9,6 +9,7 @@ import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { RagNotify } from './rag-notify';
 import { TeamAccess } from './team-access';
+import { TodoPageCleanup } from './todo-page-cleanup';
 
 @Module({
   imports: [
@@ -20,10 +21,14 @@ import { TeamAccess } from './team-access';
         name: AGENTS_CLIENT,
         ...mqttClientOptions('wiki-agents'),
       },
+      {
+        name: NOTIFY_CLIENT,
+        ...mqttClientOptions('wiki-docs-notify'),
+      },
     ]),
   ],
   controllers: [DocumentsController],
-  providers: [DocumentsService, TeamAccess, RagNotify],
+  providers: [DocumentsService, TeamAccess, RagNotify, TodoPageCleanup],
   exports: [DocumentsService, TeamAccess],
 })
 export class DocumentsModule {}

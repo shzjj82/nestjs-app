@@ -15,6 +15,7 @@ import { removedAttachmentKeys } from './attachment-keys';
 import { DocumentsService } from './documents.service';
 import { RagNotify } from './rag-notify';
 import { TeamAccess } from './team-access';
+import { TodoPageCleanup } from './todo-page-cleanup';
 import {
   isTreeView,
   parseVisibility,
@@ -29,6 +30,7 @@ export class DocumentsController {
     private readonly posts: DocumentsService,
     private readonly teamAccess: TeamAccess,
     private readonly rag: RagNotify,
+    private readonly todoPages: TodoPageCleanup,
   ) {}
 
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_POST_FIND_ALL))
@@ -192,15 +194,23 @@ export class DocumentsController {
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_POST_DELETE))
-  @ApiDoc({ name: '删除文档' })
+  @ApiDoc({ name: '删除文档', description: '删除文档及其子树，并级联清理关联 wiki 待办' })
   async remove(payload: Record<string, unknown>) {
     const id = requiredString(payload.id, 'id');
     await this.requireInBiz(payload);
     const grants = await this.grants(payload);
-    if (!(await this.posts.remove(id, authorAccountId(payload), grants.writable))) {
+    const deletedIds = await this.posts.remove(
+      id,
+      authorAccountId(payload),
+      grants.writable,
+    );
+    if (!deletedIds) {
       rpcFail(404, 'NOT_FOUND');
     }
-    this.rag.remove(id);
+    for (const pageId of deletedIds) {
+      this.rag.remove(pageId);
+    }
+    this.todoPages.removeByPages(deletedIds);
     return null;
   }
 

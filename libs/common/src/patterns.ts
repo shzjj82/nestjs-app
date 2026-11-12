@@ -286,6 +286,8 @@ export const MQTT_PATTERNS = {
   TODO_SEND: 'todo.send',
   /** 内部：仅补丁 data（含已结束待办，供 wiki 回填页面关联） */
   TODO_PATCH_DATA: 'todo.patchData',
+  /** 内部：按页面 id 物理删除 wiki 待办（文档删除级联） */
+  TODO_DELETE_BY_PAGES: 'todo.deleteByPages',
 } as const;
 
 export function sharePattern(group: string, pattern: string): string {

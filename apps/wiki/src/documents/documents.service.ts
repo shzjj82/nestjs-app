@@ -635,11 +635,11 @@ export class DocumentsService {
     id: string,
     actorId?: string,
     writableTeamIds?: readonly string[],
-  ): Promise<boolean> {
+  ): Promise<string[] | null> {
     return this.dataSource.transaction(async () => {
       const existing = await this.findById(id);
       if (!existing) {
-        return false;
+        return null;
       }
       this.assertArticleOwner(existing, actorId, writableTeamIds);
       const ids = await this.collectSubtree(id);
@@ -649,7 +649,7 @@ export class DocumentsService {
       for (const itemId of [...ids].reverse()) {
         await this.posts.delete({ id: itemId });
       }
-      return true;
+      return ids;
     });
   }
 
