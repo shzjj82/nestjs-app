@@ -8,6 +8,7 @@ import {
 import { ApprovalsModule } from './approvals/approvals.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { DatabaseModule } from './database/database.module';
+import { FacadeModule } from './facade/facade.module';
 import { IdentityModule } from './identity/identity.module';
 import { RecycleMqttModule } from './mqtt/recycle-mqtt.module';
 import { OrdersModule } from './orders/orders.module';
@@ -32,6 +33,7 @@ import { RecycleController } from './recycle.controller';
     CatalogModule,
     StoresModule,
     IdentityModule,
+    FacadeModule,
     OrdersModule,
     ApprovalsModule,
     ApiDocsModule.forService({

@@ -314,6 +314,9 @@ export const PLATFORM_BIZ_CODE = 'platform';
 /** wiki 编辑器单体产品：/wiki/* 由网关注入该 bizCode，前端无需带 X-Biz-Code */
 export const WIKI_BIZ_CODE = 'wiki';
 
+/** 回收产品登录：/recycle/auth/* 由网关注入该 bizCode，前端无需带 X-Biz-Code */
+export const RECYCLE_BIZ_CODE = 'recycle';
+
 export interface BusinessRegistryEntry {
   code: string;
   status: number;

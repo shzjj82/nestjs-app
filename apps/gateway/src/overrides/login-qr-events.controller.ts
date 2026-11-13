@@ -15,10 +15,14 @@ import { ClientHub } from '../mqtt/client.hub';
 
 /**
  * 登录小程序码实时通道：网关把 MQTT `auth/login/qr/{ticket}` 转成 SSE。
- * `/wiki/auth/...` 走同一实现，bizCode 由 BizGuard 注入为 wiki。
+ * `/wiki/auth/...` 与 `/recycle/auth/...` 走同一实现，bizCode 由 BizGuard 注入。
  * 浏览器也可用 mqtt.js 直连 Mosquitto WebSocket（默认 :9001）订阅同一 topic。
  */
-@Controller(['auth/login/qrcode', 'wiki/auth/login/qrcode'])
+@Controller([
+  'auth/login/qrcode',
+  'wiki/auth/login/qrcode',
+  'recycle/auth/login/qrcode',
+])
 export class LoginQrEventsController {
   constructor(
     private readonly clients: ClientHub,

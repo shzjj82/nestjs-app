@@ -21,6 +21,7 @@ export type GatewayHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
  * business：必须带已启用业务的 X-Biz-Code，token 属于该业务，且业务开通了该接口。
  *   功能点只针对业务层开放；业务内身份（客户 / 业务员 …）由下游服务限制。
  *   /wiki/* 例外：网关固定注入 bizCode=wiki，跳过按接口开通校验（编辑器单体产品）。
+ *   /recycle/auth/* 例外：网关固定注入 bizCode=recycle，跳过按接口开通校验（回收独立登录）。
  * 未设置：不校验业务（健康检查、登出）。
  */
 export type GatewayScope = 'platform' | 'business';
@@ -93,6 +94,28 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'GET', path: '/wiki/auth/me', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_ME, auth: ['jwt'] }),
   business({ method: 'POST', path: '/wiki/auth/bind-phone', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_BIND_PHONE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/wiki/auth/change-password', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AUTH_CHANGE_PASSWORD, auth: ['jwt'] }),
+
+  // 回收产品登录：前端走 /recycle/auth/*，无需 X-Biz-Code（网关注入 recycle）
+  business({ method: 'POST', path: '/recycle/auth/register', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_AUTH_REGISTER }),
+  business({ method: 'POST', path: '/recycle/auth/login', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_AUTH_LOGIN }),
+  business({ method: 'POST', path: '/recycle/auth/wechat', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_AUTH_WECHAT }),
+  business({ method: 'POST', path: '/recycle/auth/alipay', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_AUTH_ALIPAY }),
+  business({ method: 'POST', path: '/recycle/auth/refresh', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_AUTH_REFRESH }),
+  { method: 'POST', path: '/recycle/auth/logout', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_AUTH_LOGOUT },
+  business({ method: 'POST', path: '/recycle/auth/login/qrcode', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_AUTH_LOGIN_QR_CREATE }),
+  business({ method: 'POST', path: '/recycle/auth/login/qrcode/scan', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_AUTH_LOGIN_QR_SCAN }),
+  business({ method: 'POST', path: '/recycle/auth/login/qrcode/confirm', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_AUTH_LOGIN_QR_CONFIRM }),
+  business({ method: 'GET', path: '/recycle/auth/login/qrcode/:ticket', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_AUTH_LOGIN_QR_STATUS }),
+  business({
+    method: 'GET',
+    path: '/recycle/auth/login/qrcode/:ticket/events',
+    client: RECYCLE_CLIENT,
+    pattern: MQTT_PATTERNS.RECYCLE_AUTH_LOGIN_QR_STATUS,
+    override: true,
+  }),
+  business({ method: 'GET', path: '/recycle/auth/me', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_AUTH_ME, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/recycle/auth/bind-phone', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_AUTH_BIND_PHONE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/recycle/auth/change-password', client: RECYCLE_CLIENT, pattern: MQTT_PATTERNS.RECYCLE_AUTH_CHANGE_PASSWORD, auth: ['jwt'] }),
 
   platform({ method: 'GET', path: '/users', client: USER_CLIENT, pattern: MQTT_PATTERNS.USER_FIND_ALL, permissions: [PERMISSIONS.USER_QUERY] }),
   platform({ method: 'GET', path: '/users/:id', client: USER_CLIENT, pattern: MQTT_PATTERNS.USER_FIND_ONE, permissions: [PERMISSIONS.USER_QUERY] }),

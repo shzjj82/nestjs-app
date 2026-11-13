@@ -4,7 +4,7 @@ import {
   Inject,
   Injectable,
 } from '@nestjs/common';
-import { BIZ_REGISTRY_KEY, REDIS, WIKI_BIZ_CODE } from '@app/common';
+import { BIZ_REGISTRY_KEY, REDIS } from '@app/common';
 import { matchRoute } from '@app/gateway-contract';
 import type { BusinessRegistryEntry } from '@app/common';
 import type { Request } from 'express';
@@ -13,7 +13,7 @@ import { AuthService } from './auth.service';
 import type { GatewayUser } from './auth.types';
 import {
   evaluateBizAccess,
-  isWikiProductPath,
+  fixedProductBizCode,
   type BizRouteView,
 } from './biz-access';
 
@@ -44,8 +44,8 @@ export class BizGuard {
   ): Promise<string | null> {
     const headerCode = this.headerCode(req);
     const entries = await this.registry();
-    // wiki 单体产品固定查 wiki 注册表，不依赖前端 X-Biz-Code
-    const lookupCode = isWikiProductPath(route.path) ? WIKI_BIZ_CODE : headerCode;
+    // 单体产品固定查对应注册表，不依赖前端 X-Biz-Code
+    const lookupCode = fixedProductBizCode(route.path) ?? headerCode;
     const result = evaluateBizAccess({
       route,
       headerCode,

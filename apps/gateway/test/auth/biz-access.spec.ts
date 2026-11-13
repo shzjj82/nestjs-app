@@ -162,4 +162,50 @@ describe('evaluateBizAccess', () => {
       }),
     ).toMatchObject({ ok: false, status: 403 });
   });
+
+  it('defaults /recycle/auth/* to recycle without X-Biz-Code and skips api whitelist', () => {
+    const recycle = { code: 'recycle', status: 1, apis: [] };
+    expect(
+      evaluateBizAccess({
+        route: {
+          scope: 'business',
+          method: 'POST',
+          path: '/recycle/auth/wechat',
+        },
+        headerCode: null,
+        entry: recycle,
+        session: null,
+      }),
+    ).toEqual({ ok: true, bizCode: 'recycle' });
+  });
+
+  it('forces recycle login code even if another header is sent', () => {
+    expect(
+      evaluateBizAccess({
+        route: {
+          scope: 'business',
+          method: 'POST',
+          path: '/recycle/auth/login',
+        },
+        headerCode: 'blog',
+        entry: { code: 'recycle', status: 1, apis: [] },
+        session: null,
+      }),
+    ).toEqual({ ok: true, bizCode: 'recycle' });
+  });
+
+  it('still requires X-Biz-Code on other recycle apis', () => {
+    expect(
+      evaluateBizAccess({
+        route: {
+          scope: 'business',
+          method: 'GET',
+          path: '/recycle/orders',
+        },
+        headerCode: null,
+        entry: undefined,
+        session: null,
+      }),
+    ).toMatchObject({ ok: false, status: 400 });
+  });
 });

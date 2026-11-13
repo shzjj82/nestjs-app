@@ -87,8 +87,9 @@ const SCENE_DEFAULT_FIELDS: Record<string, Record<string, string>> = {
 /**
  * 回收业务除了自己的功能点之外，还依赖的「平台级但要按业务开通」的接口。
  * 刻意排除：
- *   - /auth/register、/auth/change-password：回收端没有自助注册入口；
+ *   - /auth/register、/auth/change-password：旧共享登录没有自助注册入口；
  *   - /auth/alipay：不用支付宝小程序；
+ *   产品登录走 /recycle/auth/*（含微信），网关固定注入 recycle，不依赖这份白名单。
  *   - /teams/*、/orders/*、/docs/*、/agents/*：最小部署不跑对应服务。
  */
 const BASELINE_EXTRA_APIS = [
