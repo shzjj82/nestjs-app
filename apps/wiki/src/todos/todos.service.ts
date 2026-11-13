@@ -26,7 +26,8 @@ import {
 } from './page-ref';
 
 /**
- * wiki 自有待办能力：页面关联在 wiki 侧强制完成，再交给 notify 持久化 / 提醒 / 推送。
+ * wiki 自有待办能力：页面关联在 wiki 侧强制完成，再交给 notify 持久化 / 推送。
+ * 催办定时与 kind 由 wiki TodoReminder 负责；notify 只提供存储占坑与投递。
  * 对外契约是 wiki 产品的，不是对 notify API 的透传。
  */
 @Injectable()

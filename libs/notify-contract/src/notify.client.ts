@@ -32,10 +32,12 @@ export type NotifyTodoStatus =
   | 'cancelled'
   | 'open';
 
+/** 通知 data.kind：客户端按 kind 做中英文案，服务端不写死自然语言 */
 export type NotifyTodoNoticeKind =
   | 'todo.started'
   | 'todo.progress'
-  | 'todo.overdue';
+  | 'todo.overdue'
+  | 'todo.due';
 
 export interface NotifyTodo {
   id: string;

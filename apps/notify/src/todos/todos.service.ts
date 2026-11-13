@@ -15,7 +15,7 @@ import {
 } from '../common/input';
 import { pushRealtime } from '../common/push';
 import { TodoEntity } from '../entities';
-import { shanghaiDayOf } from './shanghai-day';
+import { shanghaiDate, shanghaiDayOf } from './shanghai-day';
 import { asPageIds } from './todo-page-ids';
 import {
   applyStatusTransition,
@@ -23,6 +23,17 @@ import {
   reopenTargetStatus,
   type CanonicalTodoStatus,
 } from './todo-status';
+import {
+  isWikiRemindSlot,
+  wikiRemindClaimParams,
+  wikiRemindClaimSql,
+  wikiRemindListParams,
+  wikiRemindListSql,
+  wikiRemindReleaseParams,
+  wikiRemindReleaseSql,
+  type RemindMode,
+  type WikiRemindRow,
+} from './wiki-remind-store';
 
 @Injectable()
 export class TodosService {
@@ -195,6 +206,63 @@ export class TodosService {
     return view;
   }
 
+  /** 内部：wiki 催办扫描候选行（存储查询；何时/何种 kind 由 wiki 决定） */
+  async wikiRemindList(payload: Record<string, unknown>) {
+    const slot = payload.slot;
+    if (!isWikiRemindSlot(slot)) {
+      rpcFail(400, 'slot 须为 todo.started / todo.progress / todo.overdue');
+    }
+    const mode = payload.mode === 'catch-up' ? 'catch-up' : 'midnight';
+    const now = parseNow(payload.now);
+    const today = shanghaiDate(now);
+    const rows = (await this.todos.query(
+      wikiRemindListSql(slot, mode as RemindMode),
+      wikiRemindListParams(today, now, mode as RemindMode),
+    )) as WikiRemindRow[];
+    return { items: Array.isArray(rows) ? rows : [], today };
+  }
+
+  /** 内部：wiki 催办占坑 */
+  async wikiRemindClaim(payload: Record<string, unknown>) {
+    const slot = payload.slot;
+    if (!isWikiRemindSlot(slot)) {
+      rpcFail(400, 'slot 须为 todo.started / todo.progress / todo.overdue');
+    }
+    const id = requireUuid(payload.id, 'id');
+    const now = parseNow(payload.now);
+    const today =
+      typeof payload.today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(payload.today)
+        ? payload.today
+        : shanghaiDate(now);
+    const claimed = await this.todos.query(
+      wikiRemindClaimSql(slot),
+      wikiRemindClaimParams(slot, id, today, now),
+    );
+    return {
+      claimed: Array.isArray(claimed) && claimed.length > 0,
+      id,
+      today,
+    };
+  }
+
+  /** 内部：wiki 催办发送失败后释放占坑 */
+  async wikiRemindRelease(payload: Record<string, unknown>) {
+    const slot = payload.slot;
+    if (!isWikiRemindSlot(slot)) {
+      rpcFail(400, 'slot 须为 todo.started / todo.progress / todo.overdue');
+    }
+    const id = requireUuid(payload.id, 'id');
+    const today =
+      typeof payload.today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(payload.today)
+        ? payload.today
+        : shanghaiDate(parseNow(payload.now));
+    await this.todos.query(
+      wikiRemindReleaseSql(slot),
+      wikiRemindReleaseParams(slot, id, today),
+    );
+    return { released: true, id };
+  }
+
   /** 内部：文档删除时按 pageId 物理删除 wiki 待办 */
   async deleteByPages(payload: Record<string, unknown>) {
     const bizCode = bizCodeOf(payload);
@@ -268,6 +336,19 @@ function expandStatusQuery(statuses: CanonicalTodoStatus[]): string[] {
     set.add('open');
   }
   return [...set];
+}
+
+function parseNow(raw: unknown): Date {
+  if (typeof raw === 'string' || typeof raw === 'number') {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    return raw;
+  }
+  return new Date();
 }
 
 function toView(row: TodoEntity): NotifyTodo {

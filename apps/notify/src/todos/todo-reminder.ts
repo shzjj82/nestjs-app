@@ -1,11 +1,12 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { msUntilNextShanghaiMidnight } from '@app/common';
 import type { Repository } from 'typeorm';
 import { NoticesService } from '../notices/notices.service';
 import { TodoEntity } from '../entities';
-import { msUntilNextShanghaiMidnight } from './shanghai-day';
 import { deliverDueTodos, type RemindMode } from './todo-reminder-run';
 
+/** 仅非 wiki 待办截止日提醒；wiki 催办由 wiki 服务自己的 TodoReminder 负责 */
 @Injectable()
 export class TodoReminder implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(TodoReminder.name);
@@ -29,10 +30,6 @@ export class TodoReminder implements OnApplicationBootstrap, OnApplicationShutdo
     this.timer = null;
   }
 
-  /**
-   * 每日上海日：wiki 待办 started / progress / overdue 通知；
-   * 开始日只发通知，不自动改 status。非 wiki 保留截止日当天提醒。
-   */
   async remind(now: Date, mode: RemindMode): Promise<number> {
     const sent = await deliverDueTodos(
       {
@@ -44,7 +41,7 @@ export class TodoReminder implements OnApplicationBootstrap, OnApplicationShutdo
       mode,
     );
     if (sent > 0) {
-      this.logger.log(`已发送 ${sent} 条待办定时通知`);
+      this.logger.log(`已发送 ${sent} 条非 wiki 待办到期通知`);
     }
     return sent;
   }
@@ -56,7 +53,7 @@ export class TodoReminder implements OnApplicationBootstrap, OnApplicationShutdo
       void this.remind(new Date(), 'midnight')
         .catch((err: unknown) => {
           const message = err instanceof Error ? err.message : 'remind failed';
-          this.logger.error(`待办凌晨通知失败: ${message}`);
+          this.logger.error(`非 wiki 待办凌晨通知失败: ${message}`);
         })
         .finally(() => this.arm());
     }, wait);

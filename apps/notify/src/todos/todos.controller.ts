@@ -111,4 +111,34 @@ export class TodosController {
     requireInternal(payload);
     return this.todos.deleteByPages(payload);
   }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_WIKI_REMIND_LIST))
+  @ApiDoc({
+    name: 'wiki 催办候选',
+    description: '内部接口：按 slot 返回 wiki 待办候选；催办语义与定时由 wiki 负责',
+  })
+  wikiRemindList(payload: Record<string, unknown>) {
+    requireInternal(payload);
+    return this.todos.wikiRemindList(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_WIKI_REMIND_CLAIM))
+  @ApiDoc({
+    name: 'wiki 催办占坑',
+    description: '内部接口：写入 started/progress/overdue 通知标记，防止重复发送',
+  })
+  wikiRemindClaim(payload: Record<string, unknown>) {
+    requireInternal(payload);
+    return this.todos.wikiRemindClaim(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_WIKI_REMIND_RELEASE))
+  @ApiDoc({
+    name: 'wiki 催办释放',
+    description: '内部接口：发送通知失败时回滚催办标记',
+  })
+  wikiRemindRelease(payload: Record<string, unknown>) {
+    requireInternal(payload);
+    return this.todos.wikiRemindRelease(payload);
+  }
 }

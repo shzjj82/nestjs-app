@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { NOTIFY_CLIENT, mqttClientOptions } from '@app/common';
 import { DocumentsModule } from '../documents/documents.module';
+import { TodoReminder } from './todo-reminder';
 import { TodosController } from './todos.controller';
 import { TodosService } from './todos.service';
 
@@ -13,6 +14,6 @@ import { TodosService } from './todos.service';
     ]),
   ],
   controllers: [TodosController],
-  providers: [TodosService],
+  providers: [TodosService, TodoReminder],
 })
 export class TodosModule {}

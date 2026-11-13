@@ -288,6 +288,12 @@ export const MQTT_PATTERNS = {
   TODO_PATCH_DATA: 'todo.patchData',
   /** 内部：按页面 id 物理删除 wiki 待办（文档删除级联） */
   TODO_DELETE_BY_PAGES: 'todo.deleteByPages',
+  /** 内部：wiki 催办扫描候选（存储查询，语义由 wiki 决定） */
+  TODO_WIKI_REMIND_LIST: 'todo.wikiRemindList',
+  /** 内部：wiki 催办占坑（started / progress / overdue 标记） */
+  TODO_WIKI_REMIND_CLAIM: 'todo.wikiRemindClaim',
+  /** 内部：wiki 催办发送失败后释放占坑 */
+  TODO_WIKI_REMIND_RELEASE: 'todo.wikiRemindRelease',
 } as const;
 
 export function sharePattern(group: string, pattern: string): string {

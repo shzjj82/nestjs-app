@@ -12,6 +12,7 @@ export * from './redis';
 export * from './redis.module';
 export * from './rpc';
 export * from './service-registry';
+export * from './shanghai-day';
 export * from './token';
 export * from './types';
 export * from './upload.client';
