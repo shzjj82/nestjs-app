@@ -109,7 +109,6 @@ export const MQTT_PATTERNS = {
   WIKI_POST_REPARENT: 'wiki.post.reparent',
   WIKI_SHARE_CREATE: 'wiki.share.create',
   WIKI_SHARE_LIST: 'wiki.share.list',
-  WIKI_SHARE_REVOKE: 'wiki.share.revoke',
   WIKI_SHARE_VIEW: 'wiki.share.view',
   WIKI_SHARE_RESHARE: 'wiki.share.reshare',
   WIKI_CATEGORY_FIND_ALL: 'wiki.category.findAll',

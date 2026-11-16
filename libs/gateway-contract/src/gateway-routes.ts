@@ -183,7 +183,6 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   ...wikiContentRoutes('/wiki/documents'),
   business({ method: 'POST', path: '/wiki/shares', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_SHARE_CREATE, auth: ['jwt'] }),
   business({ method: 'GET', path: '/wiki/shares', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_SHARE_LIST, auth: ['jwt'] }),
-  business({ method: 'DELETE', path: '/wiki/shares/:token', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_SHARE_REVOKE, auth: ['jwt'] }),
   business({ method: 'GET', path: '/wiki/shares/view/:token', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_SHARE_VIEW, cacheControl: 'no-store' }),
   business({ method: 'POST', path: '/wiki/shares/view/:token/reshare', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_SHARE_RESHARE, cacheControl: 'no-store' }),
   { method: 'GET', path: '/wiki/health', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_HEALTH },

@@ -287,12 +287,11 @@ const businessFeatures: FeatureCatalogItem[] = [
     module: 'Wiki',
     code: 'wiki.share',
     name: '分享 Wiki',
-    description: '创建、列出、撤销页面分享，以及公开读取和再分享',
+    description: '创建、列出页面分享，以及公开读取和旧链接再分享',
     sort: 104,
     apis: [
       'POST /wiki/shares',
       'GET /wiki/shares',
-      'DELETE /wiki/shares/:token',
       'GET /wiki/shares/view/:token',
       'POST /wiki/shares/view/:token/reshare',
     ],

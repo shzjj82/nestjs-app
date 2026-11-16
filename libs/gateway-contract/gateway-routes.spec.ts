@@ -255,8 +255,7 @@ describe('matchRoute', () => {
     expect(matchRoute('POST', '/wiki/shares')?.auth).toEqual(['jwt']);
     expect(matchRoute('GET', '/wiki/shares')?.auth).toEqual(['jwt']);
     expect(matchRoute('GET', '/wiki/shares')?.pattern).toBe(MQTT_PATTERNS.WIKI_SHARE_LIST);
-    expect(matchRoute('DELETE', '/wiki/shares/tok')?.params).toEqual({ token: 'tok' });
-    expect(matchRoute('DELETE', '/wiki/shares/tok')?.auth).toEqual(['jwt']);
+    expect(matchRoute('DELETE', '/wiki/shares/tok')).toBeNull();
 
     const view = matchRoute('GET', '/wiki/shares/view/tok');
     expect(view?.pattern).toBe(MQTT_PATTERNS.WIKI_SHARE_VIEW);
@@ -264,7 +263,6 @@ describe('matchRoute', () => {
     expect(view?.cacheControl).toBe('no-store');
     expect(view?.params).toEqual({ token: 'tok' });
     expect(view?.client).toBe('WIKI_CLIENT');
-
     const reshare = matchRoute('POST', '/wiki/shares/view/tok/reshare');
     expect(reshare?.pattern).toBe(MQTT_PATTERNS.WIKI_SHARE_RESHARE);
     expect(reshare?.auth).toBeUndefined();

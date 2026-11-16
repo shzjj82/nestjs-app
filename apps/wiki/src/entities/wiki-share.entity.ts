@@ -31,6 +31,10 @@ export class WikiShareEntity {
   @Column({ type: 'jsonb' })
   body!: Record<string, unknown>;
 
+  /** 创建时的子孙页面。每层含 id、标题、正文和下一层，不并进父页面正文 */
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  children!: unknown[];
+
   /** 发出根链接的账号；再分享原样复制 */
   @Column({ name: 'owner_account_id', type: 'uuid' })
   ownerAccountId!: string;
@@ -42,6 +46,10 @@ export class WikiShareEntity {
   /** 这条记录的登录创建者；匿名再分享为空 */
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
   createdBy!: string | null;
+
+  /** 分享时的显示名，公开页只给这个名字，不给账号 id */
+  @Column({ name: 'shared_by', type: 'varchar', length: 80, nullable: true })
+  sharedBy!: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

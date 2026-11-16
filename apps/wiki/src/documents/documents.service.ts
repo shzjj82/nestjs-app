@@ -355,6 +355,19 @@ export class DocumentsService {
     return row ? this.toPost(row) : null;
   }
 
+  /** 直接子页面，按树顺序。分享父页时用来冻结整棵子树。 */
+  async listChildPosts(appCode: string, parentId: string): Promise<DocPost[]> {
+    const rows = await this.posts.find({
+      where: { appCode, parentId },
+      order: { treeSort: 'ASC', createdAt: 'ASC' },
+    });
+    const posts: DocPost[] = [];
+    for (const row of rows) {
+      posts.push(await this.toPost(row));
+    }
+    return posts;
+  }
+
   async listAncestors(
     postId: string,
     includePrivate: boolean,

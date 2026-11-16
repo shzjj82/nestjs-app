@@ -6,6 +6,8 @@ import { WikiTeamId1760000001000 } from './migrations/1760000001000-wiki-team-id
 import { InitWikiSchema1760000000000 } from './migrations/1760000000000-init-wiki-schema';
 import { WikiTeamsSchema1760000002000 } from './migrations/1760000002000-wiki-teams-schema';
 import { WikiShares1760000003000 } from './migrations/1760000003000-wiki-shares';
+import { WikiShareAuthor1760000004000 } from './migrations/1760000004000-wiki-share-author';
+import { WikiShareChildren1760000005000 } from './migrations/1760000005000-wiki-share-children';
 
 const sync = process.env.TYPEORM_SYNC === 'true';
 
@@ -22,6 +24,8 @@ const sync = process.env.TYPEORM_SYNC === 'true';
         WikiTeamId1760000001000,
         WikiTeamsSchema1760000002000,
         WikiShares1760000003000,
+        WikiShareAuthor1760000004000,
+        WikiShareChildren1760000005000,
       ],
       logging: process.env.TYPEORM_LOGGING === 'true',
     }),

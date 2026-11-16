@@ -2,22 +2,32 @@ import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes } from 'crypto';
-import { IsNull, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { asRecord, optionalString, rpcFail } from '../common/rpc';
 import { resolveAppCode } from '../common/app-code';
-import type { DocPost } from '../common/shared';
+import type { DocPost, EditorJsDocument } from '../common/shared';
+import { DocumentsService } from '../documents/documents.service';
 import { WorkspaceRead } from '../documents/workspace-read';
 import { WikiShareEntity } from '../entities/wiki-share.entity';
 
 /** 约 2MB。按快照 JSON 的 UTF-8 字节计。 */
 export const SHARE_BODY_LIMIT = 2 * 1024 * 1024;
-/** 含自身在内的父链层数。再往上视为不可用，避免成环或过深链接。 */
-const SHARE_CHAIN_LIMIT = 16;
-const MIN_EXPIRES_IN = 60;
-const MAX_EXPIRES_IN = 366 * 24 * 60 * 60;
+/** 子孙页面层数。再深就不再往下收，避免成环。 */
+const SHARE_TREE_LIMIT = 16;
+const DAY_SECONDS = 24 * 60 * 60;
+const MIN_DAYS = 1;
+const MAX_DAYS = 366;
+const SHANGHAI = 'Asia/Shanghai';
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TOKEN_RE = /^[A-Za-z0-9_-]{20,64}$/;
+
+type ShareNode = {
+  id: string;
+  title: string;
+  body: EditorJsDocument;
+  children: ShareNode[];
+};
 
 const UNAVAILABLE = {
   status: 404,
@@ -31,6 +41,7 @@ export class SharesService {
     @InjectRepository(WikiShareEntity)
     private readonly shares: Repository<WikiShareEntity>,
     private readonly workspace: WorkspaceRead,
+    private readonly posts: DocumentsService,
   ) {}
 
   async create(payload: Record<string, unknown>) {
@@ -41,20 +52,24 @@ export class SharesService {
     }
     const expiresAt = parseExpiresIn(payload.expiresIn);
     const post = await this.readPage(payload, pageId);
-    const body = freezeBody(post.body);
-    if (Buffer.byteLength(JSON.stringify(body), 'utf8') > SHARE_BODY_LIMIT) {
+    const snapshot = await this.snapshotTree(payload, post);
+    if (
+      Buffer.byteLength(JSON.stringify(snapshot), 'utf8') > SHARE_BODY_LIMIT
+    ) {
       rpcFail(400, '正文过大，无法分享', 'SHARE_TOO_LARGE');
     }
     const row = await this.insert({
       appCode: post.appCode,
       pageId: post.id,
-      title: post.title.slice(0, 200),
-      body,
+      title: snapshot.title,
+      body: snapshot.body,
+      children: snapshot.children,
       ownerAccountId: accountId,
       pageOwnerAccountId: post.authorId ?? null,
       createdBy: accountId,
+      sharedBy: sharerName(payload),
       expiresAt,
-      allowReshare: payload.allowReshare === true,
+      allowReshare: false,
       parentToken: null,
     });
     return {
@@ -63,7 +78,7 @@ export class SharesService {
       pageId: row.pageId,
       title: row.title,
       expiresAt: iso(row.expiresAt),
-      allowReshare: row.allowReshare,
+      sharedBy: row.sharedBy,
     };
   }
 
@@ -78,16 +93,12 @@ export class SharesService {
     }
     const appCode = resolveAppCode(payload);
     const rows = await this.shares.find({
-      where: [
-        { appCode, pageId, revokedAt: IsNull(), ownerAccountId: accountId },
-        { appCode, pageId, revokedAt: IsNull(), pageOwnerAccountId: accountId },
-        { appCode, pageId, revokedAt: IsNull(), createdBy: accountId },
-      ],
+      where: { appCode, pageId, createdBy: accountId },
     });
     const seen = new Set<string>();
     const shares = rows
       .filter((row) => {
-        if (seen.has(row.token) || !canManage(row, accountId)) {
+        if (seen.has(row.token)) {
           return false;
         }
         seen.add(row.token);
@@ -100,59 +111,35 @@ export class SharesService {
         title: row.title,
         createdAt: iso(row.createdAt) ?? new Date().toISOString(),
         expiresAt: iso(row.expiresAt),
-        allowReshare: row.allowReshare,
+        sharedBy: row.sharedBy,
         parentToken: row.parentToken,
       }));
     return { shares };
   }
 
-  async revoke(payload: Record<string, unknown>) {
-    const accountId = requireAccount(payload);
-    const token = optionalString(payload.token);
-    if (!token || !TOKEN_RE.test(token)) {
-      unavailable();
-    }
-    const appCode = resolveAppCode(payload);
-    const row = await this.shares.findOne({ where: { token } });
-    if (
-      !row ||
-      row.appCode !== appCode ||
-      row.revokedAt ||
-      !canManage(row, accountId)
-    ) {
-      unavailable();
-    }
-    row.revokedAt = new Date();
-    await this.shares.save(row);
-    return { revoked: true };
-  }
-
   async view(payload: Record<string, unknown>) {
-    const chain = await this.validChain(optionalString(payload.token));
-    if (!chain) {
+    const row = await this.liveShare(optionalString(payload.token));
+    if (!row) {
       unavailable();
     }
-    const row = chain[0];
     return {
+      id: row.pageId,
       title: row.title,
       body: row.body,
       expiresAt: iso(row.expiresAt),
-      allowReshare: row.allowReshare,
       sharedAt: iso(row.createdAt) ?? new Date().toISOString(),
+      sharedBy: row.sharedBy?.trim() || '',
+      children: shareNodes(row.children),
     };
   }
 
   async reshare(payload: Record<string, unknown>) {
-    const chain = await this.validChain(optionalString(payload.token));
-    if (!chain) {
+    const parent = await this.liveShare(optionalString(payload.token));
+    if (!parent) {
       unavailable();
     }
-    const parent = chain[0];
     if (parent.allowReshare !== true) {
       rpcFail(403, '不允许再分享', 'SHARE_RESHARE_DENIED');
-    }
-    if (chain.length >= SHARE_CHAIN_LIMIT) {
-      unavailable();
     }
     const requested = parseExpiresIn(payload.expiresIn);
     const row = await this.insert({
@@ -160,11 +147,13 @@ export class SharesService {
       pageId: parent.pageId,
       title: parent.title,
       body: freezeBody(parent.body),
+      children: shareNodes(parent.children),
       ownerAccountId: parent.ownerAccountId,
       pageOwnerAccountId: parent.pageOwnerAccountId,
       createdBy: null,
+      sharedBy: parent.sharedBy,
       expiresAt: clampExpiry(requested, asDate(parent.expiresAt)),
-      allowReshare: payload.allowReshare === true,
+      allowReshare: parent.allowReshare === true && payload.allowReshare === true,
       parentToken: parent.token,
     });
     return {
@@ -174,6 +163,73 @@ export class SharesService {
       expiresAt: iso(row.expiresAt),
       allowReshare: row.allowReshare,
     };
+  }
+
+  /** 根页面正文保持原样。子孙页面各自成节点，读不到的跳过。 */
+  private async snapshotTree(
+    payload: Record<string, unknown>,
+    post: DocPost,
+  ): Promise<ShareNode> {
+    const seen = new Set<string>();
+    const node = await this.snapshotNode(payload, post, seen, 0);
+    if (!node) {
+      rpcFail(404, '页面不可读', 'PAGE_UNREADABLE');
+    }
+    return node;
+  }
+
+  private async snapshotNode(
+    payload: Record<string, unknown>,
+    post: DocPost,
+    seen: Set<string>,
+    depth: number,
+  ): Promise<ShareNode | null> {
+    if (seen.has(post.id)) {
+      return null;
+    }
+    seen.add(post.id);
+    const children: ShareNode[] = [];
+    if (depth < SHARE_TREE_LIMIT) {
+      const kids = await this.posts.listChildPosts(post.appCode, post.id);
+      for (const kid of kids) {
+        if (seen.has(kid.id)) {
+          continue;
+        }
+        let readable: DocPost;
+        try {
+          readable = await this.readPage(payload, kid.id);
+        } catch (err) {
+          if (err instanceof RpcException) {
+            continue;
+          }
+          throw err;
+        }
+        const node = await this.snapshotNode(payload, readable, seen, depth + 1);
+        if (node) {
+          children.push(node);
+        }
+      }
+    }
+    return {
+      id: post.id,
+      title: post.title.slice(0, 200),
+      body: freezeBody(post.body),
+      children,
+    };
+  }
+
+  /** 链接不存在或已过期。不因撤销作废。 */
+  private async liveShare(
+    token: string | undefined,
+  ): Promise<WikiShareEntity | null> {
+    if (!token || !TOKEN_RE.test(token)) {
+      return null;
+    }
+    const row = await this.shares.findOne({ where: { token } });
+    if (!row || isExpired(row.expiresAt, new Date())) {
+      return null;
+    }
+    return row;
   }
 
   /**
@@ -262,6 +318,13 @@ export class SharesService {
   }
 }
 
+function sharerName(payload: Record<string, unknown>): string | null {
+  const session = asRecord(payload._session);
+  const name = optionalString(session.nickname) || optionalString(session.username);
+  const trimmed = name?.trim() ?? '';
+  return trimmed ? trimmed.slice(0, 80) : null;
+}
+
 function requireAccount(payload: Record<string, unknown>): string {
   const accountId = optionalString(asRecord(payload._session).accountId);
   if (!accountId) {
@@ -270,36 +333,44 @@ function requireAccount(payload: Record<string, unknown>): string {
   return accountId;
 }
 
-function canManage(row: WikiShareEntity, accountId: string): boolean {
-  return (
-    row.ownerAccountId === accountId ||
-    row.pageOwnerAccountId === accountId ||
-    row.createdBy === accountId
-  );
-}
-
 function unavailable(): never {
   rpcFail(UNAVAILABLE.status, UNAVAILABLE.message, UNAVAILABLE.code);
 }
 
-/** 省略或 null 表示不过期；否则必须是 60 秒到 366 天的整数秒。 */
+/** 省略或 null 表示不过期。否则必须是 1 到 366 的整天秒数，到期日当天结束才失效。 */
 function parseExpiresIn(value: unknown, now = new Date()): Date | null {
   if (value === undefined || value === null) {
     return null;
   }
+  const days = value / DAY_SECONDS;
   if (
     typeof value !== 'number' ||
     !Number.isInteger(value) ||
-    value < MIN_EXPIRES_IN ||
-    value > MAX_EXPIRES_IN
+    !Number.isInteger(days) ||
+    days < MIN_DAYS ||
+    days > MAX_DAYS
   ) {
     rpcFail(
       400,
-      '有效期须为 60 秒到 366 天的整数秒，或留空表示不过期',
+      '有效期须为 1 天到 366 天的整天，或留空表示不过期',
       'INVALID_EXPIRES_IN',
     );
   }
-  return new Date(now.getTime() + value * 1000);
+  return endOfShanghaiDay(now, days);
+}
+
+/** 创建日算第 1 天。到期日用上海自然日的 23:59:59.999。 */
+function endOfShanghaiDay(now: Date, days: number): Date {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SHANGHAI,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const year = Number(parts.find((part) => part.type === 'year')?.value);
+  const month = Number(parts.find((part) => part.type === 'month')?.value);
+  const day = Number(parts.find((part) => part.type === 'day')?.value);
+  return new Date(Date.UTC(year, month - 1, day + days - 1, 15, 59, 59, 999));
 }
 
 /** 父链接有到期时间时，子链接不能更晚；没填则继承父链接。 */
@@ -316,12 +387,33 @@ function clampExpiry(
   return choice;
 }
 
-function freezeBody(body: unknown): Record<string, unknown> {
+function shareNodes(value: unknown): ShareNode[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((item) => {
+    const row = asRecord(item);
+    const id = optionalString(row.id);
+    if (!id) {
+      return [];
+    }
+    return [
+      {
+        id,
+        title: optionalString(row.title)?.slice(0, 200) ?? '',
+        body: freezeBody(row.body),
+        children: shareNodes(row.children),
+      },
+    ];
+  });
+}
+
+function freezeBody(body: unknown): EditorJsDocument {
   const cloned: unknown = JSON.parse(JSON.stringify(body ?? null)) as unknown;
   if (!cloned || typeof cloned !== 'object' || Array.isArray(cloned)) {
     return { blocks: [] };
   }
-  return cloned as Record<string, unknown>;
+  return cloned as EditorJsDocument;
 }
 
 function asDate(value: Date | string | null | undefined): Date | null {
