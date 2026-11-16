@@ -16,6 +16,7 @@ import { DocumentsService } from './documents.service';
 import { RagNotify } from './rag-notify';
 import { TeamAccess } from './team-access';
 import { TodoPageCleanup } from './todo-page-cleanup';
+import { WorkspaceRead } from './workspace-read';
 import {
   isTreeView,
   parseVisibility,
@@ -31,6 +32,7 @@ export class DocumentsController {
     private readonly teamAccess: TeamAccess,
     private readonly rag: RagNotify,
     private readonly todoPages: TodoPageCleanup,
+    private readonly workspace: WorkspaceRead,
   ) {}
 
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_POST_FIND_ALL))
@@ -88,18 +90,7 @@ export class DocumentsController {
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_POST_FIND_ID))
   @ApiDoc({ name: '按 ID 查看文档', description: '工作区按 id 读取，含祖先链' })
   async findId(payload: Record<string, unknown>) {
-    const post = await this.requireInBiz(payload);
-    const actorId = authorAccountId(payload);
-    const grants = await this.grants(payload);
-    const inTeam = Boolean(post.teamId && grants.readable.includes(post.teamId));
-    // 私有文：作者或团队成员可读；公开文工作区按 id：非作者也不可读
-    if (post.visibility === 'private') {
-      if (!actorId || (post.authorId && post.authorId !== actorId && !inTeam)) {
-        rpcFail(403, 'FORBIDDEN');
-      }
-    } else if (actorId && post.authorId && post.authorId !== actorId) {
-      rpcFail(403, 'FORBIDDEN');
-    }
+    const post = await this.workspace.findById(payload, requiredString(payload.id, 'id'));
     return {
       post,
       ancestors: await this.posts.listAncestors(post.id, true),

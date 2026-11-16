@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
   GatewayTimeoutException,
+  HttpException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
@@ -31,7 +32,17 @@ export class MqttProxy {
     }
 
     const payload = this.asRecord(err);
-    const message = String(payload?.message ?? (err instanceof Error ? err.message : '微服务调用失败'));
+    const message = String(
+      payload?.message ??
+        (err instanceof Error ? err.message : '微服务调用失败'),
+    );
+    const businessCode =
+      typeof payload?.code === 'string' && payload.code
+        ? payload.code
+        : undefined;
+    if (businessCode && typeof payload?.status === 'number') {
+      return new HttpException({ code: businessCode, message }, payload.status);
+    }
     switch (payload?.status) {
       case 400:
         return new BadRequestException(message);
@@ -54,14 +65,17 @@ export class MqttProxy {
     }
   }
 
-  private asRecord(err: unknown): { status?: number; message?: string } | null {
+  private asRecord(
+    err: unknown,
+  ): { status?: number; message?: string; code?: string } | null {
     if (typeof err !== 'object' || err === null) {
       return null;
     }
     const record = err as {
       status?: number;
       message?: string;
-      error?: { status?: number; message?: string };
+      code?: string;
+      error?: { status?: number; message?: string; code?: string };
     };
     if (record.error && (record.error.status || record.error.message)) {
       return record.error;

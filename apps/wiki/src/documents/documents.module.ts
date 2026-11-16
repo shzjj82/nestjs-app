@@ -10,6 +10,7 @@ import { DocumentsService } from './documents.service';
 import { RagNotify } from './rag-notify';
 import { TeamAccess } from './team-access';
 import { TodoPageCleanup } from './todo-page-cleanup';
+import { WorkspaceRead } from './workspace-read';
 
 @Module({
   imports: [
@@ -28,7 +29,13 @@ import { TodoPageCleanup } from './todo-page-cleanup';
     ]),
   ],
   controllers: [DocumentsController],
-  providers: [DocumentsService, TeamAccess, RagNotify, TodoPageCleanup],
-  exports: [DocumentsService, TeamAccess],
+  providers: [
+    DocumentsService,
+    TeamAccess,
+    RagNotify,
+    TodoPageCleanup,
+    WorkspaceRead,
+  ],
+  exports: [DocumentsService, TeamAccess, WorkspaceRead],
 })
 export class DocumentsModule {}

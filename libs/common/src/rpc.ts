@@ -1,8 +1,10 @@
 import { RpcException } from '@nestjs/microservices';
 import { z, type ZodTypeAny } from 'zod';
 
-export function rpcFail(status: number, message: string): never {
-  throw new RpcException({ status, message });
+export function rpcFail(status: number, message: string, code?: string): never {
+  throw new RpcException(
+    code ? { status, message, code } : { status, message },
+  );
 }
 
 /** 把 Zod 错误转成统一的 RPC 400；可覆盖默认文案 */

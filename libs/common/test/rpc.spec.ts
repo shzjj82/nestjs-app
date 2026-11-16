@@ -5,6 +5,7 @@ import {
   optionalString,
   parseWith,
   requiredString,
+  rpcFail,
   toPage,
 } from '../src/rpc';
 
@@ -30,6 +31,26 @@ describe('rpc zod helpers', () => {
   it('toPage clamps page size', () => {
     expect(toPage('2', '1000')).toEqual({ page: 2, pageSize: 100, skip: 100 });
     expect(toPage(undefined, undefined)).toEqual({ page: 1, pageSize: 20, skip: 0 });
+  });
+
+  it('rpcFail keeps the old shape unless a business code is set', () => {
+    try {
+      rpcFail(400, 'INVALID_BODY');
+    } catch (err) {
+      expect((err as RpcException).getError()).toEqual({
+        status: 400,
+        message: 'INVALID_BODY',
+      });
+    }
+    try {
+      rpcFail(404, '分享链接不可用', 'SHARE_UNAVAILABLE');
+    } catch (err) {
+      expect((err as RpcException).getError()).toEqual({
+        status: 404,
+        message: '分享链接不可用',
+        code: 'SHARE_UNAVAILABLE',
+      });
+    }
   });
 
   it('parseWith maps zod errors to RpcException', () => {

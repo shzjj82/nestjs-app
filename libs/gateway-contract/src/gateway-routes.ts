@@ -35,6 +35,8 @@ export interface GatewayRoute {
   permissions?: string[];
   override?: boolean;
   scope?: GatewayScope;
+  /** 写在成功和失败响应上，公开分享快照用 no-store */
+  cacheControl?: string;
 }
 
 export interface MatchedGatewayRoute extends GatewayRoute {
@@ -179,6 +181,11 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'DELETE', path: '/docs/categories/:id', client: DOCS_CLIENT, pattern: MQTT_PATTERNS.DOC_CATEGORY_DELETE, auth: ['jwt', 'docs-key'] }),
 
   ...wikiContentRoutes('/wiki/documents'),
+  business({ method: 'POST', path: '/wiki/shares', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_SHARE_CREATE, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/wiki/shares', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_SHARE_LIST, auth: ['jwt'] }),
+  business({ method: 'DELETE', path: '/wiki/shares/:token', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_SHARE_REVOKE, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/wiki/shares/view/:token', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_SHARE_VIEW, cacheControl: 'no-store' }),
+  business({ method: 'POST', path: '/wiki/shares/view/:token/reshare', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_SHARE_RESHARE, cacheControl: 'no-store' }),
   { method: 'GET', path: '/wiki/health', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_HEALTH },
   business({ method: 'GET', path: '/wiki/categories', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_CATEGORY_FIND_ALL }),
   business({ method: 'GET', path: '/wiki/categories/:slug', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_CATEGORY_FIND_SLUG }),

@@ -30,6 +30,10 @@ export class ProxyMiddleware implements NestMiddleware {
       return;
     }
 
+    if (route.cacheControl) {
+      res.setHeader('Cache-Control', route.cacheControl);
+    }
+
     try {
       const query = (req.query ?? {}) as Record<string, unknown>;
       const isDocsList = pathname === '/docs/documents';

@@ -24,6 +24,7 @@ const FEATURE_CODES = new Set([
   'wiki.read',
   'wiki.write',
   'wiki.category.manage',
+  'wiki.share',
   'team.query',
   'team.manage',
   'agents.chat',
