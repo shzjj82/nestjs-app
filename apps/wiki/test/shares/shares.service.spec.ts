@@ -42,6 +42,20 @@ function authed(accountId: string, extra: Record<string, unknown> = {}) {
   };
 }
 
+let tokenSeq = 0;
+function nextToken(): string {
+  tokenSeq += 1;
+  return tokenSeq.toString(36).padStart(43, 'a');
+}
+
+function share(accountId: string, extra: Record<string, unknown> = {}) {
+  return authed(accountId, {
+    token: nextToken(),
+    expiresIn: 7 * 24 * 60 * 60,
+    ...extra,
+  });
+}
+
 function memoryShares() {
   const rows: WikiShareEntity[] = [];
   return {
@@ -152,10 +166,12 @@ describe('wiki shares', () => {
     return { repo, findById, listChildPosts, service };
   }
 
-  it('snapshots the readable page and ignores uploaded body, authorId, and jwt', async () => {
+  it('snapshots the readable page and keeps the editor token', async () => {
     const { service, findById, repo } = setup();
+    const token = nextToken();
     const created = await service.create(
-      authed(OWNER, {
+      share(OWNER, {
+        token,
         pageId: PAGE,
         expiresIn: 604800,
         allowReshare: true,
@@ -166,8 +182,8 @@ describe('wiki shares', () => {
         _token: 'jwt-secret-do-not-store',
       }),
     );
-    expect(typeof created.token).toBe('string');
-    expect(created.urlPath).toBe(`/s/${created.token}`);
+    expect(created.token).toBe(token);
+    expect(created.urlPath).toBe(`/s/${token}`);
     expect(created.pageId).toBe(PAGE);
     expect(created.title).toBe('周报');
     expect(created.expiresAt).toBe(shanghaiEnd(7));
@@ -178,11 +194,13 @@ describe('wiki shares', () => {
     expect(arg.authorId).toBeUndefined();
     expect(arg.body).toBeUndefined();
     expect(arg._token).toBeUndefined();
+    expect(arg.token).toBeUndefined();
     expect(arg.accountId).toBeUndefined();
     expect((arg._session as { accountId: string }).accountId).toBe(OWNER);
 
     expect(repo.rows).toHaveLength(1);
     expect(repo.rows[0]).toMatchObject({
+      token,
       pageId: PAGE,
       title: '周报',
       body: SOURCE,
@@ -201,47 +219,52 @@ describe('wiki shares', () => {
     expect(repo.rows[0]).not.toHaveProperty('_token');
   });
 
-  it('treats omitted and null expiresIn as never', async () => {
-    const { service } = setup();
-    const omitted = await service.create(authed(OWNER, { pageId: PAGE }));
-    const empty = await service.create(
-      authed(OWNER, { pageId: PAGE, expiresIn: null, allowReshare: true }),
-    );
-    expect(omitted.expiresAt).toBeNull();
-    expect(omitted).not.toHaveProperty('allowReshare');
-    expect(empty.expiresAt).toBeNull();
-    expect(empty).not.toHaveProperty('allowReshare');
-  });
-
-  it('rejects expiresIn that is not a whole day from 1 to 366', async () => {
+  it('accepts only 1, 7, or 30 days and stores that editor token', async () => {
     const { service, findById, repo } = setup();
-    const max = 366 * 24 * 60 * 60;
-    const tooSmall = await rpcError(
-      service.create(authed(OWNER, { pageId: PAGE, expiresIn: 59 })),
-    );
-    const tooBig = await rpcError(
-      service.create(authed(OWNER, { pageId: PAGE, expiresIn: max + 1 })),
-    );
-    const text = await rpcError(
-      service.create(authed(OWNER, { pageId: PAGE, expiresIn: '604800' })),
-    );
-    const fraction = await rpcError(
-      service.create(authed(OWNER, { pageId: PAGE, expiresIn: 60.5 })),
-    );
-    for (const error of [tooSmall, tooBig, text, fraction]) {
-      expect(error).toEqual({
-        status: 400,
-        code: 'INVALID_EXPIRES_IN',
-        message: '有效期须为 1 天到 366 天的整天，或留空表示不过期',
-      });
+    const invalid = {
+      status: 400,
+      code: 'INVALID_EXPIRES_IN',
+      message: '有效期须为 1 天、7 天或 30 天',
+    };
+    for (const expiresIn of [undefined, null, 59, 366 * 86_400, '604800', 60.5, 2 * 86_400]) {
+      expect(
+        await rpcError(
+          service.create(share(OWNER, { pageId: PAGE, expiresIn })),
+        ),
+      ).toEqual(invalid);
     }
+    const badToken = await rpcError(
+      service.create(share(OWNER, { pageId: PAGE, token: 'short' })),
+    );
+    expect(badToken).toEqual({
+      status: 400,
+      code: 'SHARE_TOKEN_INVALID',
+      message: '分享标识无效',
+    });
     expect(findById).not.toHaveBeenCalled();
     expect(repo.rows).toHaveLength(0);
 
-    const edge = await service.create(
-      authed(OWNER, { pageId: PAGE, expiresIn: max }),
+    const day = await service.create(
+      share(OWNER, { pageId: PAGE, expiresIn: 86_400 }),
     );
-    expect(typeof edge.expiresAt).toBe('string');
+    const week = await service.create(
+      share(OWNER, { pageId: PAGE, expiresIn: 7 * 86_400 }),
+    );
+    const month = await service.create(
+      share(OWNER, { pageId: PAGE, expiresIn: 30 * 86_400 }),
+    );
+    expect(day.expiresAt).toBe(shanghaiEnd(1));
+    expect(week.expiresAt).toBe(shanghaiEnd(7));
+    expect(month.expiresAt).toBe(shanghaiEnd(30));
+
+    const taken = await rpcError(
+      service.create(share(OWNER, { pageId: PAGE, token: day.token })),
+    );
+    expect(taken).toEqual({
+      status: 409,
+      code: 'SHARE_TOKEN_TAKEN',
+      message: '分享标识已被占用',
+    });
   });
 
   it('maps missing and forbidden documents to the same PAGE_UNREADABLE', async () => {
@@ -250,13 +273,13 @@ describe('wiki shares', () => {
       new RpcException({ status: 404, message: 'NOT_FOUND' }),
     );
     const missing = await rpcError(
-      service.create(authed(OWNER, { pageId: PAGE })),
+      service.create(share(OWNER, { pageId: PAGE })),
     );
     findById.mockRejectedValueOnce(
       new RpcException({ status: 403, message: 'FORBIDDEN' }),
     );
     const forbidden = await rpcError(
-      service.create(authed(OWNER, { pageId: PAGE })),
+      service.create(share(OWNER, { pageId: PAGE })),
     );
     const unreadable = {
       status: 404,
@@ -267,7 +290,7 @@ describe('wiki shares', () => {
     expect(forbidden).toEqual(unreadable);
     expect(repo.rows).toHaveLength(0);
 
-    const blank = await rpcError(service.create(authed(OWNER, {})));
+    const blank = await rpcError(service.create(share(OWNER, {})));
     expect(blank).toEqual(unreadable);
   });
 
@@ -282,7 +305,7 @@ describe('wiki shares', () => {
       },
     });
     const error = await rpcError(
-      service.create(authed(OWNER, { pageId: PAGE, expiresIn: 86_400 })),
+      service.create(share(OWNER, { pageId: PAGE, expiresIn: 86_400 })),
     );
     expect(error).toEqual({
       status: 400,
@@ -294,12 +317,12 @@ describe('wiki shares', () => {
 
   it('lists only links the caller issued on that page, without the body', async () => {
     const { service } = setup();
-    const mine = await service.create(authed(OWNER, { pageId: PAGE }));
+    const mine = await service.create(share(OWNER, { pageId: PAGE }));
     const authors = await service.create(
-      authed(AUTHOR, { pageId: PAGE, expiresIn: 86_400 }),
+      share(AUTHOR, { pageId: PAGE, expiresIn: 86_400 }),
     );
-    await service.create(authed(OWNER, { pageId: OTHER_PAGE }));
-    const later = await service.create(authed(OWNER, { pageId: PAGE }));
+    await service.create(share(OWNER, { pageId: OTHER_PAGE }));
+    const later = await service.create(share(OWNER, { pageId: PAGE }));
 
     const asOwner = await service.list(authed(OWNER, { pageId: PAGE }));
     expect(asOwner.shares.map((item) => item.token).sort()).toEqual(
@@ -311,8 +334,8 @@ describe('wiki shares', () => {
       title: '周报',
       parentToken: null,
       sharedBy: '周报作者',
-      expiresAt: null,
     });
+    expect(asOwner.shares.every((item) => item.expiresAt)).toBe(true);
 
     const asAuthor = await service.list(authed(AUTHOR, { pageId: PAGE }));
     expect(asAuthor.shares.map((item) => item.token)).toEqual([authors.token]);
@@ -380,7 +403,7 @@ describe('wiki shares', () => {
         ]
         : [],
     );
-    const created = await service.create(authed(OWNER, { pageId: PAGE }));
+    const created = await service.create(share(OWNER, { pageId: PAGE }));
     expect(repo.rows[0].body).toEqual(parentBody);
     expect(repo.rows[0].children).toEqual([
       { id: linked, title: '子页', body: linkedBody, children: [] },
@@ -400,7 +423,7 @@ describe('wiki shares', () => {
   it('names the sharer on the public page and keeps the page id for in-share navigation', async () => {
     const { service, repo } = setup();
     const created = await service.create(
-      authed(OWNER, { pageId: PAGE, expiresIn: 86_400 }),
+      share(OWNER, { pageId: PAGE, expiresIn: 86_400 }),
     );
     const row = repo.rows[0];
     const viewed = await service.view({ token: created.token });
@@ -419,10 +442,10 @@ describe('wiki shares', () => {
   it('uses one public error for a missing link and an expired link', async () => {
     const { service, repo } = setup();
     const created = await service.create(
-      authed(OWNER, { pageId: PAGE, expiresIn: 86_400 }),
+      share(OWNER, { pageId: PAGE, expiresIn: 86_400 }),
     );
     repo.rows[0].expiresAt = new Date(Date.now() - 1000);
-    const missing = await rpcError(service.view({ token: 'b'.repeat(32) }));
+    const missing = await rpcError(service.view({ token: 'b'.repeat(43) }));
     const expired = await rpcError(service.view({ token: created.token }));
     expect(expired).toEqual(missing);
     expect(missing).toEqual(UNAVAILABLE);
@@ -430,7 +453,7 @@ describe('wiki shares', () => {
 
   it('copies an old reshare without a new page id and refuses one that is not allowed', async () => {
     const { service, repo } = setup();
-    const closed = await service.create(authed(OWNER, { pageId: PAGE }));
+    const closed = await service.create(share(OWNER, { pageId: PAGE }));
     expect(
       await rpcError(
         service.reshare({ token: closed.token, expiresIn: 86_400, allowReshare: true }),
@@ -448,6 +471,8 @@ describe('wiki shares', () => {
       allowReshare: true,
       pageId: OTHER_PAGE,
     });
+    expect(child.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(child.token).not.toBe(closed.token);
     expect(child).not.toHaveProperty('pageId');
     expect(child.allowReshare).toBe(true);
     expect(repo.rows.find((row) => row.token === child.token)).toMatchObject({

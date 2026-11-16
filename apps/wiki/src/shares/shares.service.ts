@@ -17,10 +17,13 @@ const SHARE_TREE_LIMIT = 16;
 const DAY_SECONDS = 24 * 60 * 60;
 const MIN_DAYS = 1;
 const MAX_DAYS = 366;
+/** 编辑器创建只接受这三档，没有永久。 */
+const CREATE_DAYS = new Set([1, 7, 30]);
 const SHANGHAI = 'Asia/Shanghai';
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const TOKEN_RE = /^[A-Za-z0-9_-]{20,64}$/;
+/** 32 字节随机数的 base64url，去掉填充后正好 43 位。 */
+const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 
 type ShareNode = {
   id: string;
@@ -46,11 +49,12 @@ export class SharesService {
 
   async create(payload: Record<string, unknown>) {
     const accountId = requireAccount(payload);
+    const token = requireShareToken(payload.token);
+    const expiresAt = parseCreateExpiresIn(payload.expiresIn);
     const pageId = optionalString(payload.pageId);
     if (!pageId || !UUID_RE.test(pageId)) {
       rpcFail(404, '页面不可读', 'PAGE_UNREADABLE');
     }
-    const expiresAt = parseExpiresIn(payload.expiresIn);
     const post = await this.readPage(payload, pageId);
     const snapshot = await this.snapshotTree(payload, post);
     if (
@@ -59,6 +63,7 @@ export class SharesService {
       rpcFail(400, '正文过大，无法分享', 'SHARE_TOO_LARGE');
     }
     const row = await this.insert({
+      token,
       appCode: post.appCode,
       pageId: post.id,
       title: snapshot.title,
@@ -143,6 +148,7 @@ export class SharesService {
     }
     const requested = parseExpiresIn(payload.expiresIn);
     const row = await this.insert({
+      token: randomBytes(32).toString('base64url'),
       appCode: parent.appCode,
       pageId: parent.pageId,
       title: parent.title,
@@ -250,6 +256,8 @@ export class SharesService {
     delete rest.body;
     delete rest.title;
     delete rest._token;
+    delete rest.token;
+    delete rest.expiresIn;
     delete rest.accountId;
     delete rest.userId;
     rest._session = { ...session, accountId };
@@ -276,15 +284,25 @@ export class SharesService {
   }
 
   private async insert(
-    input: Omit<WikiShareEntity, 'token' | 'createdAt' | 'revokedAt'>,
+    input: Omit<WikiShareEntity, 'createdAt' | 'revokedAt'>,
   ): Promise<WikiShareEntity> {
+    const taken = await this.shares.findOne({ where: { token: input.token } });
+    if (taken) {
+      rpcFail(409, '分享标识已被占用', 'SHARE_TOKEN_TAKEN');
+    }
     const row = this.shares.create({
       ...input,
-      token: randomBytes(32).toString('base64url'),
       createdAt: new Date(),
       revokedAt: null,
     });
-    await this.shares.save(row);
+    try {
+      await this.shares.save(row);
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        rpcFail(409, '分享标识已被占用', 'SHARE_TOKEN_TAKEN');
+      }
+      throw err;
+    }
     return row;
   }
 }
@@ -308,7 +326,31 @@ function unavailable(): never {
   rpcFail(UNAVAILABLE.status, UNAVAILABLE.message, UNAVAILABLE.code);
 }
 
-/** 省略或 null 表示不过期。否则必须是 1 到 366 的整天秒数，到期日当天结束才失效。 */
+function requireShareToken(value: unknown): string {
+  const token = optionalString(value);
+  if (!token || !TOKEN_RE.test(token)) {
+    rpcFail(400, '分享标识无效', 'SHARE_TOKEN_INVALID');
+  }
+  return token;
+}
+
+/** 编辑器只传 1 天、7 天或 30 天，没有永久。到期日当天结束才失效。 */
+function parseCreateExpiresIn(value: unknown, now = new Date()): Date {
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    invalidCreateExpires();
+  }
+  const days = value / DAY_SECONDS;
+  if (!CREATE_DAYS.has(days)) {
+    invalidCreateExpires();
+  }
+  return endOfShanghaiDay(now, days);
+}
+
+function invalidCreateExpires(): never {
+  rpcFail(400, '有效期须为 1 天、7 天或 30 天', 'INVALID_EXPIRES_IN');
+}
+
+/** 再分享可省略，表示继承父链接。填了则须为 1 到 366 的整天。 */
 function parseExpiresIn(value: unknown, now = new Date()): Date | null {
   if (value === undefined || value === null || typeof value !== 'number') {
     if (value === undefined || value === null) {
@@ -418,4 +460,12 @@ function isExpired(
 
 function iso(value: Date | string | null | undefined): string | null {
   return asDate(value)?.toISOString() ?? null;
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  if (!err || typeof err !== 'object') {
+    return false;
+  }
+  const row = err as { code?: string; driverError?: { code?: string } };
+  return row.code === '23505' || row.driverError?.code === '23505';
 }

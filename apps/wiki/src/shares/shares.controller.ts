@@ -20,7 +20,7 @@ export class SharesController {
   @ApiDoc({
     name: '创建页面分享',
     description:
-      '登录后按文档读取权限保存标题和正文快照。不接受前端直接上传正文。',
+      '登录后按文档读取权限保存标题和正文快照。token 用请求体里的，不另行生成。不接受前端直接上传正文。',
   })
   create(payload: Record<string, unknown>) {
     return this.shares.create(payload);
