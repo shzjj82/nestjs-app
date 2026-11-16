@@ -287,35 +287,6 @@ export class SharesService {
     await this.shares.save(row);
     return row;
   }
-
-  /** 自己或任一祖先缺失、已撤销、已过期，都算这条链接不可用。 */
-  private async validChain(
-    token: string | undefined,
-  ): Promise<WikiShareEntity[] | null> {
-    if (!token || !TOKEN_RE.test(token)) {
-      return null;
-    }
-    const now = new Date();
-    const chain: WikiShareEntity[] = [];
-    const seen = new Set<string>();
-    let current: string | null = token;
-    while (current) {
-      if (seen.has(current) || chain.length >= SHARE_CHAIN_LIMIT) {
-        return null;
-      }
-      seen.add(current);
-      if (!TOKEN_RE.test(current)) {
-        return null;
-      }
-      const row = await this.shares.findOne({ where: { token: current } });
-      if (!row || row.revokedAt || isExpired(row.expiresAt, now)) {
-        return null;
-      }
-      chain.push(row);
-      current = row.parentToken;
-    }
-    return chain;
-  }
 }
 
 function sharerName(payload: Record<string, unknown>): string | null {
@@ -339,12 +310,18 @@ function unavailable(): never {
 
 /** 省略或 null 表示不过期。否则必须是 1 到 366 的整天秒数，到期日当天结束才失效。 */
 function parseExpiresIn(value: unknown, now = new Date()): Date | null {
-  if (value === undefined || value === null) {
-    return null;
+  if (value === undefined || value === null || typeof value !== 'number') {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    rpcFail(
+      400,
+      '有效期须为 1 天到 366 天的整天，或留空表示不过期',
+      'INVALID_EXPIRES_IN',
+    );
   }
   const days = value / DAY_SECONDS;
   if (
-    typeof value !== 'number' ||
     !Number.isInteger(value) ||
     !Number.isInteger(days) ||
     days < MIN_DAYS ||
