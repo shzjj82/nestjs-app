@@ -9,6 +9,7 @@ import type { DocPost, EditorJsDocument } from '../common/shared';
 import { DocumentsService } from '../documents/documents.service';
 import { WorkspaceRead } from '../documents/workspace-read';
 import { WikiShareEntity } from '../entities/wiki-share.entity';
+import { WikiShareFavoriteEntity } from '../entities/wiki-share-favorite.entity';
 
 /** 约 2MB。按快照 JSON 的 UTF-8 字节计。 */
 export const SHARE_BODY_LIMIT = 2 * 1024 * 1024;
@@ -43,6 +44,8 @@ export class SharesService {
   constructor(
     @InjectRepository(WikiShareEntity)
     private readonly shares: Repository<WikiShareEntity>,
+    @InjectRepository(WikiShareFavoriteEntity)
+    private readonly favorites: Repository<WikiShareFavoriteEntity>,
     private readonly workspace: WorkspaceRead,
     private readonly posts: DocumentsService,
   ) {}
@@ -138,6 +141,73 @@ export class SharesService {
     };
   }
 
+  /** 只返回调用者收藏的、仍然有效的分享，不含正文。 */
+  async listFavorites(payload: Record<string, unknown>) {
+    const accountId = requireAccount(payload);
+    const appCode = resolveAppCode(payload);
+    const saved = await this.favorites.find({ where: { accountId } });
+    const favorites = [];
+    for (const item of saved.sort(
+      (a, b) => timeOf(b.createdAt) - timeOf(a.createdAt),
+    )) {
+      const row = await this.liveShare(item.token);
+      if (!row || row.appCode !== appCode || isOwnShare(row, accountId)) {
+        continue;
+      }
+      favorites.push({
+        token: row.token,
+        urlPath: `/s/${row.token}`,
+        pageId: row.pageId,
+        title: row.title,
+        sharedBy: row.sharedBy?.trim() || '',
+        sharedAt: iso(row.createdAt) ?? new Date().toISOString(),
+        expiresAt: iso(row.expiresAt),
+        favorited: true,
+      });
+    }
+    return { favorites };
+  }
+
+  async readFavorite(payload: Record<string, unknown>) {
+    const accountId = requireAccount(payload);
+    const row = await this.liveShare(optionalString(payload.token));
+    if (!row) {
+      unavailable();
+    }
+    if (isOwnShare(row, accountId)) {
+      return { favorited: false, owned: true };
+    }
+    const saved = await this.favorites.findOne({
+      where: { accountId, token: row.token },
+    });
+    return { favorited: Boolean(saved), owned: false };
+  }
+
+  async addFavorite(payload: Record<string, unknown>) {
+    const accountId = requireAccount(payload);
+    const row = await this.requireFavoriteShare(payload, accountId);
+    const existing = await this.favorites.findOne({
+      where: { accountId, token: row.token },
+    });
+    if (!existing) {
+      await this.favorites.save(
+        this.favorites.create({
+          accountId,
+          token: row.token,
+          createdAt: new Date(),
+        }),
+      );
+    }
+    return { favorited: true, owned: false };
+  }
+
+  async removeFavorite(payload: Record<string, unknown>) {
+    const accountId = requireAccount(payload);
+    const row = await this.requireFavoriteShare(payload, accountId);
+    await this.favorites.delete({ accountId, token: row.token });
+    return { favorited: false, owned: false };
+  }
+
   async reshare(payload: Record<string, unknown>) {
     const parent = await this.liveShare(optionalString(payload.token));
     if (!parent) {
@@ -222,6 +292,21 @@ export class SharesService {
       body: freezeBody(post.body),
       children,
     };
+  }
+
+  /** 别人的有效分享才能收藏。作者、分享人或创建者都算自己的数据。 */
+  private async requireFavoriteShare(
+    payload: Record<string, unknown>,
+    accountId: string,
+  ): Promise<WikiShareEntity> {
+    const row = await this.liveShare(optionalString(payload.token));
+    if (!row) {
+      unavailable();
+    }
+    if (isOwnShare(row, accountId)) {
+      rpcFail(403, '不能收藏自己的文章', 'SHARE_OWN_PAGE');
+    }
+    return row;
   }
 
   /** 链接不存在或已过期。不因撤销作废。 */
@@ -324,6 +409,14 @@ function requireAccount(payload: Record<string, unknown>): string {
 
 function unavailable(): never {
   rpcFail(UNAVAILABLE.status, UNAVAILABLE.message, UNAVAILABLE.code);
+}
+
+function isOwnShare(row: WikiShareEntity, accountId: string): boolean {
+  return (
+    row.pageOwnerAccountId === accountId ||
+    row.ownerAccountId === accountId ||
+    row.createdBy === accountId
+  );
 }
 
 function requireShareToken(value: unknown): string {

@@ -8,6 +8,7 @@ import {
   SHARE_BODY_LIMIT,
 } from '../../src/shares/shares.service';
 import { WikiShareEntity } from '../../src/entities/wiki-share.entity';
+import { WikiShareFavoriteEntity } from '../../src/entities/wiki-share-favorite.entity';
 import type { DocPost } from '../../src/common/shared';
 
 const PAGE = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -54,6 +55,53 @@ function share(accountId: string, extra: Record<string, unknown> = {}) {
     expiresIn: 7 * 24 * 60 * 60,
     ...extra,
   });
+}
+
+function memoryFavorites() {
+  const rows: WikiShareFavoriteEntity[] = [];
+  return {
+    rows,
+    create(partial: WikiShareFavoriteEntity) {
+      return partial;
+    },
+    save(row: WikiShareFavoriteEntity) {
+      const copy = { ...row };
+      const index = rows.findIndex(
+        (item) => item.accountId === row.accountId && item.token === row.token,
+      );
+      if (index >= 0) {
+        rows[index] = copy;
+      } else {
+        rows.push(copy);
+      }
+      return Promise.resolve(copy);
+    },
+    findOne(options: { where: { accountId?: string; token?: string } }) {
+      return Promise.resolve(
+        rows.find(
+          (item) =>
+            item.accountId === options.where.accountId &&
+            item.token === options.where.token,
+        ) ?? null,
+      );
+    },
+    find(options: { where: { accountId?: string } }) {
+      return Promise.resolve(
+        rows.filter((item) => item.accountId === options.where.accountId),
+      );
+    },
+    delete(where: { accountId: string; token: string }) {
+      for (let i = rows.length - 1; i >= 0; i -= 1) {
+        if (
+          rows[i].accountId === where.accountId &&
+          rows[i].token === where.token
+        ) {
+          rows.splice(i, 1);
+        }
+      }
+      return Promise.resolve({ affected: 1 });
+    },
+  };
 }
 
 function memoryShares() {
@@ -153,6 +201,7 @@ describe('wiki shares', () => {
 
   function setup() {
     const repo = memoryShares();
+    const favorites = memoryFavorites();
     const findById = jest.fn((_payload: unknown, pageId: string) => ({
       ...post,
       id: pageId,
@@ -160,10 +209,11 @@ describe('wiki shares', () => {
     const listChildPosts = jest.fn(async () => [] as DocPost[]);
     const service = new SharesService(
       repo as never,
+      favorites as never,
       { findById } as never,
       { listChildPosts } as never,
     );
-    return { repo, findById, listChildPosts, service };
+    return { repo, favorites, findById, listChildPosts, service };
   }
 
   it('snapshots the readable page and keeps the editor token', async () => {
@@ -481,5 +531,79 @@ describe('wiki shares', () => {
       createdBy: null,
       parentToken: closed.token,
     });
+  });
+
+  it('lets another account favorite a live share, list it, and remove it', async () => {
+    const { service, favorites } = setup();
+    const created = await service.create(share(OWNER, { pageId: PAGE }));
+    expect(
+      await service.readFavorite(authed(OTHER, { token: created.token })),
+    ).toEqual({ favorited: false, owned: false });
+
+    const saved = await service.addFavorite(
+      authed(OTHER, { token: created.token }),
+    );
+    expect(saved).toEqual({ favorited: true, owned: false });
+    await service.addFavorite(authed(OTHER, { token: created.token }));
+    expect(favorites.rows).toHaveLength(1);
+
+    const listed = await service.listFavorites(authed(OTHER, {}));
+    expect(listed.favorites).toEqual([
+      {
+        token: created.token,
+        urlPath: `/s/${created.token}`,
+        pageId: PAGE,
+        title: '周报',
+        sharedBy: '周报作者',
+        sharedAt: expect.any(String),
+        expiresAt: created.expiresAt,
+        favorited: true,
+      },
+    ]);
+    expect(listed.favorites[0]).not.toHaveProperty('body');
+    expect(JSON.stringify(listed)).not.toContain(OTHER);
+    expect(await service.listFavorites(authed(AUTHOR, {}))).toEqual({
+      favorites: [],
+    });
+
+    const removed = await service.removeFavorite(
+      authed(OTHER, { token: created.token }),
+    );
+    expect(removed).toEqual({ favorited: false, owned: false });
+    expect(favorites.rows).toHaveLength(0);
+    expect(
+      await service.removeFavorite(authed(OTHER, { token: created.token })),
+    ).toEqual({ favorited: false, owned: false });
+  });
+
+  it('refuses a favorite of the caller’s own share and of an unavailable link', async () => {
+    const { service, repo, favorites } = setup();
+    const created = await service.create(share(OWNER, { pageId: PAGE }));
+    const own = {
+      status: 403,
+      code: 'SHARE_OWN_PAGE',
+      message: '不能收藏自己的文章',
+    };
+    expect(
+      await rpcError(service.addFavorite(authed(OWNER, { token: created.token }))),
+    ).toEqual(own);
+    expect(
+      await rpcError(
+        service.addFavorite(authed(AUTHOR, { token: created.token })),
+      ),
+    ).toEqual(own);
+    expect(
+      await service.readFavorite(authed(OWNER, { token: created.token })),
+    ).toEqual({ favorited: false, owned: true });
+    expect(favorites.rows).toHaveLength(0);
+
+    repo.rows[0].expiresAt = new Date(Date.now() - 1000);
+    expect(
+      await rpcError(service.addFavorite(authed(OTHER, { token: created.token }))),
+    ).toEqual(UNAVAILABLE);
+    expect(
+      await rpcError(service.addFavorite(authed(OTHER, { token: 'c'.repeat(43) }))),
+    ).toEqual(UNAVAILABLE);
+    expect(favorites.rows).toHaveLength(0);
   });
 });

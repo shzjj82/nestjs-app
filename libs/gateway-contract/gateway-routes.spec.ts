@@ -268,6 +268,21 @@ describe('matchRoute', () => {
     expect(reshare?.auth).toBeUndefined();
     expect(reshare?.cacheControl).toBe('no-store');
     expect(reshare?.params).toEqual({ token: 'tok' });
+
+    const list = matchRoute('GET', '/wiki/shares/favorites');
+    expect(list?.pattern).toBe(MQTT_PATTERNS.WIKI_SHARE_FAVORITE_LIST);
+    expect(list?.auth).toEqual(['jwt']);
+    expect(list?.cacheControl).toBe('no-store');
+    const read = matchRoute('GET', '/wiki/shares/view/tok/favorite');
+    expect(read?.pattern).toBe(MQTT_PATTERNS.WIKI_SHARE_FAVORITE_READ);
+    expect(read?.auth).toEqual(['jwt']);
+    expect(read?.params).toEqual({ token: 'tok' });
+    expect(matchRoute('POST', '/wiki/shares/view/tok/favorite')?.pattern).toBe(
+      MQTT_PATTERNS.WIKI_SHARE_FAVORITE_ADD,
+    );
+    expect(matchRoute('DELETE', '/wiki/shares/view/tok/favorite')?.pattern).toBe(
+      MQTT_PATTERNS.WIKI_SHARE_FAVORITE_REMOVE,
+    );
   });
 
   it('protects wechat miniprogram admin and qrcode override', () => {

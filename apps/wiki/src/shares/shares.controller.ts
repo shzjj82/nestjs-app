@@ -54,4 +54,48 @@ export class SharesController {
   reshare(payload: Record<string, unknown>) {
     return this.shares.reshare(payload);
   }
+
+  @MessagePattern(
+    sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_SHARE_FAVORITE_LIST),
+  )
+  @ApiDoc({
+    name: '分享收藏列表',
+    description: '登录。只返回调用者收藏的有效分享，不含正文。',
+  })
+  listFavorites(payload: Record<string, unknown>) {
+    return this.shares.listFavorites(payload);
+  }
+
+  @MessagePattern(
+    sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_SHARE_FAVORITE_READ),
+  )
+  @ApiDoc({
+    name: '分享收藏状态',
+    description: '登录。返回是否已收藏，以及这篇是不是自己的文章。',
+  })
+  readFavorite(payload: Record<string, unknown>) {
+    return this.shares.readFavorite(payload);
+  }
+
+  @MessagePattern(
+    sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_SHARE_FAVORITE_ADD),
+  )
+  @ApiDoc({
+    name: '收藏分享',
+    description: '登录。不能收藏自己的文章。链接不存在或已过期时不写入。',
+  })
+  addFavorite(payload: Record<string, unknown>) {
+    return this.shares.addFavorite(payload);
+  }
+
+  @MessagePattern(
+    sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_SHARE_FAVORITE_REMOVE),
+  )
+  @ApiDoc({
+    name: '取消收藏分享',
+    description: '登录。取消自己对这条分享的收藏。',
+  })
+  removeFavorite(payload: Record<string, unknown>) {
+    return this.shares.removeFavorite(payload);
+  }
 }
