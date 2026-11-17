@@ -11,6 +11,7 @@ import {
   type EditorJsDocument,
   type DocKind,
 } from '../common/shared';
+import { OpLogService } from '../oplog/op-log.service';
 import { removedAttachmentKeys } from './attachment-keys';
 import { DocumentsService } from './documents.service';
 import { RagNotify } from './rag-notify';
@@ -33,6 +34,7 @@ export class DocumentsController {
     private readonly rag: RagNotify,
     private readonly todoPages: TodoPageCleanup,
     private readonly workspace: WorkspaceRead,
+    private readonly opLogs: OpLogService,
   ) {}
 
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_POST_FIND_ALL))
@@ -160,6 +162,19 @@ export class DocumentsController {
     this.assertAssignableTeam(payload, input.teamId, grants.writable);
     const post = await this.posts.create(input);
     this.rag.index(post);
+    void this.opLogs.writeFromPayload(payload, {
+      action: 'document.create',
+      resourceType: 'document',
+      resourceId: post.id,
+      title: post.title,
+      payload: {
+        slug: post.slug,
+        kind: post.kind,
+        visibility: post.visibility,
+        parentId: post.parentId,
+        teamId: post.teamId,
+      },
+    });
     return { post };
   }
 
@@ -181,6 +196,18 @@ export class DocumentsController {
     // 正文里去掉的附件：先按 source 清向量，再全量重建
     this.rag.removeSources(removedAttachmentKeys(before.body, post.body));
     this.rag.index(post);
+    void this.opLogs.writeFromPayload(payload, {
+      action: 'document.update',
+      resourceType: 'document',
+      resourceId: post.id,
+      title: post.title,
+      payload: {
+        slug: post.slug,
+        visibility: post.visibility,
+        titleChanged: before.title !== post.title,
+        bodyChanged: before.body !== post.body,
+      },
+    });
     return { post };
   }
 
@@ -188,7 +215,7 @@ export class DocumentsController {
   @ApiDoc({ name: '删除文档', description: '删除文档及其子树，并级联清理关联 wiki 待办' })
   async remove(payload: Record<string, unknown>) {
     const id = requiredString(payload.id, 'id');
-    await this.requireInBiz(payload);
+    const before = await this.requireInBiz(payload);
     const grants = await this.grants(payload);
     const deletedIds = await this.posts.remove(
       id,
@@ -202,6 +229,17 @@ export class DocumentsController {
       this.rag.remove(pageId);
     }
     this.todoPages.removeByPages(deletedIds);
+    void this.opLogs.writeFromPayload(payload, {
+      action: 'document.delete',
+      resourceType: 'document',
+      resourceId: id,
+      title: before.title,
+      payload: {
+        slug: before.slug,
+        deletedIds,
+        deletedCount: deletedIds.length,
+      },
+    });
     return null;
   }
 
@@ -217,6 +255,17 @@ export class DocumentsController {
     );
     this.rag.index(result.post as DocPost);
     this.rag.index(result.parent as DocPost);
+    const child = result.post as DocPost;
+    void this.opLogs.writeFromPayload(payload, {
+      action: 'document.create_child',
+      resourceType: 'document',
+      resourceId: child.id,
+      title: child.title,
+      payload: {
+        parentId: requiredString(payload.id, 'id'),
+        slug: child.slug,
+      },
+    });
     return result;
   }
 
@@ -227,12 +276,21 @@ export class DocumentsController {
     const grants = await this.grants(payload);
     const raw = payload.parentId;
     const parentId = raw === undefined || raw === null ? null : String(raw);
-    return this.posts.reparent(
-      requiredString(payload.id, 'id'),
+    const id = requiredString(payload.id, 'id');
+    const result = await this.posts.reparent(
+      id,
       parentId,
       authorAccountId(payload),
       grants.writable,
     );
+    void this.opLogs.writeFromPayload(payload, {
+      action: 'document.reparent',
+      resourceType: 'document',
+      resourceId: id,
+      title: (result as { child?: DocPost })?.child?.title ?? null,
+      payload: { parentId },
+    });
+    return result;
   }
 
   /** 按 id 操作的文档必须属于当前业务，否则按不存在处理 */

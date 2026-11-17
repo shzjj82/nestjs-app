@@ -252,6 +252,7 @@ const businessFeatures: FeatureCatalogItem[] = [
       'GET /wiki/documents/id/:id',
       'GET /wiki/categories',
       'GET /wiki/categories/:slug',
+      'GET /wiki/op-logs',
     ],
   },
   {
@@ -576,6 +577,7 @@ const businessFeatures: FeatureCatalogItem[] = [
       'GET /todos/open-count',
       'POST /todos',
       'GET /todos/:id',
+      'GET /todos/:id/events',
       'PATCH /todos/:id',
       'POST /todos/:id/start',
       'POST /todos/:id/done',

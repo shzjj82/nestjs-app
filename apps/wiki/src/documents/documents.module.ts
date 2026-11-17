@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AGENTS_CLIENT, NOTIFY_CLIENT, mqttClientOptions } from '@app/common';
 import { CategoriesModule } from '../categories/categories.module';
 import { DocumentEntity } from '../entities';
+import { OpLogModule } from '../oplog/op-log.module';
 import { TeamsModule } from '../teams/teams.module';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
@@ -17,6 +18,7 @@ import { WorkspaceRead } from './workspace-read';
     TypeOrmModule.forFeature([DocumentEntity]),
     CategoriesModule,
     TeamsModule,
+    OpLogModule,
     ClientsModule.register([
       {
         name: AGENTS_CLIENT,

@@ -34,6 +34,15 @@ export class TodosController {
     return this.todos.findOne(payload);
   }
 
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_EVENT_LIST))
+  @ApiDoc({
+    name: '待办操作日志',
+    description: '本人待办的业务操作事件（创建/开始/完成/取消/重开等），按时间倒序',
+  })
+  listEvents(payload: Record<string, unknown>) {
+    return this.todos.listEvents(payload);
+  }
+
   @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_CREATE))
   @ApiDoc({ name: '新建待办', description: '给当前登录用户自己建一条待办，并经 socket 推送' })
   createMine(payload: Record<string, unknown>) {
@@ -82,14 +91,14 @@ export class TodosController {
     description: '向指定业务下的用户创建待办，并经 socket 推送',
   })
   adminCreate(payload: Record<string, unknown>) {
-    requireActor(payload);
-    return this.todos.create(parseSend(payload, 'admin'));
+    const actor = requireActor(payload);
+    return this.todos.create(parseSend(payload, 'admin'), actor.userId);
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_SEND))
   send(payload: Record<string, unknown>) {
     requireInternal(payload);
-    return this.todos.create(parseSend(payload, 'service'));
+    return this.todos.create(parseSend(payload, 'service'), null);
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_PATCH_DATA))

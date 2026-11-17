@@ -7,6 +7,7 @@ import { WikiController } from './wiki.controller';
 import { DocumentsModule } from './documents/documents.module';
 import { FacadeModule } from './facade/facade.module';
 import { TeamsModule } from './teams/teams.module';
+import { OpLogModule } from './oplog/op-log.module';
 import { SharesModule } from './shares/shares.module';
 import { TodosModule } from './todos/todos.module';
 
@@ -18,6 +19,7 @@ import { TodosModule } from './todos/todos.module';
     TeamsModule,
     TodosModule,
     SharesModule,
+    OpLogModule,
     FacadeModule,
     ApiDocsModule.forService({
       service: 'wiki',

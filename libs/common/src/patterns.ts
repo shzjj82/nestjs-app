@@ -164,6 +164,8 @@ export const MQTT_PATTERNS = {
   WIKI_TODO_REOPEN: 'wiki.todo.reopen',
   /** 给已有待办补绑 / 改绑文章页（含已完成历史数据） */
   WIKI_TODO_BIND_PAGE: 'wiki.todo.bindPage',
+  /** wiki 业务操作日志列表 */
+  WIKI_OP_LOG_LIST: 'wiki.opLog.list',
   UPLOAD_HEALTH: 'upload.health',
   UPLOAD_API_DOCS: 'upload.apiDocs',
   UPLOAD_PUT: 'upload.put',
@@ -316,6 +318,8 @@ export const MQTT_PATTERNS = {
   TODO_WIKI_REMIND_CLAIM: 'todo.wikiRemindClaim',
   /** 内部：wiki 催办发送失败后释放占坑 */
   TODO_WIKI_REMIND_RELEASE: 'todo.wikiRemindRelease',
+  /** 待办操作日志列表 */
+  TODO_EVENT_LIST: 'todo.event.list',
 } as const;
 
 export function sharePattern(group: string, pattern: string): string {

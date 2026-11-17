@@ -9,6 +9,7 @@ import { WikiShares1760000003000 } from './migrations/1760000003000-wiki-shares'
 import { WikiShareAuthor1760000004000 } from './migrations/1760000004000-wiki-share-author';
 import { WikiShareChildren1760000005000 } from './migrations/1760000005000-wiki-share-children';
 import { WikiShareFavorites1760000006000 } from './migrations/1760000006000-wiki-share-favorites';
+import { WikiOpEvents1760000007000 } from './migrations/1760000007000-wiki-op-events';
 
 const sync = process.env.TYPEORM_SYNC === 'true';
 
@@ -28,6 +29,7 @@ const sync = process.env.TYPEORM_SYNC === 'true';
         WikiShareAuthor1760000004000,
         WikiShareChildren1760000005000,
         WikiShareFavorites1760000006000,
+        WikiOpEvents1760000007000,
       ],
       logging: process.env.TYPEORM_LOGGING === 'true',
     }),

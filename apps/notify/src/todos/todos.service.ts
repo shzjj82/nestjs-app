@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { rpcFail } from '@app/common';
+import { optionalString, rpcFail } from '@app/common';
 import type { NotifyTodo } from '@app/notify-contract';
 import { Repository } from 'typeorm';
 import {
@@ -14,8 +14,9 @@ import {
   type SendCommand,
 } from '../common/input';
 import { pushRealtime } from '../common/push';
-import { TodoEntity } from '../entities';
+import { TodoEntity, TodoEventEntity } from '../entities';
 import { shanghaiDate, shanghaiDayOf } from './shanghai-day';
+import { actorIdFromPayload, writeTodoOp } from './todo-op-log';
 import { asPageIds } from './todo-page-ids';
 import {
   applyStatusTransition,
@@ -40,6 +41,8 @@ export class TodosService {
   constructor(
     @InjectRepository(TodoEntity)
     private readonly todos: Repository<TodoEntity>,
+    @InjectRepository(TodoEventEntity)
+    private readonly events: Repository<TodoEventEntity>,
   ) {}
 
   async list(payload: Record<string, unknown>) {
@@ -87,6 +90,41 @@ export class TodosService {
     return toView(await this.own(payload));
   }
 
+  async listEvents(payload: Record<string, unknown>) {
+    const row = await this.own(payload);
+    const page = toPage(payload.page, payload.pageSize);
+    const qb = this.events
+      .createQueryBuilder('e')
+      .where('e.todo_id = :todoId', { todoId: row.id })
+      .andWhere('e.biz_code = :bizCode', { bizCode: row.bizCode })
+      .orderBy('e.created_at', 'DESC')
+      .skip(page.skip)
+      .take(page.pageSize);
+    const action = optionalString(payload.action);
+    if (action) {
+      qb.andWhere('e.action = :action', { action });
+    }
+    const [rows, total] = await qb.getManyAndCount();
+    return {
+      items: rows.map((event) => ({
+        id: event.id,
+        bizCode: event.bizCode,
+        todoId: event.todoId,
+        action: event.action,
+        fromStatus: event.fromStatus,
+        toStatus: event.toStatus,
+        actorId: event.actorId,
+        title: event.title,
+        outcome: event.outcome,
+        payload: event.payload,
+        createdAt: event.createdAt.toISOString(),
+      })),
+      total,
+      page: page.page,
+      pageSize: page.pageSize,
+    };
+  }
+
   async createMine(payload: Record<string, unknown>) {
     const actor = requireActor(payload);
     const { source: _source, userId: _userId, bizCode: _bizCode, ...rest } = payload;
@@ -94,11 +132,12 @@ export class TodosService {
       { ...rest, bizCode: bizCodeOf(payload), userId: actor.userId },
       'user',
     );
-    return this.create(command);
+    return this.create(command, actorIdFromPayload(payload));
   }
 
   async updateMine(payload: Record<string, unknown>) {
     const row = await this.own(payload);
+    const fromStatus = normalizeTodoStatus(row.status);
     const command = parseUpdateMine(payload);
     row.title = command.title;
     if (command.content !== undefined) {
@@ -123,11 +162,28 @@ export class TodosService {
     }
     await this.todos.save(row);
     const view = toView(row);
+    void writeTodoOp(this.events, {
+      bizCode: row.bizCode,
+      todoId: row.id,
+      action: 'todo.update',
+      fromStatus,
+      toStatus: view.status,
+      actorId: actorIdFromPayload(payload),
+      title: row.title,
+      payload: {
+        statusChanged: fromStatus !== view.status,
+        startsAt: row.startsAt,
+        dueAt: view.dueAt,
+      },
+    });
     await pushRealtime({ kind: 'todo', action: 'updated', item: view });
     return view;
   }
 
-  async create(command: SendCommand): Promise<NotifyTodo> {
+  async create(
+    command: SendCommand,
+    actorId: string | null = null,
+  ): Promise<NotifyTodo> {
     const now = new Date();
     const status = command.status;
     const saved = await this.todos.save(
@@ -152,24 +208,54 @@ export class TodosService {
       }),
     );
     const view = toView(saved);
+    void writeTodoOp(this.events, {
+      bizCode: saved.bizCode,
+      todoId: saved.id,
+      action: 'todo.create',
+      fromStatus: null,
+      toStatus: view.status,
+      actorId: actorId ?? command.userId,
+      title: saved.title,
+      payload: { source: saved.source, category: saved.category },
+    });
     await pushRealtime({ kind: 'todo', action: 'created', item: view });
     return view;
   }
 
   async start(payload: Record<string, unknown>) {
     const row = await this.own(payload);
+    const fromStatus = normalizeTodoStatus(row.status);
     this.applyTransition(row, 'in_progress');
     await this.todos.save(row);
     const view = toView(row);
+    void writeTodoOp(this.events, {
+      bizCode: row.bizCode,
+      todoId: row.id,
+      action: 'todo.start',
+      fromStatus,
+      toStatus: view.status,
+      actorId: actorIdFromPayload(payload),
+      title: row.title,
+    });
     await pushRealtime({ kind: 'todo', action: 'updated', item: view });
     return view;
   }
 
   async finish(payload: Record<string, unknown>, action: 'done' | 'cancel') {
     const row = await this.own(payload);
+    const fromStatus = normalizeTodoStatus(row.status);
     this.applyTransition(row, action === 'done' ? 'done' : 'cancelled');
     await this.todos.save(row);
     const view = toView(row);
+    void writeTodoOp(this.events, {
+      bizCode: row.bizCode,
+      todoId: row.id,
+      action: action === 'done' ? 'todo.done' : 'todo.cancel',
+      fromStatus,
+      toStatus: view.status,
+      actorId: actorIdFromPayload(payload),
+      title: row.title,
+    });
     await pushRealtime({ kind: 'todo', action: 'updated', item: view });
     return view;
   }
@@ -183,6 +269,15 @@ export class TodosService {
     this.applyTransition(row, reopenTargetStatus(row.startsAt));
     await this.todos.save(row);
     const view = toView(row);
+    void writeTodoOp(this.events, {
+      bizCode: row.bizCode,
+      todoId: row.id,
+      action: 'todo.reopen',
+      fromStatus: current,
+      toStatus: view.status,
+      actorId: actorIdFromPayload(payload),
+      title: row.title,
+    });
     await pushRealtime({ kind: 'todo', action: 'updated', item: view });
     return view;
   }
@@ -202,6 +297,16 @@ export class TodosService {
     row.data = (data as Record<string, unknown> | null) ?? null;
     await this.todos.save(row);
     const view = toView(row);
+    void writeTodoOp(this.events, {
+      bizCode: row.bizCode,
+      todoId: row.id,
+      action: 'todo.patch_data',
+      fromStatus: view.status,
+      toStatus: view.status,
+      actorId: actorIdFromPayload(payload),
+      title: row.title,
+      payload: { data: row.data },
+    });
     await pushRealtime({ kind: 'todo', action: 'updated', item: view });
     return view;
   }
@@ -283,7 +388,15 @@ export class TodosService {
       `,
       [bizCode, pageIds],
     )) as Array<{ id: string; bizCode: string; userId: string }>;
+    const actorId = actorIdFromPayload(payload);
     for (const row of rows) {
+      void writeTodoOp(this.events, {
+        bizCode: row.bizCode,
+        todoId: row.id,
+        action: 'todo.delete_by_pages',
+        actorId,
+        payload: { pageIds },
+      });
       await pushRealtime({
         kind: 'todo',
         action: 'deleted',

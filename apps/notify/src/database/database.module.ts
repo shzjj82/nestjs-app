@@ -6,6 +6,7 @@ import { InitNotifySchema1760900000000 } from './migrations/1760900000000-init-n
 import { SplitNoticeAndTodo1760900001000 } from './migrations/1760900001000-split-notice-and-todo';
 import { TodoRemindedOn1760900002000 } from './migrations/1760900002000-todo-reminded-on';
 import { TodoFourStates1760900003000 } from './migrations/1760900003000-todo-four-states';
+import { TodoEvents1760900004000 } from './migrations/1760900004000-todo-events';
 
 const sync = process.env.TYPEORM_SYNC === 'true';
 
@@ -22,6 +23,7 @@ const sync = process.env.TYPEORM_SYNC === 'true';
         SplitNoticeAndTodo1760900001000,
         TodoRemindedOn1760900002000,
         TodoFourStates1760900003000,
+        TodoEvents1760900004000,
       ],
       logging: process.env.TYPEORM_LOGGING === 'true',
     }),
