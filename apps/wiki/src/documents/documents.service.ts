@@ -151,7 +151,17 @@ export class DocumentsService {
       // authorId 为空的是接账户归属前写的旧文，工作区暂时可见，编辑时会认领
       if (opts.readableTeamIds?.length) {
         qb.andWhere(
-          `(post.author_id = :authorId OR post.author_id IS NULL OR post.team_id IN (:...readableTeamIds))`,
+          `(post.author_id = :authorId OR post.author_id IS NULL OR post.id IN (
+            WITH RECURSIVE team_tree AS (
+              SELECT id, 0 AS depth FROM doc_documents
+              WHERE app_code = :appCode AND team_id IN (:...readableTeamIds)
+              UNION ALL
+              SELECT child.id, parent.depth + 1 FROM doc_documents child
+              INNER JOIN team_tree parent ON child.parent_id = parent.id
+              WHERE child.app_code = :appCode AND parent.depth < 64
+            )
+            SELECT id FROM team_tree
+          ))`,
           { authorId: opts.authorId, readableTeamIds: opts.readableTeamIds },
         );
       } else {
@@ -299,13 +309,14 @@ export class DocumentsService {
   }
 
   /**
-   * 文章仅作者（或尚无 authorId 的旧数据）可改。
+   * 作者、尚无作者的旧文，或这篇及祖先属于可写团队的文章，可以修改。
    * 无 actorId 时放行：仅服务密钥迁移/运维路径应走到这里；用户 JWT 路径必有 actorId。
    */
   assertArticleOwner(
     post: DocPost,
     actorId: string | undefined,
     writableTeamIds?: readonly string[],
+    lineageTeamIds?: readonly string[],
   ): void {
     if (!actorId) {
       return;
@@ -313,10 +324,34 @@ export class DocumentsService {
     if (!post.authorId || post.authorId === actorId) {
       return;
     }
-    if (post.teamId && writableTeamIds?.includes(post.teamId)) {
+    const teams = lineageTeamIds ?? (post.teamId ? [post.teamId] : []);
+    if (teams.some((id) => writableTeamIds?.includes(id))) {
       return;
     }
     rpcFail(403, 'FORBIDDEN');
+  }
+
+  /** 这篇和祖先上的团队。同团队的文章对成员共享，子页面即使没再写 teamId 也算。 */
+  async lineageTeamIds(postId: string, ownTeamId?: string | null): Promise<string[]> {
+    const ids = new Set<string>();
+    if (ownTeamId) {
+      ids.add(ownTeamId);
+    }
+    for (const node of await this.ancestorChain(postId)) {
+      if (node.teamId) {
+        ids.add(node.teamId);
+      }
+    }
+    return [...ids];
+  }
+
+  private async assertCanWrite(
+    post: DocPost,
+    actorId: string | undefined,
+    writableTeamIds?: readonly string[],
+  ) {
+    const lineage = await this.lineageTeamIds(post.id, post.teamId);
+    this.assertArticleOwner(post, actorId, writableTeamIds, lineage);
   }
 
   async findBySlug(
@@ -468,7 +503,7 @@ export class DocumentsService {
     if (!existing) {
       return null;
     }
-    this.assertArticleOwner(existing, input.authorId ?? undefined, writableTeamIds);
+    await this.assertCanWrite(existing, input.authorId ?? undefined, writableTeamIds);
     // 旧文无作者时，首次由当前用户认领
     if (!existing.authorId && input.authorId) {
       existing.authorId = input.authorId;
@@ -553,7 +588,7 @@ export class DocumentsService {
       if (!parent) {
         rpcFail(400, 'INVALID_PARENT');
       }
-      this.assertArticleOwner(parent, authorId, writableTeamIds);
+      await this.assertCanWrite(parent, authorId, writableTeamIds);
       const child = await this.create({
         appCode: parent.appCode,
         title: '无标题',
@@ -586,11 +621,11 @@ export class DocumentsService {
       if (!child) {
         rpcFail(404, 'NOT_FOUND');
       }
-      this.assertArticleOwner(child, actorId, writableTeamIds);
+      await this.assertCanWrite(child, actorId, writableTeamIds);
       if (newParentId) {
         const parent = await this.findById(newParentId);
         if (parent) {
-          this.assertArticleOwner(parent, actorId, writableTeamIds);
+          await this.assertCanWrite(parent, actorId, writableTeamIds);
         }
       }
       const resolvedParentId = await this.resolveParent(child.appCode, newParentId);
@@ -654,7 +689,7 @@ export class DocumentsService {
       if (!existing) {
         return null;
       }
-      this.assertArticleOwner(existing, actorId, writableTeamIds);
+      await this.assertCanWrite(existing, actorId, writableTeamIds);
       const ids = await this.collectSubtree(id);
       if (existing.parentId) {
         await this.stripPageLink(existing.parentId, id);

@@ -4,10 +4,11 @@ import { resolveAppCode } from '../common/app-code';
 import type { DocPost } from '../common/shared';
 import { DocumentsService } from './documents.service';
 import { TeamAccess } from './team-access';
+import { canReadWorkspacePost } from './workspace-access';
 
 /**
  * 工作区按 id 读取，规则与 GET /wiki/documents/id/:pageId 相同。
- * 私有文：作者或团队成员可读。公开文：非作者不可读。
+ * 作者、尚无作者的旧文，以及这篇或祖先属于当前用户所在团队的文章，都可以读。
  */
 @Injectable()
 export class WorkspaceRead {
@@ -26,14 +27,16 @@ export class WorkspaceRead {
     }
     const actorId = authorAccountId(payload);
     const grants = await this.grants(payload);
-    const inTeam = Boolean(
-      post.teamId && grants.readable.includes(post.teamId),
-    );
-    if (post.visibility === 'private') {
-      if (!actorId || (post.authorId && post.authorId !== actorId && !inTeam)) {
-        rpcFail(403, 'FORBIDDEN');
-      }
-    } else if (actorId && post.authorId && post.authorId !== actorId) {
+    const lineageTeamIds = await this.posts.lineageTeamIds(post.id, post.teamId);
+    if (
+      !canReadWorkspacePost({
+        visibility: post.visibility,
+        authorId: post.authorId,
+        actorId,
+        lineageTeamIds,
+        readableTeamIds: grants.readable,
+      })
+    ) {
       rpcFail(403, 'FORBIDDEN');
     }
     return post;
