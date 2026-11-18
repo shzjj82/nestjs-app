@@ -6,7 +6,7 @@ export class WikiTeamsSchema1760000002000 implements MigrationInterface {
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS wiki_teams (
-        id uuid PRIMARY KEY,
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         app_code varchar(64) NOT NULL,
         biz_code varchar(64) NOT NULL,
         code varchar(16) NOT NULL,
@@ -28,7 +28,7 @@ export class WikiTeamsSchema1760000002000 implements MigrationInterface {
 
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS wiki_team_members (
-        id uuid PRIMARY KEY,
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         team_id uuid NOT NULL,
         account_id uuid NOT NULL,
         role varchar(16) NOT NULL,
