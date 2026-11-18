@@ -159,6 +159,7 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'POST', path: '/wiki/teams/join', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TEAM_JOIN, auth: ['jwt'] }),
   business({ method: 'POST', path: '/wiki/teams/:id/code', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TEAM_REFRESH_CODE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/wiki/teams/:id/leave', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TEAM_LEAVE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/wiki/teams/:id/dissolve', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TEAM_DISSOLVE, auth: ['jwt'] }),
   business({ method: 'PATCH', path: '/wiki/teams/:id/members/:accountId', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TEAM_MEMBER_UPDATE, auth: ['jwt'] }),
   business({ method: 'GET', path: '/teams', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TEAM_FIND_ALL, auth: ['jwt'] }),
   business({ method: 'POST', path: '/teams', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TEAM_CREATE, auth: ['jwt'] }),
@@ -166,6 +167,8 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'POST', path: '/teams/join', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TEAM_JOIN, auth: ['jwt'] }),
   business({ method: 'POST', path: '/teams/:id/code', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TEAM_REFRESH_CODE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/teams/:id/leave', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TEAM_LEAVE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/teams/:id/dissolve', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TEAM_DISSOLVE, auth: ['jwt'] }),
+  business({ method: 'POST', path: '/teams/:id/dissolve', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TEAM_DISSOLVE, auth: ['jwt'] }),
   business({ method: 'PATCH', path: '/teams/:id/members/:accountId', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_TEAM_MEMBER_UPDATE, auth: ['jwt'] }),
 
   business({ method: 'GET', path: '/orders', client: ORDER_CLIENT, pattern: MQTT_PATTERNS.ORDER_FIND_ALL }),

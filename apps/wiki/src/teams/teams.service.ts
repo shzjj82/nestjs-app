@@ -14,6 +14,7 @@ import { lastValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import { Repository } from 'typeorm';
 import { optionalString, requiredString, rpcFail } from '../common/rpc';
+import { DocumentEntity } from '../entities/document.entity';
 import { TeamEntity } from '../entities/team.entity';
 import { TeamMemberEntity } from '../entities/team-member.entity';
 import { generateTeamCode } from './team-code';
@@ -32,6 +33,8 @@ export class TeamsService implements OnModuleInit {
     private readonly teams: Repository<TeamEntity>,
     @InjectRepository(TeamMemberEntity)
     private readonly members: Repository<TeamMemberEntity>,
+    @InjectRepository(DocumentEntity)
+    private readonly documents: Repository<DocumentEntity>,
     @Inject(USER_CLIENT) private readonly users: ClientProxy,
   ) {}
 
@@ -123,11 +126,24 @@ export class TeamsService implements OnModuleInit {
     const team = await this.requireTeam(teamId, scope.appCode, scope.bizCode);
     const me = await this.requireMember(team.id, scope.accountId);
     if (me.role === 'owner') {
-      await this.assertOtherOwner(team.id, scope.accountId);
+      rpcFail(400, '拥有者请解散团队，不能退出');
     }
     await this.members.delete({ id: me.id });
     await this.touch(team);
     return { left: true as const, teamId: team.id };
+  }
+
+  /** 只有拥有者可以解散。成员不能退出又解散。文章退回作者个人页面。 */
+  async dissolve(scope: TeamScope, teamId: string) {
+    this.assertScope(scope);
+    const team = await this.requireTeam(teamId, scope.appCode, scope.bizCode);
+    const me = await this.requireMember(team.id, scope.accountId);
+    if (!canManageTeam(me.role)) {
+      rpcFail(403, '只有拥有者可以解散团队');
+    }
+    await this.documents.update({ teamId: team.id }, { teamId: null });
+    await this.teams.delete({ id: team.id });
+    return { dissolved: true as const, teamId: team.id };
   }
 
   async setRole(

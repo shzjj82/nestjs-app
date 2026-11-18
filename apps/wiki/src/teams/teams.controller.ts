@@ -49,9 +49,18 @@ export class TeamsController {
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TEAM_LEAVE))
-  @ApiDoc({ name: '离开团队', description: '最后一名拥有者需先移交' })
+  @ApiDoc({ name: '离开团队', description: '非拥有者退出。拥有者不能退出，只能解散。' })
   leave(payload: Record<string, unknown>) {
     return this.teams.leave(this.scope(payload), requiredString(payload.id, 'id'));
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TEAM_DISSOLVE))
+  @ApiDoc({
+    name: '解散团队',
+    description: '仅拥有者。团队删除，成员关系失效，文章回到作者个人页面。',
+  })
+  dissolve(payload: Record<string, unknown>) {
+    return this.teams.dissolve(this.scope(payload), requiredString(payload.id, 'id'));
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TEAM_MEMBER_UPDATE))

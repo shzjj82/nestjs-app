@@ -60,6 +60,7 @@ export const MQTT_PATTERNS = {
   WIKI_TEAM_JOIN: 'wiki.team.join',
   WIKI_TEAM_REFRESH_CODE: 'wiki.team.code.refresh',
   WIKI_TEAM_LEAVE: 'wiki.team.leave',
+  WIKI_TEAM_DISSOLVE: 'wiki.team.dissolve',
   WIKI_TEAM_MEMBER_UPDATE: 'wiki.team.member.update',
   WIKI_TEAM_MEMBERSHIPS: 'wiki.team.memberships',
   CLIENT_FIND_ALL: 'client.findAll',

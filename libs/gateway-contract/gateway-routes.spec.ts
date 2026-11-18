@@ -118,6 +118,11 @@ describe('matchRoute', () => {
     expect(matchRoute('POST', '/teams/team-1/code')?.pattern).toBe(
       MQTT_PATTERNS.WIKI_TEAM_REFRESH_CODE,
     );
+    expect(matchRoute('POST', '/wiki/teams/team-1/dissolve')?.pattern).toBe(
+      MQTT_PATTERNS.WIKI_TEAM_DISSOLVE,
+    );
+    expect(matchRoute('POST', '/wiki/teams/team-1/dissolve')?.auth).toEqual(['jwt']);
+    expect(matchRoute('POST', '/teams/team-1/dissolve')?.params).toEqual({ id: 'team-1' });
     expect(matchRoute('GET', '/wiki/teams')?.client).toBe('WIKI_CLIENT');
     expect(matchRoute('POST', '/wiki/teams')?.pattern).toBe(MQTT_PATTERNS.WIKI_TEAM_CREATE);
     expect(matchRoute('PATCH', '/teams/team-1/members/acc-1')?.params).toEqual({
