@@ -36,6 +36,18 @@ export class TeamsController {
     return this.teams.create(this.scope(payload), payload);
   }
 
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TEAM_UPDATE))
+  @ApiDoc({ name: '修改团队资料', description: '仅拥有者可改名称和详情' })
+  update(payload: Record<string, unknown>) {
+    return this.teams.updateProfile(this.scope(payload), requiredString(payload.id, 'id'), payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TEAM_PREVIEW))
+  @ApiDoc({ name: '邀请预览', description: '用团队码查看名称和详情，不加入团队' })
+  preview(payload: Record<string, unknown>) {
+    return this.teams.previewByCode(this.scope(payload), requiredString(payload.code, 'code'));
+  }
+
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TEAM_JOIN))
   @ApiDoc({ name: '加入团队', description: '用团队码加入，当前账户成为使用者' })
   join(payload: Record<string, unknown>) {

@@ -89,6 +89,54 @@ export class TeamsService implements OnModuleInit {
     return this.toInfo(team, 'owner');
   }
 
+  async updateProfile(scope: TeamScope, teamId: string, payload: Record<string, unknown>): Promise<TeamInfo> {
+    this.assertScope(scope);
+    const team = await this.requireTeam(teamId, scope.appCode, scope.bizCode);
+    const actor = await this.requireMember(team.id, scope.accountId);
+    if (!canManageTeam(actor.role)) {
+      rpcFail(403, '只有拥有者可以修改团队资料');
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'name')) {
+      const name = optionalString(payload.name);
+      if (!name) {
+        rpcFail(400, '团队名称不能为空');
+      }
+      if (name.length > 64) {
+        rpcFail(400, '团队名称不能超过 64 字');
+      }
+      team.name = name;
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'description')) {
+      const description = typeof payload.description === 'string' ? payload.description.trim() : '';
+      if (description.length > 255) {
+        rpcFail(400, '详情不能超过 255 字');
+      }
+      team.description = description || null;
+    }
+    await this.teams.save(team);
+    return this.toInfo(team, actor.role);
+  }
+
+  /** 打开邀请链接时先看团队资料。不写入成员。 */
+  async previewByCode(scope: TeamScope, code: string) {
+    this.assertScope(scope);
+    const team = await this.requireTeamByCode(code, scope.appCode, scope.bizCode);
+    const existing = await this.members.findOne({
+      where: { teamId: team.id, accountId: scope.accountId },
+    });
+    const memberCount = await this.members.count({ where: { teamId: team.id } });
+    return {
+      id: team.id,
+      name: team.name,
+      description: team.description,
+      createdAt: team.createdAt.toISOString(),
+      updatedAt: team.updatedAt.toISOString(),
+      memberCount,
+      alreadyMember: Boolean(existing),
+      role: existing?.role ?? null,
+    };
+  }
+
   async join(scope: TeamScope, code: string): Promise<TeamInfo> {
     this.assertScope(scope);
     const team = await this.requireTeamByCode(code, scope.appCode, scope.bizCode);

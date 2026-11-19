@@ -129,6 +129,11 @@ describe('matchRoute', () => {
       id: 'team-1',
       accountId: 'acc-1',
     });
+    expect(matchRoute('GET', '/wiki/teams/by-code/AB12CD')?.pattern).toBe(MQTT_PATTERNS.WIKI_TEAM_PREVIEW);
+    expect(matchRoute('GET', '/teams/by-code/AB12CD')?.params).toEqual({ code: 'AB12CD' });
+    expect(matchRoute('GET', '/wiki/teams/team-1')?.pattern).toBe(MQTT_PATTERNS.WIKI_TEAM_FIND_ONE);
+    expect(matchRoute('PATCH', '/wiki/teams/team-1')?.pattern).toBe(MQTT_PATTERNS.WIKI_TEAM_UPDATE);
+    expect(matchRoute('PATCH', '/teams/team-1')?.params).toEqual({ id: 'team-1' });
   });
 
   it('protects upload writes with upload-key and marks file posts as override', () => {
