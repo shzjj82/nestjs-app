@@ -5,7 +5,7 @@
 
 文档表 `doc_*` 与 docs **共用同一库**（默认 `docs`，靠 `app_code` 区分产品）；团队表 `wiki_teams*` 也落在该库。  
 登录仍在 `/auth/*` → usercenter。  
-`/wiki/upload`、`/wiki/agents/*`、`/wiki/todos/*`、`/wiki/notifications/*` 由本服务收口后再调平台 upload / agents / notify（可在 `facade/` 加 wiki 业务）。
+`/wiki/auth/*` 在 `auth/`，`/wiki/upload` 在 `upload/`，对话在 `chat/`，检索在 `rag/`，识图在 `vision/`，通知在 `inbox/`，待办在 `todos/`。各自再调对应的平台服务。
 
 ## 网关 HTTP
 
