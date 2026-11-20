@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { DataSource, Repository, type SelectQueryBuilder } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { CategoriesService } from '../categories/categories.service';
 import { rpcFail } from '../common/rpc';
 import { resolveDocKind, type DocKind } from '../common/doc-kinds';
@@ -18,6 +18,13 @@ import {
   type EditorJsDocument,
 } from '../common/shared';
 import { DocumentEntity } from '../entities';
+import { ANCESTOR_CHAIN_SQL, privateAncestorBlocks } from './document-ancestors';
+import { appendPageLinkBlock, stripPageLinkBlock } from './document-page-link';
+import {
+  applyDocumentVisibility,
+  applyWorkspaceAuthor,
+  type VisibilityFilter,
+} from './document-visibility';
 import type { DocVisibility } from './list-scope';
 
 type WriteInput = {
@@ -38,8 +45,6 @@ type WriteInput = {
   authorId?: string | null;
   teamId?: string | null;
 };
-
-type VisibilityFilter = 'public-only' | 'feed' | 'any';
 
 const LIST_COLUMNS = [
   'post.id',
@@ -149,20 +154,11 @@ export class DocumentsService {
     qb.andWhere('post.appCode = :appCode', { appCode: opts.appCode });
     if (opts.authorScopedWorkspace && opts.authorId) {
       // authorId 为空的是接账户归属前写的旧文，工作区暂时可见，编辑时会认领
-      if (opts.readableTeamIds?.length) {
-        qb.andWhere(
-          `(post.author_id = :authorId OR post.author_id IS NULL OR post.team_id IN (:...readableTeamIds))`,
-          { authorId: opts.authorId, readableTeamIds: opts.readableTeamIds },
-        );
-      } else {
-        qb.andWhere(`(post.author_id = :authorId OR post.author_id IS NULL)`, {
-          authorId: opts.authorId,
-        });
-      }
+      applyWorkspaceAuthor(qb, opts.authorId, opts.readableTeamIds);
     } else if (opts.authorId) {
       qb.andWhere('post.authorId = :authorId', { authorId: opts.authorId });
     }
-    this.applyVisibility(qb, opts.visibilityFilter, opts.viewerId, opts.readableTeamIds);
+    applyDocumentVisibility(qb, opts.visibilityFilter, opts.viewerId, opts.readableTeamIds);
     if (opts.docKind) {
       qb.andWhere('post.kind = :docKind', { docKind: opts.docKind });
     }
@@ -237,65 +233,6 @@ export class DocumentsService {
       readableTeamIds,
     });
     return posts;
-  }
-
-  /**
-   * 公开列表去掉私有节点及其子孙。CTE 不关联外层行，一条 SQL 只算一次。
-   * feed 且带查看者时，查看者自己的私有文仍保留。
-   */
-  private applyVisibility(
-    qb: SelectQueryBuilder<DocumentEntity>,
-    filter: VisibilityFilter,
-    viewerId?: string,
-    readableTeamIds?: string[],
-  ) {
-    if (filter === 'any') {
-      return;
-    }
-    const teamIds = readableTeamIds?.length ? readableTeamIds : [];
-    const ownedFeed = filter === 'feed' && !!viewerId;
-    if (ownedFeed) {
-      const teamSql = teamIds.length ? ` OR post.team_id IN (:...readableTeamIds)` : '';
-      qb.andWhere(
-        `(post.visibility = 'public' OR (post.visibility = 'private' AND (post.author_id = :viewerId${teamSql})))`,
-        teamIds.length ? { viewerId, readableTeamIds: teamIds } : { viewerId },
-      );
-      const hiddenTeamSql = teamIds.length
-        ? `AND (team_id IS NULL OR team_id NOT IN (:...readableTeamIds))`
-        : '';
-      qb.andWhere(
-        `post.id NOT IN (
-          WITH RECURSIVE under_hidden AS (
-            SELECT id, 0 AS depth FROM doc_documents
-            WHERE visibility = 'private'
-              AND author_id IS DISTINCT FROM :viewerId
-              AND app_code = :appCode
-              ${hiddenTeamSql}
-            UNION ALL
-            SELECT child.id, parent.depth + 1 FROM doc_documents child
-            INNER JOIN under_hidden parent ON child.parent_id = parent.id
-            WHERE child.app_code = :appCode AND parent.depth < 64
-          )
-          SELECT id FROM under_hidden
-        )`,
-        teamIds.length ? { viewerId, readableTeamIds: teamIds } : { viewerId },
-      );
-      return;
-    }
-    qb.andWhere(`post.visibility = 'public'`);
-    qb.andWhere(
-      `post.id NOT IN (
-        WITH RECURSIVE under_private AS (
-          SELECT id, 0 AS depth FROM doc_documents
-          WHERE visibility = 'private' AND app_code = :appCode
-          UNION ALL
-          SELECT child.id, parent.depth + 1 FROM doc_documents child
-          INNER JOIN under_private parent ON child.parent_id = parent.id
-          WHERE child.app_code = :appCode AND parent.depth < 64
-        )
-        SELECT id FROM under_private
-      )`,
-    );
   }
 
   /**
@@ -674,29 +611,14 @@ export class DocumentsService {
     if (!parent) {
       return null;
     }
-    const blocks = [...(parent.body.blocks ?? [])];
-    if (
-      blocks.some(
-        (block) =>
-          block.type === 'pageLink' &&
-          String(block.data.pageId ?? '') === child.id,
-      )
-    ) {
+    const body = appendPageLinkBlock(parent.body, child);
+    if (!body) {
       return parent;
     }
-    const title = child.title?.trim() && child.title !== '无标题' ? child.title : '无标题';
-    parent.body = {
-      ...parent.body,
-      time: Date.now(),
-      blocks: [
-        ...blocks,
-        { type: 'pageLink', data: { pageId: child.id, slug: child.slug, title } },
-      ],
-    };
     await this.posts.update(
       { id: parentId },
       {
-        body: parent.body as never,
+        body: body as never,
         updatedAt: () => 'CURRENT_TIMESTAMP',
       },
     );
@@ -708,18 +630,14 @@ export class DocumentsService {
     if (!parent) {
       return;
     }
-    const blocks = parent.body.blocks ?? [];
-    const next = blocks.filter(
-      (block) =>
-        !(block.type === 'pageLink' && String(block.data.pageId ?? '') === childId),
-    );
-    if (next.length === blocks.length) {
+    const body = stripPageLinkBlock(parent.body, childId);
+    if (!body) {
       return;
     }
     await this.posts.update(
       { id: parentId },
       {
-        body: { ...parent.body, time: Date.now(), blocks: next } as never,
+        body: body as never,
         updatedAt: () => 'CURRENT_TIMESTAMP',
       },
     );
@@ -791,46 +709,17 @@ export class DocumentsService {
     return Number(raw?.n ?? -1) + 1;
   }
 
-  private async ancestorChain(postId: string): Promise<
-    Array<{ id: string; visibility: string; authorId: string | null; teamId: string | null }>
-  > {
-    return this.posts.query(
-      `WITH RECURSIVE chain AS (
-         SELECT id, parent_id, visibility, author_id, team_id, 1 AS depth
-         FROM doc_documents
-         WHERE id = (SELECT parent_id FROM doc_documents WHERE id = $1)
-         UNION ALL
-         SELECT parent.id, parent.parent_id, parent.visibility, parent.author_id, parent.team_id, chain.depth + 1
-         FROM doc_documents parent
-         INNER JOIN chain ON parent.id = chain.parent_id
-         WHERE chain.depth < 64
-       )
-       SELECT id, visibility, author_id AS "authorId", team_id AS "teamId"
-       FROM chain
-       WHERE id IS NOT NULL
-       ORDER BY depth ASC`,
-      [postId],
-    );
+  private async ancestorChain(postId: string) {
+    return this.posts.query(ANCESTOR_CHAIN_SQL, [postId]);
   }
 
-  /**
-   * 是否有不可见的私有祖先。
-   * 无 viewerId：任意 private 祖先即不可见。
-   * 有 viewerId：仅「private 且非本人」的祖先才阻断。
-   */
   private async hasPrivateAncestor(
     postId: string,
     viewerId?: string,
     readableTeamIds?: readonly string[],
   ) {
     const chain = await this.ancestorChain(postId);
-    const teams = new Set(readableTeamIds ?? []);
-    return chain.some(
-      (node) =>
-        node.visibility === 'private' &&
-        (!viewerId || node.authorId !== viewerId) &&
-        !(node.teamId && teams.has(node.teamId)),
-    );
+    return privateAncestorBlocks(chain, viewerId, readableTeamIds);
   }
 }
 

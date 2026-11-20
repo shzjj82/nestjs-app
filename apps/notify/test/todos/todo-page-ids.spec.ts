@@ -1,4 +1,4 @@
-import { asPageIds } from './todo-page-ids';
+import { asPageIds } from '../../src/todos/todo-page-ids';
 
 describe('asPageIds', () => {
   it('accepts uuid list and drops junk', () => {

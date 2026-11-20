@@ -5,7 +5,7 @@ import {
   requireInternal,
   toPage,
   unreadOnly,
-} from './input';
+} from '../../src/common/input';
 
 describe('notify input', () => {
   const original = process.env.NOTIFY_INTERNAL_KEY;

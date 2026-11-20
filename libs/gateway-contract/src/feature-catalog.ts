@@ -155,9 +155,6 @@ const businessFeatures: FeatureCatalogItem[] = [
       'GET /wiki/teams',
       'GET /wiki/teams/by-code/:code',
       'GET /wiki/teams/:id',
-      'GET /teams',
-      'GET /teams/by-code/:code',
-      'GET /teams/:id',
     ],
   },
   {
@@ -175,13 +172,6 @@ const businessFeatures: FeatureCatalogItem[] = [
       'POST /wiki/teams/:id/leave',
       'POST /wiki/teams/:id/dissolve',
       'PATCH /wiki/teams/:id/members/:accountId',
-      'POST /teams',
-      'PATCH /teams/:id',
-      'POST /teams/join',
-      'POST /teams/:id/code',
-      'POST /teams/:id/leave',
-      'POST /teams/:id/dissolve',
-      'PATCH /teams/:id/members/:accountId',
     ],
   },
   {

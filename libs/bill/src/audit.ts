@@ -1,4 +1,4 @@
-import type { BillDraft, BillItem } from './schema'
+import type { BillDraft } from './schema'
 import {
   finalizeOcrBillDraft,
   parseBillDraftStructure,
@@ -716,9 +716,4 @@ export function reconcileOcrBillDraft(input: unknown): FinalizeOcrBillResult & {
 export function formatAuditForRepair(audit: BillAuditReport | null | undefined): string {
   if (!audit) return '（无验算报告）'
   return audit.summary
-}
-
-/** 供测试：清空单品优惠（仅测试/诊断，不进自动路径） */
-export function __clearItemDiscountsForTest(items: BillItem[]): BillItem[] {
-  return items.map((item) => ({ ...item, itemDiscount: 0 }))
 }

@@ -166,7 +166,8 @@ async function main() {
 
     if (existing) {
       const missing = desiredApis.filter((key) => !existing.apis.includes(key));
-      if (missing.length || existing.status !== 1) {
+      const stale = existing.apis.filter((key) => !desiredApis.includes(key));
+      if (missing.length || stale.length || existing.status !== 1) {
         await call(
           client,
           MQTT_PATTERNS.BUSINESS_UPDATE,
@@ -178,7 +179,15 @@ async function main() {
           },
           timeoutMs,
         );
-        console.log(`\n[业务] 已存在，补充 ${missing.length} 个新接口并置为启用`);
+        const parts = [
+          missing.length ? `补充 ${missing.length} 个新接口` : '',
+          stale.length ? `移除 ${stale.length} 个旧接口` : '',
+        ].filter(Boolean);
+        console.log(
+          parts.length
+            ? `\n[业务] 已存在，${parts.join('，')}并置为启用`
+            : '\n[业务] 已存在，已重新启用',
+        );
       } else {
         console.log('\n[业务] 已存在且接口白名单已是最新，无需变更');
       }
@@ -200,7 +209,7 @@ async function main() {
     }
 
     console.log('\n=== 开通完成 ===');
-    console.log('登录仍走 /auth/* → usercenter；团队与文档走 /wiki/*（/teams 别名仍可用）。');
+    console.log('登录仍走 /auth/* → usercenter；团队与文档走 /wiki/*。');
   } finally {
     await client.close();
   }

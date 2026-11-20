@@ -111,29 +111,24 @@ describe('matchRoute', () => {
     expect(matchRoute('PUT', '/wiki/categories/abc')?.auth).toEqual(['jwt', 'wiki-key']);
   });
 
-  it('registers team routes on wiki (including /teams alias)', () => {
-    expect(matchRoute('POST', '/teams')?.client).toBe('WIKI_CLIENT');
-    expect(matchRoute('POST', '/teams')?.pattern).toBe(MQTT_PATTERNS.WIKI_TEAM_CREATE);
-    expect(matchRoute('POST', '/teams/join')?.pattern).toBe(MQTT_PATTERNS.WIKI_TEAM_JOIN);
-    expect(matchRoute('POST', '/teams/team-1/code')?.pattern).toBe(
-      MQTT_PATTERNS.WIKI_TEAM_REFRESH_CODE,
-    );
+  it('registers team routes only under /wiki/teams', () => {
+    expect(matchRoute('POST', '/teams')).toBeNull();
+    expect(matchRoute('GET', '/teams/by-code/AB12CD')).toBeNull();
     expect(matchRoute('POST', '/wiki/teams/team-1/dissolve')?.pattern).toBe(
       MQTT_PATTERNS.WIKI_TEAM_DISSOLVE,
     );
     expect(matchRoute('POST', '/wiki/teams/team-1/dissolve')?.auth).toEqual(['jwt']);
-    expect(matchRoute('POST', '/teams/team-1/dissolve')?.params).toEqual({ id: 'team-1' });
     expect(matchRoute('GET', '/wiki/teams')?.client).toBe('WIKI_CLIENT');
     expect(matchRoute('POST', '/wiki/teams')?.pattern).toBe(MQTT_PATTERNS.WIKI_TEAM_CREATE);
-    expect(matchRoute('PATCH', '/teams/team-1/members/acc-1')?.params).toEqual({
+    expect(matchRoute('PATCH', '/wiki/teams/team-1/members/acc-1')?.params).toEqual({
       id: 'team-1',
       accountId: 'acc-1',
     });
     expect(matchRoute('GET', '/wiki/teams/by-code/AB12CD')?.pattern).toBe(MQTT_PATTERNS.WIKI_TEAM_PREVIEW);
-    expect(matchRoute('GET', '/teams/by-code/AB12CD')?.params).toEqual({ code: 'AB12CD' });
+    expect(matchRoute('GET', '/wiki/teams/by-code/AB12CD')?.params).toEqual({ code: 'AB12CD' });
     expect(matchRoute('GET', '/wiki/teams/team-1')?.pattern).toBe(MQTT_PATTERNS.WIKI_TEAM_FIND_ONE);
     expect(matchRoute('PATCH', '/wiki/teams/team-1')?.pattern).toBe(MQTT_PATTERNS.WIKI_TEAM_UPDATE);
-    expect(matchRoute('PATCH', '/teams/team-1')?.params).toEqual({ id: 'team-1' });
+    expect(matchRoute('PATCH', '/wiki/teams/team-1')?.params).toEqual({ id: 'team-1' });
   });
 
   it('protects upload writes with upload-key and marks file posts as override', () => {
