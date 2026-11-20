@@ -12,7 +12,7 @@ import { lastValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import { rpcFail } from '../common/rpc';
 
-/** wiki 门面调平台微服务；业务扩展点集中在各 facade controller */
+/** 下游连接。登录、上传、对话、检索、识图、通知各自的规则在对应 service。 */
 @Injectable()
 export class PlatformProxy implements OnModuleInit {
   constructor(
