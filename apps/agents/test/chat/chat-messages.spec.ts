@@ -1,10 +1,12 @@
 import { RpcException } from '@nestjs/microservices';
 import { parseChatInput } from '../../src/chat/chat-input';
 import {
+  applyRagPolicy,
   buildHistoryMessages,
   contextAppendix,
   describeAttachments,
   normalizeMessages,
+  RAG_HIT_SCORE,
 } from '../../src/chat/chat-messages';
 
 describe('normalizeMessages', () => {
@@ -67,6 +69,33 @@ describe('buildHistoryMessages', () => {
         { type: 'image_url', image_url: { url: 'https://cdn.example/a.png' } },
       ]),
     );
+  });
+});
+
+describe('applyRagPolicy', () => {
+  const hit = (title: string, score: number) => ({
+    title,
+    slug: title,
+    content: `${title}的正文`,
+    sourceType: 'editorjs',
+    score,
+  });
+
+  it('keeps chunks at or above the hit score', () => {
+    const policy = applyRagPolicy([hit('弱标题', RAG_HIT_SCORE - 0.01), hit('正文', RAG_HIT_SCORE)]);
+    expect(policy.mode).toBe('grounded');
+    expect(policy.sources.map((item) => item.title)).toEqual(['正文']);
+    expect(policy.context).toContain('正文的正文');
+    expect(policy.context).not.toContain('弱标题');
+    expect(policy.systemAppendix).toContain('只根据下方参考资料');
+  });
+
+  it('drops every chunk below the line and allows labeled general knowledge', () => {
+    const policy = applyRagPolicy([hit('待办标题', 0.2)]);
+    expect(policy.mode).toBe('general');
+    expect(policy.sources).toEqual([]);
+    expect(policy.context).toBe('');
+    expect(policy.systemAppendix).toContain('以下不是知识库内容');
   });
 });
 

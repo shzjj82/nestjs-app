@@ -43,8 +43,15 @@ function makeChat(conversations = makeConversations()) {
       embeddingDim: 1536,
     }),
     searchForChat: jest.fn().mockResolvedValue([]),
-  } as unknown as RagPort;
-  return { chat: new ChatService(rag, conversations), conversations };
+  } as unknown as RagPort & { searchForChat: jest.Mock };
+  return { chat: new ChatService(rag, conversations), conversations, rag };
+}
+
+function sentSystem(fetchMock: jest.Mock): string {
+  const body = JSON.parse(String(fetchMock.mock.calls[0][1].body)) as {
+    messages: Array<{ role: string; content: string }>;
+  };
+  return body.messages.map((item) => (typeof item.content === 'string' ? item.content : '')).join('\n');
 }
 
 function sessionPayload(body: Record<string, unknown>) {
@@ -138,6 +145,52 @@ describe('ChatService', () => {
     expect(result.reply).toBe('text ok');
     expect(result.conversationId).toBe('conv-1');
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses wiki pages only when the retrieval score is high enough', async () => {
+    process.env.AI_API_KEY = 'test-key';
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '根据资料' } }] }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { chat, rag } = makeChat();
+    rag.searchForChat.mockResolvedValue([
+      { docId: '1', title: '弱标题', slug: 'weak', chunkIndex: 0, content: '只有标题', score: 0.2, sourceType: 'editorjs' },
+      { docId: '2', title: 'Fiber详解', slug: 'fiber', chunkIndex: 0, content: 'Fiber 把渲染拆成单元', score: 0.8, sourceType: 'editorjs' },
+    ]);
+
+    const result = await chat.complete(
+      sessionPayload({ rag: true, messages: [{ role: 'user', content: 'Fiber 是什么' }] }),
+    );
+
+    expect(result.sources?.map((item) => item.title)).toEqual(['Fiber详解']);
+    const sent = sentSystem(fetchMock);
+    expect(sent).toContain('只根据下方参考资料');
+    expect(sent).toContain('Fiber 把渲染拆成单元');
+    expect(sent).not.toContain('只有标题');
+  });
+
+  it('drops weak hits and allows labeled general knowledge', async () => {
+    process.env.AI_API_KEY = 'test-key';
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '一般说明' } }] }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { chat, rag } = makeChat();
+    rag.searchForChat.mockResolvedValue([
+      { docId: '1', title: 'React源码学习', slug: 'react', chunkIndex: 0, content: '待办：Fiber详解', score: 0.2, sourceType: 'editorjs' },
+    ]);
+
+    const result = await chat.complete(
+      sessionPayload({ rag: true, messages: [{ role: 'user', content: 'Fiber 详情包含哪些' }] }),
+    );
+
+    expect(result.sources).toBeUndefined();
+    const sent = sentSystem(fetchMock);
+    expect(sent).toContain('以下不是知识库内容');
+    expect(sent).not.toContain('待办：Fiber详解');
   });
 
   it('maps upstream HTTP errors to AI_UPSTREAM_*', async () => {

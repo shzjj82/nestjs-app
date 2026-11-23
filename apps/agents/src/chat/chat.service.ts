@@ -12,12 +12,11 @@ import { RagPort } from '../rag/rag-port';
 import { aiApiBase, aiApiKey, aiConfigured, aiModel, aiTimeoutMs } from './chat-env';
 import { parseChatInput } from './chat-input';
 import {
+  applyRagPolicy,
   DEFAULT_SYSTEM,
-  RAG_SYSTEM_APPENDIX,
   buildHistoryMessages,
   contextAppendix,
   describeAttachments,
-  ragContextAppendix,
   type NormalizedMessage,
   type UpstreamMessage,
 } from './chat-messages';
@@ -194,15 +193,16 @@ export class ChatService {
       const lastUser = [...input.messages].reverse().find((item) => item.role === 'user');
       const query = lastUser?.content?.trim() ?? '';
       if (query) {
-        sources = await this.rag.searchForChat({
+        const found = await this.rag.searchForChat({
           payload: asRecord(rawPayload),
           query,
           topK: input.ragTopK,
         });
-        const ragAppendix = ragContextAppendix(sources);
-        if (ragAppendix) {
-          system = `${system}\n\n${RAG_SYSTEM_APPENDIX}`;
-          appendix = [appendix, ragAppendix].filter(Boolean).join('\n\n');
+        const policy = applyRagPolicy(found);
+        sources = policy.sources;
+        system = `${system}\n\n${policy.systemAppendix}`;
+        if (policy.context) {
+          appendix = [appendix, policy.context].filter(Boolean).join('\n\n');
         }
       }
     }

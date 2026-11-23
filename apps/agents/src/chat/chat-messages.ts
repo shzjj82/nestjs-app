@@ -8,7 +8,46 @@ export const DEFAULT_SYSTEM = `你是中文写作搭档。
 如果用户消息里带有「划选原文」，请紧扣那段文字回答（改写、扩写、纠错、解释等）。
 若提供了「参考资料」，请优先依据资料回答，并在相关处简要标明来自哪篇文档；资料不足时再说明无法从资料确认。`;
 
-export const RAG_SYSTEM_APPENDIX = `回答时优先使用下方参考资料中的事实；不要编造资料未出现的内容。`;
+/**
+ * 余弦相似度达到这条线，才把片段当作知识库正文。
+ * 低于此线的标题或待办名命中不交给模型，避免被当成资料。
+ */
+export const RAG_HIT_SCORE = 0.5;
+
+export const RAG_GROUNDED_SYSTEM = `本次知识库检索已命中。只根据下方参考资料回答，并标明文档标题。不要用通用知识补充资料里没有的细节。待办、日期、负责人和项目事实若资料未列出，直接说没有，不要编造。`;
+
+export const RAG_GENERAL_SYSTEM = `本次知识库检索未达到采用线，没有可引用的正文。不要把未附上的页面当成依据，也不要编造文档标题。先说明知识库里没有可回答该问题的正文，再另起一段用通用知识回答，并标明「以下不是知识库内容」。待办、日期、负责人和项目里有没有这件事，仍然只能说资料不足，不要用通用知识编造。`;
+
+type RagHit = { title: string; slug: string; content: string; sourceType: string; score: number };
+
+export type RagPolicy<T extends RagHit> = {
+  /** grounded：分数够，只准用资料。general：分数不够，允许标明后的通用知识。 */
+  mode: 'grounded' | 'general';
+  sources: T[];
+  systemAppendix: string;
+  context: string;
+};
+
+/** 按命中分决定回答方式。未达标的片段不进入参考资料。 */
+export function applyRagPolicy<T extends RagHit>(sources: T[]): RagPolicy<T> {
+  const grounded = sources
+    .filter((item) => Number(item.score) >= RAG_HIT_SCORE)
+    .sort((a, b) => b.score - a.score);
+  if (grounded.length > 0) {
+    return {
+      mode: 'grounded',
+      sources: grounded,
+      systemAppendix: RAG_GROUNDED_SYSTEM,
+      context: ragContextAppendix(grounded),
+    };
+  }
+  return {
+    mode: 'general',
+    sources: [],
+    systemAppendix: RAG_GENERAL_SYSTEM,
+    context: '',
+  };
+}
 
 export type ChatContent =
   | { type: 'text'; text: string }
