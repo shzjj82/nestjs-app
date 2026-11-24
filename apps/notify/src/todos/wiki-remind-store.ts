@@ -175,6 +175,7 @@ function wikiProgressSql(mode: RemindMode): string {
   `;
 }
 
+/** 未结束且完成日早于今天：每个上海日催办一次，完成或终止后不再进入 */
 function wikiOverdueSql(mode: RemindMode): string {
   return `
     ${selectCols()}
