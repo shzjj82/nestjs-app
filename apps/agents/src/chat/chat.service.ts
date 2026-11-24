@@ -17,9 +17,12 @@ import {
   buildHistoryMessages,
   contextAppendix,
   describeAttachments,
+  WEB_RESULTS_SYSTEM,
+  webResultsAppendix,
   type NormalizedMessage,
   type UpstreamMessage,
 } from './chat-messages';
+import { searchWeb } from './web-search';
 import { contentFromUpstreamData, splitSseBlocks } from './chat-stream';
 import { ConversationService } from './conversation.service';
 
@@ -193,16 +196,23 @@ export class ChatService {
       const lastUser = [...input.messages].reverse().find((item) => item.role === 'user');
       const query = lastUser?.content?.trim() ?? '';
       if (query) {
-        const found = await this.rag.searchForChat({
-          payload: asRecord(rawPayload),
-          query,
-          topK: input.ragTopK,
-        });
-        const policy = applyRagPolicy(found);
+        const [found, web] = await Promise.all([
+          this.rag.searchForChat({
+            payload: asRecord(rawPayload),
+            query,
+            topK: input.ragTopK,
+          }),
+          this.lookupWeb(query),
+        ]);
+        const policy = applyRagPolicy(found, query);
         sources = policy.sources;
         system = `${system}\n\n${policy.systemAppendix}`;
         if (policy.context) {
           appendix = [appendix, policy.context].filter(Boolean).join('\n\n');
+        }
+        if (web.length) {
+          system = `${system}\n\n${WEB_RESULTS_SYSTEM}`;
+          appendix = [appendix, webResultsAppendix(web)].filter(Boolean).join('\n\n');
         }
       }
     }
@@ -213,6 +223,15 @@ export class ChatService {
       withVision: buildHistoryMessages(system, input.messages, appendix, imageUrls, true),
       textOnly: buildHistoryMessages(system, input.messages, appendix, imageUrls, false),
     };
+  }
+
+  private async lookupWeb(query: string) {
+    try {
+      return await searchWeb(query);
+    } catch (err) {
+      this.logger.warn(`web search failed: ${err instanceof Error ? err.message : String(err)}`);
+      return [];
+    }
   }
 
   private async callModel(

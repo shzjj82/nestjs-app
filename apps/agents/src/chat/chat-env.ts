@@ -53,3 +53,8 @@ export function aiConfigured(): boolean {
 export function ragConfigured(): boolean {
   return Boolean(aiEmbeddingApiKey());
 }
+
+/** 本机 SearXNG。留空表示这次对话不联网。 */
+export function searxngUrl(): string {
+  return (process.env.SEARXNG_URL ?? '').trim().replace(/\/+$/, '');
+}

@@ -64,13 +64,23 @@ function sessionPayload(body: Record<string, unknown>) {
 
 describe('ChatService', () => {
   const originalKey = process.env.AI_API_KEY;
+  const originalSearx = process.env.SEARXNG_URL;
   const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    delete process.env.SEARXNG_URL;
+  });
 
   afterEach(() => {
     if (originalKey === undefined) {
       delete process.env.AI_API_KEY;
     } else {
       process.env.AI_API_KEY = originalKey;
+    }
+    if (originalSearx === undefined) {
+      delete process.env.SEARXNG_URL;
+    } else {
+      process.env.SEARXNG_URL = originalSearx;
     }
     global.fetch = originalFetch;
   });
@@ -169,6 +179,73 @@ describe('ChatService', () => {
     expect(sent).toContain('只根据下方参考资料');
     expect(sent).toContain('Fiber 把渲染拆成单元');
     expect(sent).not.toContain('只有标题');
+    expect(sent).not.toContain('以下不是知识库内容');
+  });
+
+  it('adds a labeled general definition when the user asks how it is defined online', async () => {
+    process.env.AI_API_KEY = 'test-key';
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '资料加上通用定义' } }] }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { chat, rag } = makeChat();
+    rag.searchForChat.mockResolvedValue([
+      { docId: '2', title: 'Fiber详解', slug: 'fiber', chunkIndex: 0, content: 'Fiber 把渲染拆成单元', score: 0.8, sourceType: 'editorjs' },
+    ]);
+
+    const result = await chat.complete(
+      sessionPayload({ rag: true, messages: [{ role: 'user', content: '网上是怎么定义的' }] }),
+    );
+
+    expect(result.sources?.map((item) => item.title)).toEqual(['Fiber详解']);
+    const sent = sentSystem(fetchMock);
+    expect(sent).toContain('Fiber 把渲染拆成单元');
+    expect(sent).toContain('以下不是知识库内容');
+  });
+
+  it('puts SearXNG hits next to the wiki pages', async () => {
+    process.env.AI_API_KEY = 'test-key';
+    process.env.SEARXNG_URL = 'http://127.0.0.1:8888';
+    const fetchMock = jest
+      .fn()
+      .mockImplementation(async (url: string) => {
+        if (String(url).includes('/search')) {
+          return {
+            ok: true,
+            json: async () => ({
+              results: [
+                { title: 'React Fiber', url: 'https://react.dev/fiber', content: 'A unit of work' },
+                { title: 'skip', url: 'not-a-url', content: 'no' },
+              ],
+            }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({ choices: [{ message: { content: '综合' } }] }),
+        };
+      });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { chat, rag } = makeChat();
+    rag.searchForChat.mockResolvedValue([
+      { docId: '2', title: 'Fiber详解', slug: 'fiber', chunkIndex: 0, content: 'Fiber 把渲染拆成单元', score: 0.8, sourceType: 'editorjs' },
+    ]);
+
+    const result = await chat.complete(
+      sessionPayload({ rag: true, messages: [{ role: 'user', content: 'Fiber 是什么' }] }),
+    );
+
+    expect(result.sources?.map((item) => item.title)).toEqual(['Fiber详解']);
+    const chatCall = fetchMock.mock.calls.find((call) => String(call[0]).includes('/chat/completions'));
+    const body = JSON.parse(String(chatCall?.[1].body)) as {
+      messages: Array<{ content: string | unknown }>;
+    };
+    const sent = body.messages.map((item) => (typeof item.content === 'string' ? item.content : '')).join('\n');
+    expect(sent).toContain('Fiber 把渲染拆成单元');
+    expect(sent).toContain('【网上结果】');
+    expect(sent).toContain('https://react.dev/fiber');
+    expect(sent).not.toContain('not-a-url');
   });
 
   it('drops weak hits and allows labeled general knowledge', async () => {
