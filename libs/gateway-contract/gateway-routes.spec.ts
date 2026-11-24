@@ -206,6 +206,12 @@ describe('matchRoute', () => {
     );
     expect(matchRoute('POST', '/agents/rag/search')?.auth).toEqual(['jwt']);
     expect(matchRoute('POST', '/agents/rag/search')?.pattern).toBe(MQTT_PATTERNS.AGENTS_RAG_SEARCH);
+    expect(matchRoute('POST', '/wiki/agents/ocr')?.pattern).toBe(MQTT_PATTERNS.WIKI_AGENTS_OCR);
+    expect(matchRoute('POST', '/wiki/agents/ocr/tasks')?.pattern).toBe(
+      MQTT_PATTERNS.WIKI_AGENTS_OCR_TASK_CREATE,
+    );
+    expect(matchRoute('GET', '/wiki/agents/ocr/tasks/job-1')?.params).toEqual({ id: 'job-1' });
+    expect(matchRoute('POST', '/wiki/agents/ocr/stream')?.override).toBe(true);
     expect(matchRoute('POST', '/agents/vision')?.override).toBe(true);
     expect(matchRoute('POST', '/agents/vision')?.auth).toEqual(['jwt']);
     expect(matchRoute('POST', '/agents/vision')?.pattern).toBe(MQTT_PATTERNS.AGENTS_VISION_PARSE);

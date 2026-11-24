@@ -8,6 +8,7 @@ import { SeedService } from './database/seed.service';
 import { WikiController } from './wiki.controller';
 import { DocumentsModule } from './documents/documents.module';
 import { InboxModule } from './inbox/inbox.module';
+import { OcrModule } from './ocr/ocr.module';
 import { RagModule } from './rag/rag.module';
 import { TeamsModule } from './teams/teams.module';
 import { OpLogModule } from './oplog/op-log.module';
@@ -30,6 +31,7 @@ import { VisionModule } from './vision/vision.module';
     ChatModule,
     RagModule,
     VisionModule,
+    OcrModule,
     InboxModule,
     ApiDocsModule.forService({
       service: 'wiki',

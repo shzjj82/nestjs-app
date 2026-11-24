@@ -151,6 +151,9 @@ export const MQTT_PATTERNS = {
   WIKI_AGENTS_CONVERSATION_DELETE: 'wiki.agents.conversation.delete',
   WIKI_AGENTS_RAG_SEARCH: 'wiki.agents.rag.search',
   WIKI_AGENTS_VISION: 'wiki.agents.vision',
+  WIKI_AGENTS_OCR: 'wiki.agents.ocr',
+  WIKI_AGENTS_OCR_TASK_CREATE: 'wiki.agents.ocr.task.create',
+  WIKI_AGENTS_OCR_TASK_FIND: 'wiki.agents.ocr.task.find',
   WIKI_NOTIFY_LIST: 'wiki.notify.list',
   WIKI_NOTIFY_UNREAD_COUNT: 'wiki.notify.unreadCount',
   WIKI_NOTIFY_FIND_ONE: 'wiki.notify.findOne',
@@ -203,6 +206,11 @@ export const MQTT_PATTERNS = {
   AGENTS_CONVERSATION_UPDATE: 'agents.conversation.update',
   AGENTS_CONVERSATION_DELETE: 'agents.conversation.delete',
   AGENTS_VISION_PARSE: 'agents.vision.parse',
+  /** 同步 OCR：等待每张图的文字 */
+  AGENTS_OCR: 'agents.ocr',
+  /** 异步 OCR：立即返回任务号 */
+  AGENTS_OCR_TASK_CREATE: 'agents.ocr.task.create',
+  AGENTS_OCR_TASK_FIND: 'agents.ocr.task.find',
   /** 内部：docs 保存后索引文档（不注册网关） */
   AGENTS_RAG_INDEX: 'agents.rag.index',
   /** 内部：docs 删除后清索引（不注册网关） */

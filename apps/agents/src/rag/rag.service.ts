@@ -16,10 +16,12 @@ import { extractAttachmentTexts } from './attachment-text';
 import { chunkText } from './chunk';
 import {
   editorJsAttachments,
+  editorJsImages,
   editorJsToText,
   editorJsUnresolvedAttachments,
   resolvePublicFileUrl,
 } from './editorjs-text';
+import { OcrService } from '../ocr/ocr.service';
 import { EmbeddingService } from './embedding.service';
 import { RagPort } from './rag-port';
 
@@ -41,6 +43,7 @@ export class RagService extends RagPort implements OnModuleInit {
 
   constructor(
     private readonly embedding: EmbeddingService,
+    private readonly ocr: OcrService,
     @InjectDataSource() private readonly db: DataSource,
     @Inject(WIKI_CLIENT) private readonly wiki: ClientProxy,
   ) {
@@ -75,6 +78,7 @@ export class RagService extends RagPort implements OnModuleInit {
       );
     }
     const attachmentTexts = await extractAttachmentTexts(attachments);
+    const imageTexts = await this.ocr.textsForIndex(editorJsImages(input.body));
 
     const pieces: Array<{ sourceType: string; sourceKey: string | null; text: string }> = [];
     if (bodyText) {
@@ -85,6 +89,13 @@ export class RagService extends RagPort implements OnModuleInit {
         sourceType: file.ext,
         sourceKey: file.url,
         text: `【附件：${file.name}】\n${file.text}`,
+      });
+    }
+    for (const image of imageTexts) {
+      pieces.push({
+        sourceType: 'image',
+        sourceKey: image.url,
+        text: image.text,
       });
     }
 
@@ -251,6 +262,7 @@ export class RagService extends RagPort implements OnModuleInit {
         chunk_index AS "chunkIndex",
         content,
         source_type AS "sourceType",
+        source_key AS "sourceKey",
         1 - (embedding <=> $1::vector) AS score
       FROM ag_rag_chunks
       WHERE app_code = $2
@@ -266,6 +278,7 @@ export class RagService extends RagPort implements OnModuleInit {
       chunkIndex: number;
       content: string;
       sourceType: string;
+      sourceKey: string | null;
       score: number;
     }>;
 
@@ -278,6 +291,7 @@ export class RagService extends RagPort implements OnModuleInit {
         content: String(row.content ?? '').slice(0, 2000),
         score: Number(row.score) || 0,
         sourceType: row.sourceType ?? 'editorjs',
+        ...(row.sourceType === 'image' && row.sourceKey ? { imageUrl: row.sourceKey } : {}),
       })),
     };
   }

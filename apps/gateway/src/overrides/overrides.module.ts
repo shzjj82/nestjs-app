@@ -4,6 +4,7 @@ import { MqttModule } from '../mqtt/mqtt.module';
 import { AgentsOverrideController } from './agents.controller';
 import { BizModulesController } from './biz-modules.controller';
 import { OrdersOverrideController } from './orders.controller';
+import { OcrOverrideController } from './ocr.controller';
 import { VisionOverrideController } from './vision.controller';
 import { PermissionsFileController } from './permissions-file.controller';
 import { UploadOverrideController } from './upload.controller';
@@ -19,6 +20,7 @@ import { WechatQrcodeController } from './wechat-qrcode.controller';
     BizModulesController,
     OrdersOverrideController,
     VisionOverrideController,
+    OcrOverrideController,
     PermissionsFileController,
     UploadOverrideController,
     WechatQrcodeController,

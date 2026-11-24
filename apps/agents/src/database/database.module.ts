@@ -8,6 +8,7 @@ import { VisionAccountId1760000003200 } from './migrations/1760000003200-vision-
 import { AgentsCreatedUpdatedAt1760000003300 } from './migrations/1760000003300-created-updated-at';
 import { RagChunks1760000003400 } from './migrations/1760000003400-rag-chunks';
 import { ChatConversations1760000003500 } from './migrations/1760000003500-chat-conversations';
+import { Ocr1760000003600 } from './migrations/1760000003600-ocr';
 
 const sync = process.env.TYPEORM_SYNC === 'true';
 
@@ -26,6 +27,7 @@ const sync = process.env.TYPEORM_SYNC === 'true';
         AgentsCreatedUpdatedAt1760000003300,
         RagChunks1760000003400,
         ChatConversations1760000003500,
+        Ocr1760000003600,
       ],
       logging: process.env.TYPEORM_LOGGING === 'true',
     }),

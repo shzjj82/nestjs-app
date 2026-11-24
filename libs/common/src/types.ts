@@ -458,6 +458,8 @@ export interface AgentRagSource {
   content: string;
   score: number;
   sourceType: string;
+  /** 命中来自图片时的原图地址 */
+  imageUrl?: string;
 }
 
 export interface AgentChatResult {

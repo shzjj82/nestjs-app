@@ -14,6 +14,29 @@ export function aiVisionModel(): string {
   return process.env.AI_VISION_MODEL?.trim() || 'qwen-vl-max';
 }
 
+/**
+ * 图片 OCR 走通义百炼，密钥是 AI_OCR_API_KEY，与对话用的 AI_API_KEY 不是同一套。
+ * 这里不回退到对话密钥。未配置时索引跳过图片，识图接口返回 503。
+ */
+export function ocrApiBase(): string {
+  return (
+    process.env.AI_OCR_API_BASE?.trim() ||
+    'https://dashscope.aliyuncs.com/compatible-mode/v1'
+  ).replace(/\/+$/, '');
+}
+
+export function ocrApiKey(): string {
+  return process.env.AI_OCR_API_KEY?.trim() ?? '';
+}
+
+export function ocrModel(): string {
+  return process.env.AI_OCR_MODEL?.trim() || 'qwen3.5-ocr';
+}
+
+export function ocrConfigured(): boolean {
+  return Boolean(ocrApiKey());
+}
+
 /** embedding 可与 chat 分家（如 chat=DeepSeek、embedding=通义） */
 export function aiEmbeddingApiBase(): string {
   const dedicated = process.env.AI_EMBEDDING_API_BASE?.trim();

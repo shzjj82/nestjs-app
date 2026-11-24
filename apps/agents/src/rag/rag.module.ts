@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { mqttClientOptions, WIKI_CLIENT } from '@app/common';
 import { DatabaseModule } from '../database/database.module';
+import { OcrModule } from '../ocr/ocr.module';
 import { EmbeddingService } from './embedding.service';
 import { RagController } from './rag.controller';
 import { RagPort } from './rag-port';
@@ -10,6 +11,7 @@ import { RagService } from './rag.service';
 @Module({
   imports: [
     DatabaseModule,
+    OcrModule,
     ClientsModule.register([
       {
         name: WIKI_CLIENT,

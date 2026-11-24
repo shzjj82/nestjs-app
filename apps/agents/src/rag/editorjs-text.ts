@@ -17,6 +17,7 @@ export type ExtractedAttachment = {
 };
 
 const ATTACH_BLOCK_TYPES = new Set(['attaches', 'file', 'attachment']);
+const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
 
 /** 从 EditorJS 抽出纯文本（去 HTML） */
 export function editorJsToText(body: unknown, title = '', summary = ''): string {
@@ -35,6 +36,43 @@ export function editorJsToText(body: unknown, title = '', summary = ''): string 
     }
   }
   return parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** 页面图片和图片附件的公开地址，供 OCR。同一地址只保留一次。 */
+export function editorJsImages(body: unknown): string[] {
+  const doc = asEditorDoc(body);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (url: string) => {
+    if (!url || seen.has(url)) {
+      return;
+    }
+    seen.add(url);
+    out.push(url);
+  };
+  for (const block of doc.blocks ?? []) {
+    const data = block.data ?? {};
+    const file = asRecord(data.file);
+    if (block.type === 'image') {
+      push(resolveAttachmentUrl(data, file));
+      continue;
+    }
+    if (!ATTACH_BLOCK_TYPES.has(block.type)) {
+      continue;
+    }
+    const url = resolveAttachmentUrl(data, file ?? data);
+    const name = String(
+      data.title ?? data.name ?? file?.title ?? file?.name ?? fileNameFromUrl(url),
+    ).trim();
+    const ext =
+      extFromName(name) ||
+      extFromName(url) ||
+      extFromMime(String(data.mime ?? file?.mime ?? ''));
+    if (IMAGE_EXT.has(ext)) {
+      push(url);
+    }
+  }
+  return out;
 }
 
 /** 从 attaches / file / attachment 等 block 收集可解析附件 URL */
@@ -295,6 +333,11 @@ function extFromMime(mime: string): string {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
     'text/plain': 'txt',
     'text/csv': 'csv',
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/bmp': 'bmp',
   };
   return map[mime.trim().toLowerCase()] ?? '';
 }

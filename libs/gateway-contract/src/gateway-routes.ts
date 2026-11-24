@@ -319,6 +319,10 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'DELETE', path: '/agents/conversations/:id', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CONVERSATION_DELETE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/agents/rag/search', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_RAG_SEARCH, auth: ['jwt'] }),
   business({ method: 'POST', path: '/agents/vision', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_VISION_PARSE, auth: ['jwt'], override: true }),
+  business({ method: 'POST', path: '/agents/ocr', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_OCR, auth: ['jwt'], override: true }),
+  business({ method: 'POST', path: '/agents/ocr/tasks', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_OCR_TASK_CREATE, auth: ['jwt'], override: true }),
+  business({ method: 'GET', path: '/agents/ocr/tasks/:id', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_OCR_TASK_FIND, auth: ['jwt'], override: true }),
+  business({ method: 'POST', path: '/agents/ocr/stream', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_OCR, auth: ['jwt'], override: true }),
   business({ method: 'GET', path: '/wiki/agents/chat/status', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AGENTS_CHAT_STATUS, auth: ['jwt'] }),
   business({ method: 'POST', path: '/wiki/agents/chat', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AGENTS_CHAT, auth: ['jwt'], override: true }),
   business({ method: 'GET', path: '/wiki/agents/conversations', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AGENTS_CONVERSATION_LIST, auth: ['jwt'] }),
@@ -327,6 +331,10 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
   business({ method: 'DELETE', path: '/wiki/agents/conversations/:id', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AGENTS_CONVERSATION_DELETE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/wiki/agents/rag/search', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AGENTS_RAG_SEARCH, auth: ['jwt'] }),
   business({ method: 'POST', path: '/wiki/agents/vision', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AGENTS_VISION, auth: ['jwt'], override: true }),
+  business({ method: 'POST', path: '/wiki/agents/ocr', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AGENTS_OCR, auth: ['jwt'], override: true }),
+  business({ method: 'POST', path: '/wiki/agents/ocr/tasks', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AGENTS_OCR_TASK_CREATE, auth: ['jwt'], override: true }),
+  business({ method: 'GET', path: '/wiki/agents/ocr/tasks/:id', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AGENTS_OCR_TASK_FIND, auth: ['jwt'], override: true }),
+  business({ method: 'POST', path: '/wiki/agents/ocr/stream', client: WIKI_CLIENT, pattern: MQTT_PATTERNS.WIKI_AGENTS_OCR, auth: ['jwt'], override: true }),
 ];
 
 function docsContentRoutes(prefix: '/docs/documents'): GatewayRoute[] {
