@@ -111,6 +111,15 @@ export class TodosController {
     return this.todos.patchData(payload);
   }
 
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_DELETE))
+  @ApiDoc({
+    name: '删除待办',
+    description: '物理删除本人在当前业务下的一条待办，任意状态都可删',
+  })
+  remove(payload: Record<string, unknown>) {
+    return this.todos.remove(payload);
+  }
+
   @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_DELETE_BY_PAGES))
   @ApiDoc({
     name: '按页面删除待办',

@@ -566,7 +566,7 @@ const businessFeatures: FeatureCatalogItem[] = [
     module: '待办',
     code: 'todo.inbox',
     name: '我的待办',
-    description: '查看、新建本人待办，以及完成或取消',
+    description: '查看、新建本人待办，以及完成、取消或删除',
     sort: 270,
     apis: [
       'GET /todos',
@@ -589,6 +589,7 @@ const businessFeatures: FeatureCatalogItem[] = [
       'POST /wiki/todos/:id/done',
       'POST /wiki/todos/:id/cancel',
       'POST /wiki/todos/:id/reopen',
+      'DELETE /wiki/todos/:id',
     ],
   },
 ];

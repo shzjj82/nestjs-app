@@ -85,6 +85,15 @@ export class TodosController {
     return this.todos.cancel(payload);
   }
 
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_DELETE))
+  @ApiDoc({
+    name: 'Wiki 删除待办',
+    description: '物理删除本人的一条待办，任意状态都可删',
+  })
+  remove(payload: Record<string, unknown>) {
+    return this.todos.remove(payload);
+  }
+
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_REOPEN))
   @ApiDoc({
     name: 'Wiki 重新打开待办',

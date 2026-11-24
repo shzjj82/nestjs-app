@@ -282,6 +282,34 @@ export class TodosService {
     return view;
   }
 
+  /** 物理删除本人的一条待办，任意状态都可删 */
+  async remove(payload: Record<string, unknown>) {
+    const row = await this.own(payload);
+    const fromStatus = normalizeTodoStatus(row.status);
+    const snapshot = {
+      id: row.id,
+      bizCode: row.bizCode,
+      userId: row.userId,
+      title: row.title,
+    };
+    await this.todos.delete({ id: row.id });
+    void writeTodoOp(this.events, {
+      bizCode: snapshot.bizCode,
+      todoId: snapshot.id,
+      action: 'todo.delete',
+      fromStatus,
+      toStatus: null,
+      actorId: actorIdFromPayload(payload),
+      title: snapshot.title,
+    });
+    await pushRealtime({
+      kind: 'todo',
+      action: 'deleted',
+      item: { id: snapshot.id, bizCode: snapshot.bizCode, userId: snapshot.userId },
+    });
+    return { deleted: true, id: snapshot.id };
+  }
+
   /** 内部：任意状态待办只补丁 data（wiki 给历史待办绑页面） */
   async patchData(payload: Record<string, unknown>) {
     const id = requireUuid(payload.id, 'id');

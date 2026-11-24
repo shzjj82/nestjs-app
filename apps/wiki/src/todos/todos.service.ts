@@ -164,6 +164,10 @@ export class TodosService implements OnModuleInit {
     );
   }
 
+  remove(payload: Record<string, unknown>) {
+    return this.call(MQTT_PATTERNS.TODO_DELETE, this.scoped(payload));
+  }
+
   private scoped(payload: Record<string, unknown>): Record<string, unknown> {
     return { ...payload, _bizCode: WIKI_BIZ_CODE };
   }

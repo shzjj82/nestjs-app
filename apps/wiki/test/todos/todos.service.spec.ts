@@ -53,6 +53,18 @@ describe('wiki TodosService start/reopen', () => {
     );
   });
 
+  it('forwards delete to notify TODO_DELETE', async () => {
+    const { service, send } = setup();
+    await service.remove({
+      id: 'todo-1',
+      _session: { userId: 'u1', accountId: 'a1' },
+    });
+    expect(send).toHaveBeenCalledWith(
+      MQTT_PATTERNS.TODO_DELETE,
+      expect.objectContaining({ id: 'todo-1', _bizCode: WIKI_BIZ_CODE }),
+    );
+  });
+
   it('forwards reopen to notify TODO_REOPEN and enriches page', async () => {
     const { service, send } = setup();
     await service.reopen({

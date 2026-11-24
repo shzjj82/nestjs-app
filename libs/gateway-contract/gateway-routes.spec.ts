@@ -166,6 +166,10 @@ describe('matchRoute', () => {
     expect(matchRoute('POST', '/wiki/todos/t-1/reopen')?.pattern).toBe(
       MQTT_PATTERNS.WIKI_TODO_REOPEN,
     );
+    expect(matchRoute('DELETE', '/wiki/todos/t-1')?.pattern).toBe(
+      MQTT_PATTERNS.WIKI_TODO_DELETE,
+    );
+    expect(matchRoute('DELETE', '/wiki/todos/t-1')?.auth).toEqual(['jwt']);
     expect(matchRoute('POST', '/todos/t-1/start')?.client).toBe('NOTIFY_CLIENT');
     expect(matchRoute('POST', '/todos/t-1/reopen')?.pattern).toBe(
       MQTT_PATTERNS.TODO_REOPEN,

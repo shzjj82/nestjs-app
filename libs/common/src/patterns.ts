@@ -165,6 +165,8 @@ export const MQTT_PATTERNS = {
   WIKI_TODO_CANCEL: 'wiki.todo.cancel',
   WIKI_TODO_START: 'wiki.todo.start',
   WIKI_TODO_REOPEN: 'wiki.todo.reopen',
+  /** 物理删除本人的一条 wiki 待办 */
+  WIKI_TODO_DELETE: 'wiki.todo.delete',
   /** 给已有待办补绑 / 改绑文章页（含已完成历史数据） */
   WIKI_TODO_BIND_PAGE: 'wiki.todo.bindPage',
   /** wiki 业务操作日志列表 */
@@ -313,6 +315,8 @@ export const MQTT_PATTERNS = {
   TODO_SEND: 'todo.send',
   /** 内部：仅补丁 data（含已结束待办，供 wiki 回填页面关联） */
   TODO_PATCH_DATA: 'todo.patchData',
+  /** 物理删除当前用户本人的一条待办 */
+  TODO_DELETE: 'todo.delete',
   /** 内部：按页面 id 物理删除 wiki 待办（文档删除级联） */
   TODO_DELETE_BY_PAGES: 'todo.deleteByPages',
   /** 内部：wiki 催办扫描候选（存储查询，语义由 wiki 决定） */
