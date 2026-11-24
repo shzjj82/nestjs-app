@@ -29,6 +29,7 @@ const FEATURE_CODES = new Set([
   'team.manage',
   'agents.chat',
   'agents.rag',
+  'agents.ocr',
   'notify.inbox',
   'todo.inbox',
   'upload.file',
