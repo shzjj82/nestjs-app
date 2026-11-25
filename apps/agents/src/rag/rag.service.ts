@@ -77,7 +77,9 @@ export class RagService extends RagPort implements OnModuleInit {
         `doc ${input.docId} skip attachments without public url: ${unresolved.join(', ')}`,
       );
     }
-    const attachmentTexts = await extractAttachmentTexts(attachments);
+    const attachmentTexts = await extractAttachmentTexts(attachments, (images) =>
+      this.ocr.textsForEmbedded(images),
+    );
     const imageTexts = await this.ocr.textsForIndex(editorJsImages(input.body));
 
     const pieces: Array<{ sourceType: string; sourceKey: string | null; text: string }> = [];

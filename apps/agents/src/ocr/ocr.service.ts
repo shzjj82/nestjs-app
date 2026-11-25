@@ -21,6 +21,33 @@ export class OcrService {
     @InjectRepository(OcrJobEntity) private readonly jobs: Repository<OcrJobEntity>,
   ) {}
 
+  /** 文件内嵌图片。按内容哈希缓存，同一张图重复索引不再请求模型。 */
+  async textsForEmbedded(
+    images: Array<{ bytes: Buffer; mime: string }>,
+  ): Promise<string[]> {
+    if (!images.length) {
+      return [];
+    }
+    if (!ocrConfigured()) {
+      this.logger.warn('skip embedded image ocr: AI_OCR_NOT_CONFIGURED');
+      return [];
+    }
+    const out: string[] = [];
+    for (const image of images.slice(0, INDEX_IMAGES)) {
+      try {
+        const text = (await this.recognizeBytes(image.bytes, image.mime)).trim().slice(0, TEXT_MAX);
+        if (text) {
+          out.push(text);
+        }
+      } catch (err) {
+        this.logger.warn(
+          `skip embedded image ocr: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+    return out;
+  }
+
   /** 索引用：失败或未配置的图片跳过，不让整篇文档索引失败。 */
   async textsForIndex(urls: string[]): Promise<Array<{ url: string; text: string }>> {
     if (!ocrConfigured()) {
@@ -144,6 +171,26 @@ export class OcrService {
     }
   }
 
+  private async recognizeBytes(bytes: Buffer, mime: string): Promise<string> {
+    const urlHash = createHash('sha256').update(bytes).digest('hex');
+    const model = ocrModel();
+    const cached = await this.cache.findOne({ where: { urlHash } });
+    if (cached && cached.model === model) {
+      return cached.text;
+    }
+    const dataUrl = `data:${mime};base64,${bytes.toString('base64')}`;
+    const text = await this.callOcr(dataUrl);
+    await this.cache.save(
+      this.cache.create({
+        urlHash,
+        url: `embedded:${urlHash}`,
+        text,
+        model,
+      }),
+    );
+    return text;
+  }
+
   private async recognizeUrl(url: string): Promise<string> {
     const urlHash = createHash('sha256').update(url).digest('hex');
     const model = ocrModel();
@@ -151,11 +198,8 @@ export class OcrService {
     if (cached && cached.model === model) {
       return cached.text;
     }
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), aiTimeoutMs());
-    try {
-      const text = await requestOcrText(url, controller.signal);
-      await this.cache.save(
+    const text = await this.callOcr(url);
+    await this.cache.save(
         this.cache.create({
           urlHash,
           url,
@@ -163,7 +207,14 @@ export class OcrService {
           model,
         }),
       );
-      return text;
+    return text;
+  }
+
+  private async callOcr(url: string): Promise<string> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), aiTimeoutMs());
+    try {
+      return await requestOcrText(url, controller.signal);
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         throw new Error('OCR_TIMEOUT');

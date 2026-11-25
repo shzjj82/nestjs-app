@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { Logger } from '@nestjs/common';
+import { embeddedImages, type EmbeddedImage } from './embedded-images';
 import type { ExtractedAttachment } from './editorjs-text';
 
 const logger = new Logger('AgentsRagAttach');
@@ -13,11 +14,12 @@ function nodeRequire(id: string): unknown {
 /** 尽力从 OSS 公开 URL 抽取附件文本；失败则跳过 */
 export async function extractAttachmentTexts(
   files: ExtractedAttachment[],
+  recognizeImages?: (images: EmbeddedImage[]) => Promise<string[]>,
 ): Promise<Array<{ name: string; url: string; ext: string; text: string }>> {
   const out: Array<{ name: string; url: string; ext: string; text: string }> = [];
   for (const file of files.slice(0, 8)) {
     try {
-      const text = await extractOne(file);
+      const text = await extractOne(file, recognizeImages);
       if (text.trim()) {
         out.push({ ...file, text: text.trim().slice(0, 80_000) });
       }
@@ -30,7 +32,10 @@ export async function extractAttachmentTexts(
   return out;
 }
 
-async function extractOne(file: ExtractedAttachment): Promise<string> {
+async function extractOne(
+  file: ExtractedAttachment,
+  recognizeImages?: (images: EmbeddedImage[]) => Promise<string[]>,
+): Promise<string> {
   const res = await fetch(file.url, {
     signal: AbortSignal.timeout(30_000),
   });
@@ -38,7 +43,15 @@ async function extractOne(file: ExtractedAttachment): Promise<string> {
     throw new Error(`HTTP ${res.status}`);
   }
   const buf = Buffer.from(await res.arrayBuffer());
-  switch (file.ext) {
+  const text = await textOf(file.ext, buf);
+  const images = await embeddedImages(buf, file.ext).catch(() => []);
+  const recognized = images.length && recognizeImages ? await recognizeImages(images) : [];
+  const pictureText = recognized.filter(Boolean).join('\n\n');
+  return [text, pictureText ? `【文件内图片】\n${pictureText}` : ''].filter(Boolean).join('\n\n');
+}
+
+async function textOf(ext: string, buf: Buffer): Promise<string> {
+  switch (ext) {
     case 'txt':
     case 'csv':
       return buf.toString('utf8');
