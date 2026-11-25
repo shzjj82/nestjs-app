@@ -450,6 +450,16 @@ export interface AgentConversationListResult {
   pageSize: number;
 }
 
+/** 和编辑器 LocateTarget 同一套字段：先打开文档，再定位摘录。 */
+export interface WikiLocate {
+  type: 'page' | 'text' | 'url';
+  pageId?: string;
+  text?: string;
+  url?: string;
+  mode?: 'push' | 'replace' | 'here' | 'browser';
+  next?: WikiLocate;
+}
+
 export interface AgentRagSource {
   docId: string;
   title: string;
@@ -458,8 +468,14 @@ export interface AgentRagSource {
   content: string;
   score: number;
   sourceType: string;
+  /** 附件或图片的公开地址；页面正文没有 */
+  sourceKey?: string;
+  /** 附件文件名，用来标明出处类型旁边的文件名 */
+  sourceName?: string;
   /** 命中来自图片时的原图地址 */
   imageUrl?: string;
+  /** 编辑器 Locate 组件直接使用的跳转目标 */
+  locate?: WikiLocate;
 }
 
 export interface AgentChatResult {
@@ -483,5 +499,5 @@ export interface AgentRagSearchResult {
 
 export type AgentChatStreamEvent =
   | { delta: string }
-  | { reply: string; conversationId: string }
+  | { reply: string; conversationId: string; sources?: AgentRagSource[] }
   | { error: string };

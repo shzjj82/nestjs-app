@@ -128,7 +128,11 @@ export class ChatService {
       }
       const trimmed = reply.slice(0, 12000);
       await this.persistTurn(session, input, trimmed, prepared.sources);
-      yield { reply: trimmed, conversationId: session.conversation.id };
+      yield {
+        reply: trimmed,
+        conversationId: session.conversation.id,
+        ...(prepared.sources.length ? { sources: prepared.sources } : {}),
+      };
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         rpcFail(504, 'AI_TIMEOUT');

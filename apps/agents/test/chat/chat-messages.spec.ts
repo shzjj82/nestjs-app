@@ -87,6 +87,8 @@ describe('applyRagPolicy', () => {
     expect(policy.mode).toBe('grounded');
     expect(policy.sources.map((item) => item.title)).toEqual(['正文']);
     expect(policy.context).toContain('### [1] 正文');
+    expect(policy.context).toContain('类型：页面正文');
+    expect(policy.context).toContain('定位：页面「正文」');
     expect(policy.context).toContain('正文的正文');
     expect(policy.context).not.toContain('弱标题');
     expect(policy.context).not.toContain('editorjs');
@@ -102,6 +104,22 @@ describe('applyRagPolicy', () => {
     expect(policy.context).toContain('Fiber详解的正文');
     expect(policy.systemAppendix).toContain('先写资料中的定义');
     expect(policy.systemAppendix).toContain('以下不是知识库内容');
+  });
+
+  it('labels a file hit with its type and filename', () => {
+    const policy = applyRagPolicy([
+      {
+        title: '准备条件',
+        slug: 'prep',
+        content: '【附件：资质.docx】\n企业认证费用',
+        sourceType: 'docx',
+        sourceName: '资质.docx',
+        score: 0.8,
+      },
+    ]);
+    expect(policy.context).toContain('类型：Word');
+    expect(policy.context).toContain('定位：文件「资质.docx」');
+    expect(policy.context).not.toContain('类型：docx');
   });
 
   it('drops every chunk below the line and allows labeled general knowledge', () => {

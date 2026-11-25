@@ -22,6 +22,7 @@ import {
   resolvePublicFileUrl,
 } from './editorjs-text';
 import { OcrService } from '../ocr/ocr.service';
+import { locateForRagSource } from './rag-locate';
 import { EmbeddingService } from './embedding.service';
 import { RagPort } from './rag-port';
 
@@ -285,16 +286,26 @@ export class RagService extends RagPort implements OnModuleInit {
     }>;
 
     return {
-      items: rows.map((row) => ({
-        docId: row.docId,
-        title: row.title ?? '',
-        slug: row.slug ?? '',
-        chunkIndex: Number(row.chunkIndex) || 0,
-        content: String(row.content ?? '').slice(0, 2000),
-        score: Number(row.score) || 0,
-        sourceType: row.sourceType ?? 'editorjs',
-        ...(row.sourceType === 'image' && row.sourceKey ? { imageUrl: row.sourceKey } : {}),
-      })),
+      items: rows.map((row) => {
+        const content = String(row.content ?? '').slice(0, 2000);
+        const sourceType = row.sourceType ?? 'editorjs';
+        const sourceKey = row.sourceKey?.trim() || undefined;
+        const sourceName = attachmentName(content);
+        const locate = locateForRagSource({ docId: row.docId, content });
+        return {
+          docId: row.docId,
+          title: row.title ?? '',
+          slug: row.slug ?? '',
+          chunkIndex: Number(row.chunkIndex) || 0,
+          content,
+          score: Number(row.score) || 0,
+          sourceType,
+          ...(sourceKey ? { sourceKey } : {}),
+          ...(sourceName ? { sourceName } : {}),
+          ...(sourceType === 'image' && sourceKey ? { imageUrl: sourceKey } : {}),
+          ...(locate ? { locate } : {}),
+        };
+      }),
     };
   }
 
@@ -342,6 +353,12 @@ export class RagService extends RagPort implements OnModuleInit {
       return [];
     }
   }
+}
+
+function attachmentName(content: string): string | undefined {
+  const match = /^【附件：([^】]+)】/.exec(content.trim());
+  const name = match?.[1]?.trim();
+  return name || undefined;
 }
 
 function parseIndexPayload(payload: unknown): IndexPayload {

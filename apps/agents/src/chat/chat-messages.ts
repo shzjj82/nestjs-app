@@ -14,10 +14,10 @@ export const DEFAULT_SYSTEM = `你是中文写作搭档。
  */
 export const RAG_HIT_SCORE = 0.5;
 
-export const RAG_GROUNDED_SYSTEM = `本次知识库检索已命中。只根据下方参考资料回答，并标明文档标题。引用时只写标题本身，不要带出存储格式或类型。不要用通用知识补充资料里没有的细节。待办、日期、负责人和项目事实若资料未列出，直接说没有，不要编造。`;
+export const RAG_GROUNDED_SYSTEM = `本次知识库检索已命中。只根据下方参考资料回答。引用时写出文档标题，并按资料中的类型和定位标明出处。类型只用页面正文、图片、Word、Excel、PDF 或文本，不要写存储格式名。不要用通用知识补充资料里没有的细节。待办、日期、负责人和项目事实若资料未列出，直接说没有，不要编造。`;
 
 /** 资料已命中，但用户明确在问资料以外的通用定义。 */
-export const RAG_GROUNDED_OUTSIDE_SYSTEM = `本次知识库检索已命中。知识库里的事实只根据下方参考资料回答，并标明文档标题。引用时只写标题本身，不要带出存储格式或类型。用户在问网上、业界或通用定义：先写资料中的定义，再另起一段用通用知识回答，并标明「以下不是知识库内容」。不要说自己联网搜索过，也不要把后一段写成知识库内容。待办、日期、负责人和项目里有没有这件事，仍然只能说资料不足，不要用通用知识编造。`;
+export const RAG_GROUNDED_OUTSIDE_SYSTEM = `本次知识库检索已命中。知识库里的事实只根据下方参考资料回答。引用时写出文档标题，并按资料中的类型和定位标明出处。类型只用页面正文、图片、Word、Excel、PDF 或文本，不要写存储格式名。用户在问网上、业界或通用定义：先写资料中的定义，再另起一段用通用知识回答，并标明「以下不是知识库内容」。不要说自己联网搜索过，也不要把后一段写成知识库内容。待办、日期、负责人和项目里有没有这件事，仍然只能说资料不足，不要用通用知识编造。`;
 
 /** 用户点名要资料以外的定义，而不是在问知识库里怎么写。 */
 export function asksForOutsideDefinition(query: string): boolean {
@@ -28,7 +28,7 @@ export function asksForOutsideDefinition(query: string): boolean {
 
 export const RAG_GENERAL_SYSTEM = `本次知识库检索未达到采用线，没有可引用的正文。不要把未附上的页面当成依据，也不要编造文档标题。先说明知识库里没有可回答该问题的正文，再另起一段用通用知识回答，并标明「以下不是知识库内容」。待办、日期、负责人和项目里有没有这件事，仍然只能说资料不足，不要用通用知识编造。`;
 
-export const WEB_RESULTS_SYSTEM = `下方「网上结果」是本次联网检索到的网页摘要。转述网上内容时只能依据这些摘要，并写出标题和链接。不要编造没有给出的网址，也不要说自己没有联网。网上结果不是知识库内容。「参考资料」仍只表示知识库。待办、日期、负责人和项目里有没有这件事，仍然只能依据知识库，不要用网上结果编造。`;
+export const WEB_RESULTS_SYSTEM = `下方「网上结果」是本次联网检索到、并且页面仍然可以打开的网页摘要。转述网上内容时只能依据这些摘要，并写出标题和链接。不要编造没有给出的网址，不要引用 404 或已不存在的页面，也不要说自己没有联网。网上结果不是知识库内容。「参考资料」仍只表示知识库。待办、日期、负责人和项目里有没有这件事，仍然只能依据知识库，不要用网上结果编造。`;
 
 export type WebHit = { title: string; url: string; content: string };
 
@@ -43,7 +43,49 @@ export function webResultsAppendix(hits: WebHit[]): string {
   return `【网上结果】\n${blocks.join('\n\n')}`;
 }
 
-type RagHit = { title: string; slug: string; content: string; sourceType: string; score: number };
+type RagHit = {
+  title: string;
+  slug: string;
+  content: string;
+  sourceType: string;
+  score: number;
+  sourceName?: string;
+};
+
+/** 给模型和界面看的来源类型，不用 editorjs 这类存储名。 */
+export function sourceKindLabel(sourceType: string): string {
+  switch (sourceType) {
+    case 'editorjs':
+      return '页面正文';
+    case 'image':
+      return '图片';
+    case 'doc':
+    case 'docx':
+      return 'Word';
+    case 'xls':
+    case 'xlsx':
+    case 'csv':
+      return 'Excel';
+    case 'pdf':
+      return 'PDF';
+    case 'txt':
+      return '文本';
+    default:
+      return '文件';
+  }
+}
+
+/** 出处该跳到页面，还是文件、图片。 */
+export function sourcePlace(item: { title: string; sourceType: string; sourceName?: string }): string {
+  if (item.sourceType === 'editorjs') {
+    return item.title ? `页面「${item.title}」` : '页面';
+  }
+  if (item.sourceType === 'image') {
+    return '图片';
+  }
+  const name = item.sourceName?.trim();
+  return name ? `文件「${name}」` : '文件';
+}
 
 export type RagPolicy<T extends RagHit> = {
   /** grounded：分数够，只准用资料。general：分数不够，允许标明后的通用知识。 */
@@ -131,14 +173,20 @@ export function contextAppendix(attachments: AgentChatAttachment[]): string {
 }
 
 export function ragContextAppendix(
-  sources: Array<{ title: string; slug: string; content: string; sourceType: string }>,
+  sources: Array<{
+    title: string;
+    slug: string;
+    content: string;
+    sourceType: string;
+    sourceName?: string;
+  }>,
 ): string {
   if (!sources.length) {
     return '';
   }
   const blocks = sources.map((item, index) => {
     const label = item.title || item.slug || `文档${index + 1}`;
-    return `### [${index + 1}] ${label}\n${item.content}`;
+    return `### [${index + 1}] ${label}\n类型：${sourceKindLabel(item.sourceType)}\n定位：${sourcePlace(item)}\n${item.content}`;
   });
   return `【参考资料】\n${blocks.join('\n\n')}`;
 }
