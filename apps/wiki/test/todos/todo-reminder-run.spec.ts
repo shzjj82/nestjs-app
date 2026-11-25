@@ -34,7 +34,7 @@ describe('wiki TodoReminder', () => {
   });
 
   it('builds locale-neutral notice with kind and page/file fields', () => {
-    const notice = buildWikiRemindNotice(baseRow(), 'todo.started');
+    const notice = buildWikiRemindNotice(baseRow(), 'todo.started', now);
     expect(notice).toEqual({
       bizCode: 'wiki',
       userId: 'user-1',
@@ -42,6 +42,7 @@ describe('wiki TodoReminder', () => {
       content: 'Sprint notes\nweekly\nli-1\nbody',
       category: 'todo',
       source: 'wiki',
+      expiresAt: '2026-11-10T16:00:00.000Z',
       data: expect.objectContaining({
         kind: 'todo.started',
         todoId: '11111111-1111-1111-1111-111111111111',

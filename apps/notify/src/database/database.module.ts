@@ -7,6 +7,7 @@ import { SplitNoticeAndTodo1760900001000 } from './migrations/1760900001000-spli
 import { TodoRemindedOn1760900002000 } from './migrations/1760900002000-todo-reminded-on';
 import { TodoFourStates1760900003000 } from './migrations/1760900003000-todo-four-states';
 import { TodoEvents1760900004000 } from './migrations/1760900004000-todo-events';
+import { NoticeExpiresAt1760900005000 } from './migrations/1760900005000-notice-expires-at';
 
 const sync = process.env.TYPEORM_SYNC === 'true';
 
@@ -24,6 +25,7 @@ const sync = process.env.TYPEORM_SYNC === 'true';
         TodoRemindedOn1760900002000,
         TodoFourStates1760900003000,
         TodoEvents1760900004000,
+        NoticeExpiresAt1760900005000,
       ],
       logging: process.env.TYPEORM_LOGGING === 'true',
     }),

@@ -25,6 +25,8 @@ export interface WikiRemindNotice {
   category: 'todo';
   source: 'wiki';
   data: Record<string, unknown>;
+  /** 催办通知默认一天后过期 */
+  expiresAt: string;
 }
 
 export interface WikiRemindDeps {
@@ -45,6 +47,7 @@ export interface WikiRemindDeps {
 }
 
 const SLOTS: WikiRemindSlot[] = ['todo.started', 'todo.overdue', 'todo.progress'];
+const REMIND_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * wiki 催办编排：决定 slot 顺序与通知形态。
@@ -79,7 +82,7 @@ async function claimAndSend(
     return false;
   }
   try {
-    await deps.send(buildWikiRemindNotice(row, slot));
+    await deps.send(buildWikiRemindNotice(row, slot, now));
     return true;
   } catch (err) {
     await deps.release(slot, row.id, today);
@@ -93,6 +96,7 @@ async function claimAndSend(
 export function buildWikiRemindNotice(
   row: WikiRemindRow,
   kind: WikiRemindSlot,
+  now: Date,
 ): WikiRemindNotice {
   const data = row.data && typeof row.data === 'object' ? { ...row.data } : {};
   const page = pageRefOf(data);
@@ -111,6 +115,7 @@ export function buildWikiRemindNotice(
     content,
     category: 'todo',
     source: 'wiki',
+    expiresAt: new Date(now.getTime() + REMIND_TTL_MS).toISOString(),
     data: {
       ...data,
       kind,

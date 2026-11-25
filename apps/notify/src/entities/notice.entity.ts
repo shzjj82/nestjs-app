@@ -36,6 +36,10 @@ export class NoticeEntity {
   @Column({ name: 'read_at', type: 'timestamptz', nullable: true })
   readAt: Date | null;
 
+  /** 为空表示不过期。催办一般写成发送后 24 小时。 */
+  @Column({ name: 'expires_at', type: 'timestamptz', nullable: true })
+  expiresAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

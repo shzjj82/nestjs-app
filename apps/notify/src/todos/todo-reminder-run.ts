@@ -43,7 +43,7 @@ async function deliverLegacyDueTodos(
   );
   let sent = 0;
   for (const row of rows) {
-    if (await sendLegacyDue(deps, row, today)) {
+    if (await sendLegacyDue(deps, row, today, now)) {
       sent += 1;
     }
   }
@@ -54,6 +54,7 @@ async function sendLegacyDue(
   deps: DueTodoDeps,
   row: LegacyDueRow,
   today: string,
+  now: Date,
 ): Promise<boolean> {
   const claimed = await deps.query(
     `UPDATE nt_todos
@@ -85,6 +86,7 @@ async function sendLegacyDue(
       data: { ...linked, kind: 'todo.due', todoId: row.id },
       dueAt: null,
       startsAt: null,
+      expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
     });
     return true;
   } catch (err) {

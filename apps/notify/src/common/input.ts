@@ -55,6 +55,21 @@ const dueAtSchema = z.preprocess((value) => {
     .transform((text) => new Date(text)),
 ]));
 
+const expiresAtSchema = z.preprocess((value) => {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  return value;
+}, z.union([
+  z.null(),
+  z
+    .string({ invalid_type_error: 'expiresAt 无效' })
+    .trim()
+    .min(1, 'expiresAt 无效')
+    .refine((text) => !Number.isNaN(new Date(text).getTime()), 'expiresAt 无效')
+    .transform((text) => new Date(text)),
+]));
+
 const startsAtSchema = z.preprocess((value) => {
   if (value === undefined || value === null || value === '') {
     return null;
@@ -117,6 +132,7 @@ const sendSchema = (sourceFallback: string) =>
     data: dataSchema,
     dueAt: dueAtSchema,
     startsAt: startsAtSchema,
+    expiresAt: expiresAtSchema,
   });
 
 export interface SendCommand {
@@ -130,6 +146,8 @@ export interface SendCommand {
   data: Record<string, unknown> | null;
   dueAt: Date | null;
   startsAt: string | null;
+  /** 为空表示不过期 */
+  expiresAt: Date | null;
 }
 
 export function actorOf(payload: Record<string, unknown>): Actor | null {

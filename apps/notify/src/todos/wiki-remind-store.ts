@@ -123,12 +123,19 @@ function wikiScope(mode: RemindMode): string {
   `;
 }
 
+/**
+ * 区间结束日。data.end 取前 10 位日历日（11/21 就是 2026-11-21，不把 23:59Z 算成次日）。
+ * 没有 end 时才用 due_at 的上海日。
+ */
 function endDateExpr(): string {
   return `
-    COALESCE(
-      NULLIF(TRIM(data->>'end'), ''),
-      (due_at AT TIME ZONE 'Asia/Shanghai')::date::text
-    )
+    CASE
+      WHEN NULLIF(TRIM(data->>'end'), '') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+        THEN LEFT(TRIM(data->>'end'), 10)::date
+      WHEN due_at IS NOT NULL
+        THEN (due_at AT TIME ZONE 'Asia/Shanghai')::date
+      ELSE NULL
+    END
   `;
 }
 
@@ -168,21 +175,21 @@ function wikiProgressSql(mode: RemindMode): string {
       AND starts_at <= $1::date
       AND (
         ${endDateExpr()} IS NULL
-        OR ${endDateExpr()} >= $1::text
+        OR ${endDateExpr()} >= $1::date
       )
       AND (last_progress_notice_on IS NULL OR last_progress_notice_on <> $1::date)
     ORDER BY created_at ASC
   `;
 }
 
-/** 未结束且完成日早于今天：每个上海日催办一次，完成或终止后不再进入 */
+/** 结束日的次日起，每个上海日催办一次。11/14–11/21 从 11/22 起每天一条，完成或终止后不再进入。 */
 function wikiOverdueSql(mode: RemindMode): string {
   return `
     ${selectCols()}
     WHERE ${wikiScope(mode)}
       AND status IN ('pending', 'in_progress', 'open')
       AND ${endDateExpr()} IS NOT NULL
-      AND ${endDateExpr()} < $1::text
+      AND ${endDateExpr()} < $1::date
       AND (last_overdue_notice_on IS NULL OR last_overdue_notice_on <> $1::date)
     ORDER BY created_at ASC
   `;

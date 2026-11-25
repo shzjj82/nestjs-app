@@ -21,6 +21,8 @@ export interface NotifyMessage {
   source: string;
   data: Record<string, unknown> | null;
   readAt: string | null;
+  /** 为空表示不过期 */
+  expiresAt: string | null;
   createdAt: string;
 }
 
@@ -86,6 +88,8 @@ export interface NotifySendInput {
   category?: string;
   source?: string;
   data?: Record<string, unknown> | null;
+  /** ISO 时间。不传则通知不过期。 */
+  expiresAt?: string | null;
 }
 
 export interface NotifyTodoInput extends NotifySendInput {

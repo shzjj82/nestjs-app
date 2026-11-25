@@ -41,6 +41,7 @@ describe('notify input', () => {
       data: null,
       dueAt: null,
       startsAt: null,
+      expiresAt: null,
     });
   });
 
@@ -78,9 +79,24 @@ describe('notify input', () => {
     );
     expect(command.dueAt?.toISOString()).toBe('2026-12-01T00:00:00.000Z');
     expect(command.startsAt).toBe('2026-11-20');
+    expect(command.expiresAt).toBeNull();
     expect(finishTodo('open', 'cancel')).toBe('cancelled');
     expect(finishTodo('pending', 'done')).toBe('done');
     expect(() => finishTodo('done', 'cancel')).toThrow(/活跃待办/);
+  });
+
+  it('keeps an optional notice expiry', () => {
+    const command = parseSend(
+      {
+        bizCode: 'wiki',
+        userId: 'user-1',
+        title: '周报',
+        content: '请更新',
+        expiresAt: '2026-11-22T16:00:00.000Z',
+      },
+      'service',
+    );
+    expect(command.expiresAt?.toISOString()).toBe('2026-11-22T16:00:00.000Z');
   });
 
   it('pages and unread flags', () => {

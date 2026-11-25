@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { rpcFail } from '@app/common';
 import type { NotifyMessage } from '@app/notify-contract';
-import { FindOptionsWhere, IsNull, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import {
   bizCodeOf,
   requireActor,
@@ -24,19 +24,15 @@ export class NoticesService {
   async list(payload: Record<string, unknown>) {
     const actor = requireActor(payload);
     const page = toPage(payload.page, payload.pageSize);
-    const where: FindOptionsWhere<NoticeEntity> = {
-      bizCode: bizCodeOf(payload),
-      userId: actor.userId,
-    };
+    const qb = this.visible(bizCodeOf(payload), actor.userId);
     if (unreadOnly(payload)) {
-      where.readAt = IsNull();
+      qb.andWhere('notice.readAt IS NULL');
     }
-    const [rows, total] = await this.notices.findAndCount({
-      where,
-      order: { createdAt: 'DESC' },
-      skip: page.skip,
-      take: page.pageSize,
-    });
+    const [rows, total] = await qb
+      .orderBy('notice.createdAt', 'DESC')
+      .skip(page.skip)
+      .take(page.pageSize)
+      .getManyAndCount();
     return {
       items: rows.map(toView),
       total,
@@ -47,13 +43,9 @@ export class NoticesService {
 
   async unreadCount(payload: Record<string, unknown>) {
     const actor = requireActor(payload);
-    const count = await this.notices.count({
-      where: {
-        bizCode: bizCodeOf(payload),
-        userId: actor.userId,
-        readAt: IsNull(),
-      },
-    });
+    const count = await this.visible(bizCodeOf(payload), actor.userId)
+      .andWhere('notice.readAt IS NULL')
+      .getCount();
     return { count };
   }
 
@@ -76,10 +68,15 @@ export class NoticesService {
   async markAllRead(payload: Record<string, unknown>) {
     const actor = requireActor(payload);
     const bizCode = bizCodeOf(payload);
-    const result = await this.notices.update(
-      { bizCode, userId: actor.userId, readAt: IsNull() },
-      { readAt: new Date() },
-    );
+    const result = await this.notices
+      .createQueryBuilder()
+      .update(NoticeEntity)
+      .set({ readAt: new Date() })
+      .where('bizCode = :bizCode', { bizCode })
+      .andWhere('userId = :userId', { userId: actor.userId })
+      .andWhere('readAt IS NULL')
+      .andWhere('(expiresAt IS NULL OR expiresAt > NOW())')
+      .execute();
     await pushRealtime({
       kind: 'notice',
       action: 'read-all',
@@ -99,11 +96,20 @@ export class NoticesService {
         source: command.source,
         data: command.data,
         readAt: null,
+        expiresAt: command.expiresAt,
       }),
     );
     const view = toView(saved);
     await pushRealtime({ kind: 'notice', action: 'created', item: view });
     return view;
+  }
+
+  private visible(bizCode: string, userId: string) {
+    return this.notices
+      .createQueryBuilder('notice')
+      .where('notice.bizCode = :bizCode', { bizCode })
+      .andWhere('notice.userId = :userId', { userId })
+      .andWhere('(notice.expiresAt IS NULL OR notice.expiresAt > NOW())');
   }
 
   private async own(payload: Record<string, unknown>): Promise<NoticeEntity> {
@@ -114,6 +120,9 @@ export class NoticesService {
     });
     if (!row) {
       rpcFail(404, '通知不存在');
+    }
+    if (row.expiresAt && row.expiresAt.getTime() <= Date.now()) {
+      rpcFail(404, '通知已过期');
     }
     return row;
   }
@@ -130,6 +139,7 @@ function toView(row: NoticeEntity): NotifyMessage {
     source: row.source,
     data: row.data,
     readAt: row.readAt ? row.readAt.toISOString() : null,
+    expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
   };
 }

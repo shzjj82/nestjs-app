@@ -36,6 +36,7 @@ describe('TodoReminder (legacy non-wiki)', () => {
       data: { kind: 'todo.due', todoId: 'legacy-1' },
       dueAt: null,
       startsAt: null,
+      expiresAt: new Date('2026-11-10T16:00:00.000Z'),
     });
   });
 
