@@ -23,6 +23,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { GatewayUser } from '../auth/auth.types';
 import { ClientHub } from '../mqtt/client.hub';
+import { markWikiCitations } from '../../../wiki/src/chat/inline-cite';
 import { requestPathname } from '../proxy/proxy.routes';
 
 function agentsMqttTimeoutMs() {
@@ -61,8 +62,9 @@ export class AgentsOverrideController {
       },
     };
     if (body?.sync === false) {
-      // 流式仍直连 agents HTTP；同步路径走 wiki 门面便于加业务
-      await this.pipeStream(res, payload);
+      // 流式仍直连 agents HTTP。知识库这条在写出前套上 wiki 的出处标记。
+      const wiki = requestPathname(req).startsWith('/wiki/agents');
+      await this.pipeStream(res, payload, wiki);
       return;
     }
     const wiki = requestPathname(req).startsWith('/wiki/agents');
@@ -91,7 +93,7 @@ export class AgentsOverrideController {
     }
   }
 
-  private async pipeStream(res: Response, payload: unknown) {
+  private async pipeStream(res: Response, payload: unknown, wiki = false) {
     let upstream: globalThis.Response;
     try {
       upstream = await fetch(`${agentsHttpUrl()}/internal/chat/stream`, {
@@ -116,14 +118,59 @@ export class AgentsOverrideController {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
     const reader = upstream.body.getReader();
+    if (!wiki) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        res.write(value);
+      }
+      res.end();
+      return;
+    }
+    const decoder = new TextDecoder();
+    let rest = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
+        rest += decoder.decode();
+        if (rest) {
+          res.write(rewriteWikiSse(rest));
+        }
         break;
       }
-      res.write(value);
+      rest += decoder.decode(value, { stream: true });
+      const parts = rest.split(/\n\n/);
+      rest = parts.pop() ?? '';
+      if (parts.length) {
+        res.write(`${parts.map(rewriteWikiSse).join('\n\n')}\n\n`);
+      }
     }
     res.end();
+  }
+}
+
+function rewriteWikiSse(block: string): string {
+  const lines = block.split('\n');
+  const index = lines.findIndex((line) => line.startsWith('data:'));
+  if (index < 0) {
+    return block;
+  }
+  const data = lines[index].slice(5).trim();
+  if (!data || data === '[DONE]') {
+    return block;
+  }
+  try {
+    const event = JSON.parse(data) as { reply?: unknown; sources?: unknown };
+    if (typeof event.reply !== 'string') {
+      return block;
+    }
+    event.reply = markWikiCitations(event.reply, event.sources);
+    lines[index] = `data: ${JSON.stringify(event)}`;
+    return lines.join('\n');
+  } catch {
+    return block;
   }
 }
 
