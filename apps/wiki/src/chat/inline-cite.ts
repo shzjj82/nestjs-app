@@ -10,7 +10,7 @@ type Hit = {
   index: number;
 };
 
-/** 把模型写的（《标题》，Word）或《标题》换成 {{cite:序号}}，序号对应 sources。 */
+/** 把模型写的出处换成 {{cite:序号}}，序号对应 sources。认《标题》、（《标题》，类型）和（出处：标题，类型）。 */
 export function markWikiCitations(reply: string, sources: unknown): string {
   if (!reply || !Array.isArray(sources) || sources.length === 0) {
     return reply;
@@ -38,13 +38,33 @@ function collectHits(reply: string, sources: unknown[]): Hit[] {
     }
     const names = namesOf(source);
     const kinds = kindWords(source.sourceType ?? '');
+    const kindAlt = kinds.map(escapeRegExp).join('|');
     for (const name of names) {
       const escaped = escapeRegExp(name);
-      const paren = new RegExp(
-        `[（(]\\s*《${escaped}》\\s*[，,]\\s*(?:${kinds.map(escapeRegExp).join('|')})\\s*[）)]`,
-        'gi',
+      pushMatches(
+        found,
+        reply,
+        new RegExp(
+          `[（(]\\s*《${escaped}》\\s*[，,]\\s*(?:${kindAlt})\\s*[）)]`,
+          'gi',
+        ),
+        index,
       );
-      pushMatches(found, reply, paren, index);
+      pushMatches(
+        found,
+        reply,
+        new RegExp(
+          `[（(]\\s*出处\\s*[：:]\\s*${escaped}\\s*[，,]\\s*(?:${kindAlt})\\s*[）)]`,
+          'gi',
+        ),
+        index,
+      );
+      pushMatches(
+        found,
+        reply,
+        new RegExp(`出处\\s*[：:]\\s*${escaped}\\s*[，,]\\s*(?:${kindAlt})`, 'gi'),
+        index,
+      );
       pushMatches(found, reply, new RegExp(`《${escaped}》`, 'g'), index);
     }
   });

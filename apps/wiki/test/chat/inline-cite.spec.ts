@@ -17,6 +17,11 @@ describe('markWikiCitations', () => {
     expect(markWikiCitations('（《项目相关》，Word）', [word])).toBe('{{cite:0}}');
   });
 
+  it('认模型实际写出的出处：标题，类型', () => {
+    const reply = '基础准备条件（出处：准备条件，页面正文）\n合规（出处：项目相关，Word）';
+    expect(markWikiCitations(reply, [page, word])).toBe('基础准备条件{{cite:0}}\n合规{{cite:1}}');
+  });
+
   it('对不上的正文保持原样', () => {
     expect(markWikiCitations('没有出处。', [page])).toBe('没有出处。');
   });
