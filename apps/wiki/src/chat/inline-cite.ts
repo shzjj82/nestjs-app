@@ -10,7 +10,7 @@ type Hit = {
   index: number;
 };
 
-/** 把模型写的出处换成 {{cite:序号}}，序号对应 sources。类型字样一并去掉，标签由前端来画。 */
+/** 把模型写的出处换成（来源：{{cite:序号}}）。类型字样一并去掉，标签由前端来画。 */
 export function markWikiCitations(reply: string, sources: unknown): string {
   if (!reply || !Array.isArray(sources) || sources.length === 0) {
     return reply;
@@ -22,11 +22,34 @@ export function markWikiCitations(reply: string, sources: unknown): string {
   let out = '';
   let cursor = 0;
   for (const hit of hits) {
-    out += reply.slice(cursor, hit.start);
-    out += `{{cite:${hit.index}}}`;
-    cursor = hit.end;
+    const span = expandSourcePrefix(reply, hit);
+    if (span.start < cursor) {
+      continue;
+    }
+    out += reply.slice(cursor, span.start);
+    out += sourceLabel(hit.index, reply.slice(Math.max(0, span.start - 24), span.end));
+    cursor = span.end;
   }
   return out + reply.slice(cursor);
+}
+
+function sourceLabel(index: number, sample: string): string {
+  const mark = `{{cite:${index}}}`;
+  if (/[\u3400-\u9fff（）：「」]/.test(sample)) {
+    return `（来源：${mark}）`;
+  }
+  return `(来源: ${mark})`;
+}
+
+function expandSourcePrefix(reply: string, hit: Hit): Hit {
+  const before = reply.slice(0, hit.start);
+  const lead = before.match(/(?:[（(]\s*)?(?:来源|Source)\s*[：:]\s*$/i);
+  if (!lead) {
+    return hit;
+  }
+  const start = hit.start - lead[0].length;
+  const tail = reply.slice(hit.end).match(/^\s*[）)]/);
+  return { ...hit, start, end: hit.end + (tail ? tail[0].length : 0) };
 }
 
 function collectHits(reply: string, sources: unknown[]): Hit[] {
