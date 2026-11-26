@@ -22,6 +22,11 @@ describe('markWikiCitations', () => {
     expect(markWikiCitations(reply, [page, word])).toBe('基础准备条件{{cite:0}}\n合规{{cite:1}}');
   });
 
+  it('去掉类型写在书名前面的出处，只留引用标记', () => {
+    expect(markWikiCitations('费用见出处：Word「《项目相关》」。', [word])).toBe('费用见{{cite:0}}。');
+    expect(markWikiCitations('出处：页面正文「准备条件」', [page])).toBe('{{cite:0}}');
+  });
+
   it('对不上的正文保持原样', () => {
     expect(markWikiCitations('没有出处。', [page])).toBe('没有出处。');
   });
