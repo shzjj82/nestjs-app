@@ -396,6 +396,24 @@ export class TodosService {
     return { released: true, id };
   }
 
+  /** 内部：一篇页面上的任务，不含列表壳，不按用户过滤。 */
+  async listByPage(payload: Record<string, unknown>) {
+    const pageId = requireUuid(payload.pageId, 'pageId');
+    const rows = await this.todos
+      .createQueryBuilder('todo')
+      .where('todo.biz_code = :bizCode', { bizCode: bizCodeOf(payload) })
+      .andWhere(`todo.source = 'wiki'`)
+      .andWhere(`(todo.data->>'kind' IS NULL OR todo.data->>'kind' <> 'list')`)
+      .andWhere(
+        `(todo.data->>'pageId' = :pageId OR COALESCE(todo.data->'page'->>'id', '') = :pageId)`,
+        { pageId },
+      )
+      .orderBy('todo.created_at', 'ASC')
+      .take(100)
+      .getMany();
+    return { items: rows.map(toView) };
+  }
+
   /** 内部：文档删除时按 pageId 物理删除 wiki 待办 */
   async deleteByPages(payload: Record<string, unknown>) {
     const bizCode = bizCodeOf(payload);

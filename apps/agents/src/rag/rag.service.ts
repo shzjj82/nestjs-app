@@ -25,6 +25,13 @@ import { OcrService } from '../ocr/ocr.service';
 import { locateForRagSource } from './rag-locate';
 import { EmbeddingService } from './embedding.service';
 import { RagPort } from './rag-port';
+import {
+  formatTodoIndexText,
+  mergeRagTodos,
+  ragTodoFromRecord,
+  todosFromEditorJs,
+  type RagTodo,
+} from './todo-text';
 
 type IndexPayload = {
   appCode: string;
@@ -82,6 +89,9 @@ export class RagService extends RagPort implements OnModuleInit {
       this.ocr.textsForEmbedded(images),
     );
     const imageTexts = await this.ocr.textsForIndex(editorJsImages(input.body));
+    const todoText = formatTodoIndexText(
+      mergeRagTodos(await this.pageTodos(input), todosFromEditorJs(input.body)),
+    );
 
     const pieces: Array<{ sourceType: string; sourceKey: string | null; text: string }> = [];
     if (bodyText) {
@@ -100,6 +110,9 @@ export class RagService extends RagPort implements OnModuleInit {
         sourceKey: image.url,
         text: image.text,
       });
+    }
+    if (todoText) {
+      pieces.push({ sourceType: 'todo', sourceKey: null, text: todoText });
     }
 
     const prepared: Array<{
@@ -327,6 +340,31 @@ export class RagService extends RagPort implements OnModuleInit {
     } catch (err) {
       this.logger.warn(
         `chat rag search failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return [];
+    }
+  }
+
+  /** 页面上已同步的待办。失败时只索引正文里还没同步的条目。 */
+  private async pageTodos(input: IndexPayload): Promise<RagTodo[]> {
+    if (input.appCode !== 'wiki') {
+      return [];
+    }
+    try {
+      const raw = await lastValueFrom(
+        this.wiki
+          .send<{ items?: unknown[] }>(MQTT_PATTERNS.WIKI_TODOS_FOR_INDEX, {
+            pageId: input.docId,
+            _bizCode: input.appCode,
+          })
+          .pipe(timeout(8000)),
+      );
+      return (raw?.items ?? [])
+        .map((item) => ragTodoFromRecord(item))
+        .filter((item): item is RagTodo => Boolean(item));
+    } catch (err) {
+      this.logger.warn(
+        `page todos unavailable for ${input.docId}: ${err instanceof Error ? err.message : String(err)}`,
       );
       return [];
     }

@@ -167,6 +167,8 @@ function kindWords(sourceType: string): string[] {
       return ['页面正文', '页面'];
     case 'image':
       return ['图片'];
+    case 'todo':
+      return ['待办'];
     case 'doc':
     case 'docx':
       return ['Word'];

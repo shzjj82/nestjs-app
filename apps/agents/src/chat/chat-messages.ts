@@ -14,10 +14,10 @@ export const DEFAULT_SYSTEM = `你是中文写作搭档。
  */
 export const RAG_HIT_SCORE = 0.5;
 
-export const RAG_GROUNDED_SYSTEM = `本次知识库检索已命中。只根据下方参考资料回答。引用时写出文档标题，并按资料中的类型和定位标明出处。类型只用页面正文、图片、Word、Excel、PDF 或文本，不要写存储格式名。不要用通用知识补充资料里没有的细节。待办、日期、负责人和项目事实若资料未列出，直接说没有，不要编造。`;
+export const RAG_GROUNDED_SYSTEM = `本次知识库检索已命中。只根据下方参考资料回答。引用时写出文档标题，并按资料中的类型和定位标明出处。类型只用页面正文、图片、待办、Word、Excel、PDF 或文本，不要写存储格式名。不要用通用知识补充资料里没有的细节。待办、日期、负责人和项目事实若资料未列出，直接说没有，不要编造。`;
 
 /** 资料已命中，但用户明确在问资料以外的通用定义。 */
-export const RAG_GROUNDED_OUTSIDE_SYSTEM = `本次知识库检索已命中。知识库里的事实只根据下方参考资料回答。引用时写出文档标题，并按资料中的类型和定位标明出处。类型只用页面正文、图片、Word、Excel、PDF 或文本，不要写存储格式名。用户在问网上、业界或通用定义：先写资料中的定义，再另起一段用通用知识回答，并标明「以下不是知识库内容」。不要说自己联网搜索过，也不要把后一段写成知识库内容。待办、日期、负责人和项目里有没有这件事，仍然只能说资料不足，不要用通用知识编造。`;
+export const RAG_GROUNDED_OUTSIDE_SYSTEM = `本次知识库检索已命中。知识库里的事实只根据下方参考资料回答。引用时写出文档标题，并按资料中的类型和定位标明出处。类型只用页面正文、图片、待办、Word、Excel、PDF 或文本，不要写存储格式名。用户在问网上、业界或通用定义：先写资料中的定义，再另起一段用通用知识回答，并标明「以下不是知识库内容」。不要说自己联网搜索过，也不要把后一段写成知识库内容。待办、日期、负责人和项目里有没有这件事，仍然只能说资料不足，不要用通用知识编造。`;
 
 /** 用户点名要资料以外的定义，而不是在问知识库里怎么写。 */
 export function asksForOutsideDefinition(query: string): boolean {
@@ -59,6 +59,8 @@ export function sourceKindLabel(sourceType: string): string {
       return '页面正文';
     case 'image':
       return '图片';
+    case 'todo':
+      return '待办';
     case 'doc':
     case 'docx':
       return 'Word';
@@ -82,6 +84,9 @@ export function sourcePlace(item: { title: string; sourceType: string; sourceNam
   }
   if (item.sourceType === 'image') {
     return '图片';
+  }
+  if (item.sourceType === 'todo') {
+    return '待办';
   }
   const name = item.sourceName?.trim();
   return name ? `文件「${name}」` : '文件';

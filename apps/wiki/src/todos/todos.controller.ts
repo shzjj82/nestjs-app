@@ -18,6 +18,15 @@ import { TodosService } from './todos.service';
 export class TodosController {
   constructor(private readonly todos: TodosService) {}
 
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODOS_FOR_INDEX))
+  @ApiDoc({
+    name: '页面待办索引',
+    description: '内部：向量索引读取一篇页面上的任务，不按当前用户过滤',
+  })
+  forIndex(payload: Record<string, unknown>) {
+    return this.todos.listForIndex(payload);
+  }
+
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_TODO_LIST))
   @ApiDoc({
     name: 'Wiki 我的待办',

@@ -120,6 +120,16 @@ export class TodosController {
     return this.todos.remove(payload);
   }
 
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_LIST_BY_PAGE))
+  @ApiDoc({
+    name: '按页面读取待办',
+    description: '内部接口：向量索引读取一篇页面上的 wiki 任务，不含列表壳',
+  })
+  listByPage(payload: Record<string, unknown>) {
+    requireInternal(payload);
+    return this.todos.listByPage(payload);
+  }
+
   @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_DELETE_BY_PAGES))
   @ApiDoc({
     name: '按页面删除待办',

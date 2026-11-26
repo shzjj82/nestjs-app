@@ -62,10 +62,9 @@ export class AgentsOverrideController {
       },
     };
     if (body?.sync === false) {
-      // 流式仍直连 agents HTTP。知识库这条先让 wiki 附上待办，写出前再套出处标记。
+      // 流式仍直连 agents HTTP。知识库这条写出前再套出处标记。
       const wiki = requestPathname(req).startsWith('/wiki/agents');
-      const prepared = wiki ? await this.prepareWikiChat(payload) : payload;
-      await this.pipeStream(res, prepared, wiki);
+      await this.pipeStream(res, payload, wiki);
       return;
     }
     const wiki = requestPathname(req).startsWith('/wiki/agents');
@@ -92,24 +91,6 @@ export class AgentsOverrideController {
       }
       throw err;
     }
-  }
-
-  private async prepareWikiChat(payload: Record<string, unknown>) {
-    try {
-      const raw = await this.clients.send<ServiceEnvelope<Record<string, unknown>>>(
-        WIKI_CLIENT,
-        MQTT_PATTERNS.WIKI_AGENTS_CHAT_PREPARE,
-        payload,
-        agentsMqttTimeoutMs(),
-      );
-      const prepared = unwrapData(raw);
-      if (prepared && typeof prepared === 'object') {
-        return prepared;
-      }
-    } catch {
-      // 待办清单失败时仍按原问题继续对话
-    }
-    return payload;
   }
 
   private async pipeStream(res: Response, payload: unknown, wiki = false) {

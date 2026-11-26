@@ -173,6 +173,8 @@ export const MQTT_PATTERNS = {
   WIKI_TODO_DELETE: 'wiki.todo.delete',
   /** 给已有待办补绑 / 改绑文章页（含已完成历史数据） */
   WIKI_TODO_BIND_PAGE: 'wiki.todo.bindPage',
+  /** 内部：索引一篇文档时读取该页待办，不注册到网关 */
+  WIKI_TODOS_FOR_INDEX: 'wiki.todos.forIndex',
   /** wiki 业务操作日志列表 */
   WIKI_OP_LOG_LIST: 'wiki.opLog.list',
   UPLOAD_HEALTH: 'upload.health',
@@ -328,6 +330,8 @@ export const MQTT_PATTERNS = {
   TODO_DELETE: 'todo.delete',
   /** 内部：按页面 id 物理删除 wiki 待办（文档删除级联） */
   TODO_DELETE_BY_PAGES: 'todo.deleteByPages',
+  /** 内部：按页面取出 wiki 待办正文，供向量索引 */
+  TODO_LIST_BY_PAGE: 'todo.listByPage',
   /** 内部：wiki 催办扫描候选（存储查询，语义由 wiki 决定） */
   TODO_WIKI_REMIND_LIST: 'todo.wikiRemindList',
   /** 内部：wiki 催办占坑（started / progress / overdue 标记） */

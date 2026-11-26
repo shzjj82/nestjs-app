@@ -13,6 +13,7 @@ import {
 import { lastValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import { DocumentsService } from '../documents/documents.service';
+import { RagNotify } from '../documents/rag-notify';
 import { TeamAccess } from '../documents/team-access';
 import {
   asData,
@@ -36,10 +37,21 @@ export class TodosService implements OnModuleInit {
     private readonly posts: DocumentsService,
     private readonly teams: TeamAccess,
     @Inject(NOTIFY_CLIENT) private readonly notify: ClientProxy,
+    private readonly rag: RagNotify,
   ) {}
 
   async onModuleInit() {
     await this.notify.connect();
+  }
+
+  /** 索引用：该页全部任务，不限当前用户。 */
+  listForIndex(payload: Record<string, unknown>) {
+    const pageId = requirePageId(payload.pageId);
+    return this.call<{ items?: unknown[] }>(MQTT_PATTERNS.TODO_LIST_BY_PAGE, {
+      pageId,
+      _bizCode: WIKI_BIZ_CODE,
+      _internal: notifyInternalKey(),
+    });
   }
 
   list(payload: Record<string, unknown>) {
@@ -71,9 +83,11 @@ export class TodosService implements OnModuleInit {
       source: 'wiki',
       data: mergeTodoData(payload.data, page),
     });
-    return this.enrichItem(
+    const created = this.enrichItem(
       await this.call<Record<string, unknown>>(MQTT_PATTERNS.TODO_CREATE, body),
     );
+    this.reindexPage(pageIdOf(created) ?? page.id);
+    return created;
   }
 
   async update(payload: Record<string, unknown>) {
@@ -82,10 +96,11 @@ export class TodosService implements OnModuleInit {
       MQTT_PATTERNS.TODO_FIND_ONE,
       this.scoped(payload),
     );
+    const previousPageId = pageIdOf(current);
     const baseData = asData(current.data);
     if (pageId) {
       const page = await this.resolveReadablePage(payload, pageId);
-      return this.enrichItem(
+      const updated = this.enrichItem(
         await this.call<Record<string, unknown>>(
           MQTT_PATTERNS.TODO_UPDATE,
           this.scoped({
@@ -96,6 +111,9 @@ export class TodosService implements OnModuleInit {
           }),
         ),
       );
+      this.reindexPage(previousPageId);
+      this.reindexPage(page.id);
+      return updated;
     }
     const existing = pageFromTodoData(current.data);
     // 历史待办可能没有 page：允许只改标题等内容，但不允许新建无页关联
@@ -106,7 +124,7 @@ export class TodosService implements OnModuleInit {
           ...(asData(payload.data) ?? {}),
           legacyWithoutPage: true,
         };
-    return this.enrichItem(
+    const updated = this.enrichItem(
       await this.call<Record<string, unknown>>(
         MQTT_PATTERNS.TODO_UPDATE,
         this.scoped({
@@ -117,6 +135,9 @@ export class TodosService implements OnModuleInit {
         }),
       ),
     );
+    this.reindexPage(previousPageId);
+    this.reindexPage(pageIdOf(updated));
+    return updated;
   }
 
   /** 给已有待办补绑/改绑文章（含已完成），供历史数据治理 */
@@ -126,6 +147,7 @@ export class TodosService implements OnModuleInit {
       MQTT_PATTERNS.TODO_FIND_ONE,
       this.scoped(payload),
     );
+    const previousPageId = pageIdOf(current);
     const data = mergeTodoData(payload.data, page, asData(current.data));
     delete data.legacyWithoutPage;
     const patched = await this.call<Record<string, unknown>>(
@@ -137,35 +159,61 @@ export class TodosService implements OnModuleInit {
         _internal: notifyInternalKey(),
       },
     );
-    return this.enrichItem(patched);
+    const bound = this.enrichItem(patched);
+    this.reindexPage(previousPageId);
+    this.reindexPage(page.id);
+    return bound;
   }
 
   start(payload: Record<string, unknown>) {
-    return this.call(MQTT_PATTERNS.TODO_START, this.scoped(payload)).then((item) =>
-      this.enrichItem(item as Record<string, unknown>),
-    );
+    return this.finishStatus(MQTT_PATTERNS.TODO_START, payload);
   }
 
   done(payload: Record<string, unknown>) {
-    return this.call(MQTT_PATTERNS.TODO_DONE, this.scoped(payload)).then((item) =>
-      this.enrichItem(item as Record<string, unknown>),
-    );
+    return this.finishStatus(MQTT_PATTERNS.TODO_DONE, payload);
   }
 
   cancel(payload: Record<string, unknown>) {
-    return this.call(MQTT_PATTERNS.TODO_CANCEL, this.scoped(payload)).then((item) =>
-      this.enrichItem(item as Record<string, unknown>),
-    );
+    return this.finishStatus(MQTT_PATTERNS.TODO_CANCEL, payload);
   }
 
   reopen(payload: Record<string, unknown>) {
-    return this.call(MQTT_PATTERNS.TODO_REOPEN, this.scoped(payload)).then((item) =>
-      this.enrichItem(item as Record<string, unknown>),
-    );
+    return this.finishStatus(MQTT_PATTERNS.TODO_REOPEN, payload);
   }
 
-  remove(payload: Record<string, unknown>) {
-    return this.call(MQTT_PATTERNS.TODO_DELETE, this.scoped(payload));
+  async remove(payload: Record<string, unknown>) {
+    let pageId: string | undefined;
+    try {
+      pageId = pageIdOf(await this.findOne(payload));
+    } catch {
+      pageId = undefined;
+    }
+    const removed = await this.call(MQTT_PATTERNS.TODO_DELETE, this.scoped(payload));
+    this.reindexPage(pageId);
+    return removed;
+  }
+
+  private async finishStatus(pattern: string, payload: Record<string, unknown>) {
+    const item = this.enrichItem(
+      (await this.call(pattern, this.scoped(payload))) as Record<string, unknown>,
+    );
+    this.reindexPage(pageIdOf(item));
+    return item;
+  }
+
+  private reindexPage(pageId: string | undefined) {
+    const id = pageId?.trim();
+    if (!id || typeof this.posts?.findById !== 'function' || typeof this.rag?.index !== 'function') {
+      return;
+    }
+    void this.posts
+      .findById(id)
+      .then((post) => {
+        if (post) {
+          this.rag.index(post);
+        }
+      })
+      .catch(() => undefined);
   }
 
   private scoped(payload: Record<string, unknown>): Record<string, unknown> {
@@ -279,6 +327,22 @@ function rpcStatus(err: unknown): { code: number; message: string } | null {
     return { code: source.status, message: String(source.message) };
   }
   return null;
+}
+
+function pageIdOf(item: unknown): string | undefined {
+  if (!item || typeof item !== 'object') {
+    return undefined;
+  }
+  const row = item as Record<string, unknown>;
+  const top = row.page && typeof row.page === 'object' ? (row.page as { id?: unknown }).id : undefined;
+  if (typeof top === 'string' && top.trim()) {
+    return top.trim();
+  }
+  const data = asData(row.data);
+  if (typeof data?.pageId === 'string' && data.pageId.trim()) {
+    return data.pageId.trim();
+  }
+  return pageFromTodoData(row.data)?.id;
 }
 
 /** 列表 status：数组或逗号串都收成 `pending,in_progress` 形式 */

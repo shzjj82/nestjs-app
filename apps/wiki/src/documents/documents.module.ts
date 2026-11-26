@@ -38,6 +38,6 @@ import { WorkspaceRead } from './workspace-read';
     TodoPageCleanup,
     WorkspaceRead,
   ],
-  exports: [DocumentsService, TeamAccess, WorkspaceRead],
+  exports: [DocumentsService, TeamAccess, WorkspaceRead, RagNotify],
 })
 export class DocumentsModule {}

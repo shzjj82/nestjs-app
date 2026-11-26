@@ -21,7 +21,7 @@ export class WikiChatController {
   }
 
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AGENTS_CHAT_PREPARE))
-  @ApiDoc({ name: 'Wiki 对话准备', description: '问待办时附上待办清单，再交给 agents' })
+  @ApiDoc({ name: 'Wiki 对话准备', description: '原样返回问题，检索由 agents 完成' })
   prepare(payload: Record<string, unknown>) {
     return this.chat.prepare(payload);
   }
