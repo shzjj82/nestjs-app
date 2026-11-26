@@ -97,26 +97,55 @@ export class ChatService {
     this.assertConfigured();
     const input = parseChatInput(payload);
     const session = await this.beginSession(input, payload);
+    const lastUser = [...session.messages].reverse().find((item) => item.role === 'user');
+    if (!lastUser) {
+      rpcFail(400, '请先写一条问题');
+    }
+    const turn = await this.conversations.startTurn({
+      conversation: session.conversation,
+      userContent: lastUser.content,
+      attachments: input.attachments,
+    });
+    yield { conversationId: session.conversation.id };
+
     const prepared = await this.prepare(
       { ...input, messages: session.messages },
       payload,
     );
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), aiTimeoutMs());
+    let reply = '';
+    let writeChain = Promise.resolve();
+    let lastQueued = '';
+    let lastAt = 0;
+    const flush = (force: boolean, withSources: boolean) => {
+      const content = reply.slice(0, 12000);
+      const now = Date.now();
+      if (!force && (content === lastQueued || now - lastAt < 400)) {
+        return;
+      }
+      lastAt = now;
+      lastQueued = content;
+      const sources = withSources ? prepared.sources : undefined;
+      writeChain = writeChain.catch(() => undefined).then(() =>
+        this.conversations.finishAssistant(turn.assistantMessageId, content, sources),
+      );
+    };
     try {
-      let reply = '';
       try {
         for await (const delta of this.iterateUpstream(
           prepared.imageUrls.length ? prepared.withVision : prepared.textOnly,
           controller.signal,
         )) {
           reply += delta;
+          flush(false, false);
           yield { delta };
         }
       } catch (err) {
         if (prepared.imageUrls.length && reply === '' && isUpstreamError(err)) {
           for await (const delta of this.iterateUpstream(prepared.textOnly, controller.signal)) {
             reply += delta;
+            flush(false, false);
             yield { delta };
           }
         } else {
@@ -126,10 +155,11 @@ export class ChatService {
       if (!reply) {
         rpcFail(502, 'AI_EMPTY');
       }
-      const trimmed = reply.slice(0, 12000);
-      await this.persistTurn(session, input, trimmed, prepared.sources);
+      reply = reply.slice(0, 12000);
+      flush(true, true);
+      await writeChain;
       yield {
-        reply: trimmed,
+        reply,
         conversationId: session.conversation.id,
         ...(prepared.sources.length ? { sources: prepared.sources } : {}),
       };
@@ -139,6 +169,8 @@ export class ChatService {
       }
       throw err;
     } finally {
+      flush(true, false);
+      await writeChain;
       clearTimeout(timer);
     }
   }

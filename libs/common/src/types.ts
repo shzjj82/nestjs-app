@@ -499,5 +499,7 @@ export interface AgentRagSearchResult {
 
 export type AgentChatStreamEvent =
   | { delta: string }
+  /** 流一开始就带上，提问已经入库，前端可以先记住这场对话 */
+  | { conversationId: string }
   | { reply: string; conversationId: string; sources?: AgentRagSource[] }
   | { error: string };

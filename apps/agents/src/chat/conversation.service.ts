@@ -118,6 +118,60 @@ export class ConversationService {
     return mergeConversationHistory(history, incoming);
   }
 
+  /** 回复还没生成就把提问记下，并占一条助手消息，后面只更新这条。 */
+  async startTurn(input: {
+    conversation: ConversationEntity;
+    userContent: string;
+    attachments?: AgentChatAttachment[];
+  }): Promise<{ assistantMessageId: string }> {
+    const { conversation } = input;
+    const isFirst = !(await this.messages.exist({
+      where: { conversationId: conversation.id },
+    }));
+    const user = await this.messages.save(
+      this.messages.create({
+        conversationId: conversation.id,
+        role: 'user' as AgentChatRole,
+        content: input.userContent,
+        attachments: input.attachments?.length ? input.attachments : null,
+        sources: null,
+      }),
+    );
+    const assistant = await this.messages.save(
+      this.messages.create({
+        conversationId: conversation.id,
+        role: 'assistant' as AgentChatRole,
+        content: '',
+        attachments: null,
+        sources: null,
+      }),
+    );
+    if (isFirst || conversation.title === '新对话') {
+      conversation.title = input.userContent.replace(/\s+/g, ' ').trim().slice(0, 40) || '新对话';
+    }
+    conversation.updatedAt = new Date();
+    await this.conversations.save(conversation);
+    return { assistantMessageId: assistant.id };
+  }
+
+  /** 把已经生成的回复写回占位消息。sources 不传则保留原来的引用。 */
+  async finishAssistant(
+    assistantMessageId: string,
+    content: string,
+    sources?: AgentRagSource[],
+  ): Promise<void> {
+    const row = await this.messages.findOne({ where: { id: assistantMessageId } });
+    if (!row) {
+      return;
+    }
+    row.content = content;
+    if (sources !== undefined) {
+      row.sources = sources.length ? sources : null;
+    }
+    await this.messages.save(row);
+    await this.conversations.update({ id: row.conversationId }, { updatedAt: new Date() });
+  }
+
   async appendTurn(input: {
     conversation: ConversationEntity;
     userContent: string;

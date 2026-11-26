@@ -20,6 +20,12 @@ export class WikiChatController {
     return this.chat.chat(payload);
   }
 
+  @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AGENTS_CHAT_PREPARE))
+  @ApiDoc({ name: 'Wiki 对话准备', description: '问待办时附上待办清单，再交给 agents' })
+  prepare(payload: Record<string, unknown>) {
+    return this.chat.prepare(payload);
+  }
+
   @MessagePattern(sharePattern(MQTT_GROUPS.WIKI, MQTT_PATTERNS.WIKI_AGENTS_CHAT_STATUS))
   status(payload: Record<string, unknown>) {
     return this.chat.status(payload);

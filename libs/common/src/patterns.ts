@@ -144,6 +144,7 @@ export const MQTT_PATTERNS = {
   WIKI_UPLOAD_JOB: 'wiki.upload.job',
   WIKI_UPLOAD_DELETE: 'wiki.upload.delete',
   WIKI_AGENTS_CHAT: 'wiki.agents.chat',
+  WIKI_AGENTS_CHAT_PREPARE: 'wiki.agents.chat.prepare',
   WIKI_AGENTS_CHAT_STATUS: 'wiki.agents.chat.status',
   WIKI_AGENTS_CONVERSATION_LIST: 'wiki.agents.conversation.list',
   WIKI_AGENTS_CONVERSATION_FIND_ONE: 'wiki.agents.conversation.findOne',
