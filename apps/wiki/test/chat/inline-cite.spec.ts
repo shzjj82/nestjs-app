@@ -11,8 +11,11 @@ describe('markWikiCitations', () => {
     );
   });
 
-  it('没有类型括号时也认书名号，文件名去掉后缀也能对上', () => {
-    expect(markWikiCitations('详见《项目相关》。', [word])).toBe('详见{{cite:0}}。');
+  it('单独的书名号和标题原文不换成引用', () => {
+    expect(markWikiCitations('详见《项目相关》。', [word])).toBe('详见《项目相关》。');
+    expect(markWikiCitations('任务进度还没开始。', [{ title: '任务进度', sourceType: 'editorjs' }])).toBe(
+      '任务进度还没开始。',
+    );
   });
 
   it('同一处优先吃掉整段括号，不重复标记', () => {
@@ -31,11 +34,11 @@ describe('markWikiCitations', () => {
     ).toBe('根据参考资料{{cite:0}}，未开始的任务如下：');
   });
 
-  it('同一篇在两句话里仍各标记一次', () => {
+  it('同一篇在两句出处里仍各标记一次', () => {
     const task = { title: '任务进度', sourceType: 'editorjs' };
-    expect(markWikiCitations('见《任务进度》。另外《任务进度》里还有待办。', [task])).toBe(
-      '见{{cite:0}}。另外{{cite:0}}里还有待办。',
-    );
+    expect(
+      markWikiCitations('见（出处：任务进度，页面）。另外（出处：任务进度，页面）里还有待办。', [task]),
+    ).toBe('见{{cite:0}}。另外{{cite:0}}里还有待办。');
   });
 
   it('认模型实际写出的出处：标题，类型', () => {
@@ -50,12 +53,13 @@ describe('markWikiCitations', () => {
       '费用见{{cite:0}}。',
     );
     expect(markWikiCitations('出处：页面正文「准备条件」', [page])).toBe('{{cite:0}}');
-    expect(markWikiCitations('费用见（来源：《项目相关》）。', [word])).toBe('费用见{{cite:0}}。');
+    expect(markWikiCitations('费用见（来源：《项目相关》）。', [word])).toBe('费用见（来源：《项目相关》）。');
   });
 
-  it('英文句子也只留标记', () => {
+  it('英文出处也只留标记', () => {
     const project = { title: 'Project', sourceName: 'Project.docx', sourceType: 'docx' };
-    expect(markWikiCitations('See 《Project》.', [project])).toBe('See {{cite:0}}.');
+    expect(markWikiCitations('See (出处: Project, Word).', [project])).toBe('See {{cite:0}}.');
+    expect(markWikiCitations('See 《Project》.', [project])).toBe('See 《Project》.');
   });
 
   it('对不上的正文保持原样', () => {

@@ -10,7 +10,7 @@ type Hit = {
   index: number;
 };
 
-/** 把模型写的出处换成 {{cite:序号}}。来源二字和括号由前端按界面语言补上。 */
+/** 只把写成出处的片段换成 {{cite:序号}}。单独的书名号和标题原文不动。来源括号由前端补。 */
 export function markWikiCitations(reply: string, sources: unknown): string {
   if (!reply || !Array.isArray(sources) || sources.length === 0) {
     return reply;
@@ -154,7 +154,6 @@ function collectHits(reply: string, sources: unknown[]): Hit[] {
         new RegExp(`(?:${kindAlt})\\s*[「『"“]\\s*${quotedName}\\s*[」』"”]`, 'gi'),
         index,
       );
-      pushMatches(found, reply, new RegExp(`《${escaped}》`, 'g'), index);
     }
   });
   found.sort((a, b) => a.start - b.start || b.end - b.start - (a.end - a.start) || a.index - b.index);
