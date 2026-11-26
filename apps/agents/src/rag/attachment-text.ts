@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import { Logger } from '@nestjs/common';
 import { embeddedImages, type EmbeddedImage } from './embedded-images';
 import type { ExtractedAttachment } from './editorjs-text';
+import { mapPool } from '../common/map-pool';
 
 const logger = new Logger('AgentsRagAttach');
 
@@ -16,20 +17,22 @@ export async function extractAttachmentTexts(
   files: ExtractedAttachment[],
   recognizeImages?: (images: EmbeddedImage[]) => Promise<string[]>,
 ): Promise<Array<{ name: string; url: string; ext: string; text: string }>> {
-  const out: Array<{ name: string; url: string; ext: string; text: string }> = [];
-  for (const file of files.slice(0, 8)) {
+  const extracted = await mapPool(files.slice(0, 8), 4, async (file) => {
     try {
       const text = await extractOne(file, recognizeImages);
-      if (text.trim()) {
-        out.push({ ...file, text: text.trim().slice(0, 80_000) });
+      const trimmed = text.trim();
+      if (!trimmed) {
+        return null;
       }
+      return { ...file, text: trimmed.slice(0, 80_000) };
     } catch (err) {
       logger.warn(
         `skip attachment ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
       );
+      return null;
     }
-  }
-  return out;
+  });
+  return extracted.filter((item) => item !== null);
 }
 
 async function extractOne(

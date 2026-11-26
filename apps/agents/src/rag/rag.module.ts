@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
-import { mqttClientOptions, WIKI_CLIENT } from '@app/common';
+import { mqttClientOptions, RedisInfraModule, WIKI_CLIENT } from '@app/common';
 import { DatabaseModule } from '../database/database.module';
 import { OcrModule } from '../ocr/ocr.module';
 import { EmbeddingService } from './embedding.service';
@@ -11,6 +11,7 @@ import { RagService } from './rag.service';
 @Module({
   imports: [
     DatabaseModule,
+    RedisInfraModule,
     OcrModule,
     ClientsModule.register([
       {

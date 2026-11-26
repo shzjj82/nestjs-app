@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { mqttClientOptions, USER_CLIENT } from '@app/common';
+import { mqttClientOptions, RedisInfraModule, USER_CLIENT } from '@app/common';
 import { DocumentEntity } from '../entities/document.entity';
 import { TeamEntity } from '../entities/team.entity';
 import { TeamMemberEntity } from '../entities/team-member.entity';
@@ -10,6 +10,7 @@ import { TeamsService } from './teams.service';
 
 @Module({
   imports: [
+    RedisInfraModule,
     TypeOrmModule.forFeature([TeamEntity, TeamMemberEntity, DocumentEntity]),
     ClientsModule.register([
       {

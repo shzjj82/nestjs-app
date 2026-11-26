@@ -65,8 +65,22 @@ export function aiEmbeddingDim(): number {
 }
 
 export function aiTimeoutMs(): number {
-  const n = Number(process.env.AI_TIMEOUT_MS ?? 90_000);
-  return Number.isFinite(n) && n > 0 ? n : 90_000;
+  return positiveMs(process.env.AI_TIMEOUT_MS, 90_000);
+}
+
+/** SearXNG 整次检索最多等这么久。超时由调用方当作没有网上结果。 */
+export function webSearchTimeoutMs(): number {
+  return positiveMs(process.env.WEB_SEARCH_TIMEOUT_MS, 8_000);
+}
+
+/** 打开单个网页确认是不是 404 / 410 的最长等待。 */
+export function pageProbeTimeoutMs(): number {
+  return positiveMs(process.env.PAGE_PROBE_TIMEOUT_MS, 2_500);
+}
+
+function positiveMs(raw: string | undefined, fallback: number): number {
+  const n = Number(raw ?? fallback);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
 export function aiConfigured(): boolean {

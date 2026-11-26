@@ -7,6 +7,7 @@ import { asRecord, optionalString, rpcFail } from '../common/rpc';
 import { OcrCacheEntity } from '../entities/ocr-cache.entity';
 import { OcrItem, OcrJobEntity } from '../entities/ocr-job.entity';
 import { requestOcrText } from './ocr-client';
+import { mapPool } from '../common/map-pool';
 
 const MAX_IMAGES = 9;
 const INDEX_IMAGES = 8;
@@ -32,20 +33,17 @@ export class OcrService {
       this.logger.warn('skip embedded image ocr: AI_OCR_NOT_CONFIGURED');
       return [];
     }
-    const out: string[] = [];
-    for (const image of images.slice(0, INDEX_IMAGES)) {
+    const recognized = await mapPool(images.slice(0, INDEX_IMAGES), 4, async (image) => {
       try {
-        const text = (await this.recognizeBytes(image.bytes, image.mime)).trim().slice(0, TEXT_MAX);
-        if (text) {
-          out.push(text);
-        }
+        return (await this.recognizeBytes(image.bytes, image.mime)).trim().slice(0, TEXT_MAX);
       } catch (err) {
         this.logger.warn(
           `skip embedded image ocr: ${err instanceof Error ? err.message : String(err)}`,
         );
+        return '';
       }
-    }
-    return out;
+    });
+    return recognized.filter(Boolean);
   }
 
   /** 索引用：失败或未配置的图片跳过，不让整篇文档索引失败。 */
@@ -56,20 +54,18 @@ export class OcrService {
       }
       return [];
     }
-    const out: Array<{ url: string; text: string }> = [];
-    for (const url of urls.slice(0, INDEX_IMAGES)) {
+    const recognized = await mapPool(urls.slice(0, INDEX_IMAGES), 4, async (url) => {
       try {
         const text = (await this.recognizeUrl(url)).trim().slice(0, TEXT_MAX);
-        if (text) {
-          out.push({ url, text });
-        }
+        return text ? { url, text } : null;
       } catch (err) {
         this.logger.warn(
           `skip image ocr ${url.slice(0, 120)}: ${err instanceof Error ? err.message : String(err)}`,
         );
+        return null;
       }
-    }
-    return out;
+    });
+    return recognized.filter((item) => item !== null);
   }
 
   async recognize(payload: unknown) {

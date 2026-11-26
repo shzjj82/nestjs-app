@@ -16,3 +16,4 @@ export * from './shanghai-day';
 export * from './token';
 export * from './types';
 export * from './upload.client';
+export * from './wiki-team-cache';

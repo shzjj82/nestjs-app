@@ -1,10 +1,8 @@
-import { searxngUrl } from './chat-env';
+import { pageProbeTimeoutMs, searxngUrl, webSearchTimeoutMs } from './chat-env';
 import type { WebHit } from './chat-messages';
 
-const WEB_SEARCH_TIMEOUT_MS = 8_000;
 const WEB_RESULT_LIMIT = 5;
 const WEB_CANDIDATE_LIMIT = 12;
-const PAGE_PROBE_TIMEOUT_MS = 2_500;
 
 /** 向本机 SearXNG 取网页摘要。未配置或失败时由调用方决定是否放弃联网。 */
 export async function searchWeb(query: string): Promise<WebHit[]> {
@@ -20,7 +18,7 @@ export async function searchWeb(query: string): Promise<WebHit[]> {
   endpoint.searchParams.set('categories', 'general');
   const res = await fetch(endpoint, {
     headers: { Accept: 'application/json' },
-    signal: AbortSignal.timeout(WEB_SEARCH_TIMEOUT_MS),
+    signal: AbortSignal.timeout(webSearchTimeoutMs()),
   });
   if (!res.ok) {
     throw new Error(`SEARXNG_${res.status}`);
@@ -63,7 +61,7 @@ async function httpStatus(url: string): Promise<number | null> {
     const res = await fetch(url, {
       method: 'GET',
       redirect: 'follow',
-      signal: AbortSignal.timeout(PAGE_PROBE_TIMEOUT_MS),
+      signal: AbortSignal.timeout(pageProbeTimeoutMs()),
       headers: {
         Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
         'User-Agent': 'Mozilla/5.0 (compatible; WikiLinkCheck/1.0)',

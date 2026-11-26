@@ -3,13 +3,16 @@ import { ClientProxy } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   MQTT_PATTERNS,
+  REDIS,
   USER_CLIENT,
   unwrapData,
+  publishTeamIds,
   type TeamInfo,
   type TeamMemberInfo,
   type TeamRole,
   type UserAccountInfo,
 } from '@app/common';
+import type Redis from 'ioredis';
 import { lastValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import { Repository } from 'typeorm';
@@ -36,6 +39,7 @@ export class TeamsService implements OnModuleInit {
     @InjectRepository(DocumentEntity)
     private readonly documents: Repository<DocumentEntity>,
     @Inject(USER_CLIENT) private readonly users: ClientProxy,
+    @Inject(REDIS) private readonly redis: Redis,
   ) {}
 
   async onModuleInit() {
@@ -86,6 +90,7 @@ export class TeamsService implements OnModuleInit {
         role: 'owner',
       }),
     );
+    await this.refreshTeamIds(scope.accountId, team.appCode, team.bizCode);
     return this.toInfo(team, 'owner');
   }
 
@@ -154,6 +159,7 @@ export class TeamsService implements OnModuleInit {
       }),
     );
     await this.touch(team);
+    await this.refreshTeamIds(scope.accountId, team.appCode, team.bizCode);
     return this.toInfo(team, row.role);
   }
 
@@ -178,6 +184,7 @@ export class TeamsService implements OnModuleInit {
     }
     await this.members.delete({ id: me.id });
     await this.touch(team);
+    await this.refreshTeamIds(scope.accountId, team.appCode, team.bizCode);
     return { left: true as const, teamId: team.id };
   }
 
@@ -189,8 +196,12 @@ export class TeamsService implements OnModuleInit {
     if (!canManageTeam(me.role)) {
       rpcFail(403, '只有拥有者可以解散团队');
     }
+    const members = await this.members.find({ where: { teamId: team.id } });
     await this.documents.update({ teamId: team.id }, { teamId: null });
     await this.teams.delete({ id: team.id });
+    await Promise.all(
+      members.map((row) => this.refreshTeamIds(row.accountId, team.appCode, team.bizCode)),
+    );
     return { dissolved: true as const, teamId: team.id };
   }
 
@@ -219,6 +230,7 @@ export class TeamsService implements OnModuleInit {
     target.role = role;
     await this.members.save(target);
     await this.touch(team);
+    await this.refreshTeamIds(target.accountId, team.appCode, team.bizCode);
     const accounts = await this.loadAccounts([target.accountId]);
     return this.toMember(target, accounts.get(target.accountId));
   }
@@ -244,6 +256,27 @@ export class TeamsService implements OnModuleInit {
       .andWhere('team.status = 1')
       .orderBy('team.createdAt', 'DESC')
       .getMany();
+  }
+
+  private async teamIdsOf(accountId: string, appCode: string, bizCode: string): Promise<string[]> {
+    const rows = await this.membershipRows({ accountId, appCode, bizCode });
+    return rows.map((row) => row.teamId);
+  }
+
+  /** 按数据库里的当前名单重写缓存。对话用的业务码钥匙单独重算，不把另一套范围抄过去。 */
+  private async refreshTeamIds(accountId: string, appCode: string, bizCode: string) {
+    const scopes = [{ accountId, appCode, bizCode }];
+    if (appCode !== bizCode) {
+      scopes.push({ accountId, appCode: bizCode, bizCode });
+    }
+    try {
+      for (const scope of scopes) {
+        const ids = await this.teamIdsOf(scope.accountId, scope.appCode, scope.bizCode);
+        await publishTeamIds(this.redis, scope, ids);
+      }
+    } catch {
+      // 重写失败时旧缓存会过期，下一次检索再向 wiki 要
+    }
   }
 
   private assertScope(scope: TeamScope) {

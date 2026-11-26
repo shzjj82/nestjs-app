@@ -83,6 +83,8 @@ const agentsApps = replicate('agents', agentsReplicas, (id) => ({
   AI_API_KEY: process.env.AI_API_KEY ?? '',
   AI_MODEL: process.env.AI_MODEL ?? 'gpt-4o-mini',
   AI_TIMEOUT_MS: process.env.AI_TIMEOUT_MS ?? '90000',
+  WEB_SEARCH_TIMEOUT_MS: process.env.WEB_SEARCH_TIMEOUT_MS ?? '8000',
+  PAGE_PROBE_TIMEOUT_MS: process.env.PAGE_PROBE_TIMEOUT_MS ?? '2500',
 }));
 
 module.exports = {

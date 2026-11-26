@@ -10,12 +10,15 @@ type Hit = {
   index: number;
 };
 
-/** 把模型写的出处换成（来源：{{cite:序号}}）。类型字样一并去掉，标签由前端来画。 */
+/** 把模型写的出处换成 {{cite:序号}}。来源二字和括号由前端按界面语言补上。 */
 export function markWikiCitations(reply: string, sources: unknown): string {
   if (!reply || !Array.isArray(sources) || sources.length === 0) {
     return reply;
   }
-  const hits = collectHits(reply, sources);
+  const hits = mergeSameSource(
+    reply,
+    collectHits(reply, sources).map((hit) => expandLocationLead(reply, hit)),
+  );
   if (!hits.length) {
     return reply;
   }
@@ -27,19 +30,14 @@ export function markWikiCitations(reply: string, sources: unknown): string {
       continue;
     }
     out += reply.slice(cursor, span.start);
-    out += sourceLabel(hit.index, reply.slice(Math.max(0, span.start - 24), span.end));
+    out += `{{cite:${hit.index}}}`;
     cursor = span.end;
   }
   return out + reply.slice(cursor);
 }
 
-function sourceLabel(index: number, sample: string): string {
-  const mark = `{{cite:${index}}}`;
-  if (/[\u3400-\u9fff（）：「」]/.test(sample)) {
-    return `（来源：${mark}）`;
-  }
-  return `(来源: ${mark})`;
-}
+const CITE_GLUE =
+  /^(?:[\s（(）)，,、：:;；]|类型|定位|来源|页面正文|页面|图片|待办|Word|Excel|PDF|文本|文件|Source)*$/i;
 
 function expandSourcePrefix(reply: string, hit: Hit): Hit {
   const before = reply.slice(0, hit.start);
@@ -50,6 +48,58 @@ function expandSourcePrefix(reply: string, hit: Hit): Hit {
   const start = hit.start - lead[0].length;
   const tail = reply.slice(hit.end).match(/^\s*[）)]/);
   return { ...hit, start, end: hit.end + (tail ? tail[0].length : 0) };
+}
+
+function expandLocationLead(reply: string, hit: Hit): Hit {
+  const lead = reply.slice(0, hit.start).match(
+    /(?:[（(]\s*)?类型\s*[：:]\s*(?:页面正文|页面|图片|待办|Word|Excel|PDF|文本|文件)\s*[，,]\s*定位\s*[：:]\s*$/,
+  );
+  if (!lead) {
+    return hit;
+  }
+  return { ...hit, start: hit.start - lead[0].length };
+}
+
+/** 标题和「类型 / 定位」紧挨着写同一篇时，收成一个出处。两句话里各写一次仍各留一个。 */
+function mergeSameSource(reply: string, hits: Hit[]): Hit[] {
+  const ordered = [...hits].sort((a, b) => a.start - b.start || a.end - b.end);
+  const merged: Hit[] = [];
+  for (const hit of ordered) {
+    const prev = merged[merged.length - 1];
+    const gap = prev && hit.start > prev.end ? reply.slice(prev.end, hit.start) : '';
+    if (prev && prev.index === hit.index && (hit.start <= prev.end || isCiteGlue(gap))) {
+      prev.start = Math.min(prev.start, hit.start);
+      prev.end = Math.max(prev.end, hit.end);
+      continue;
+    }
+    merged.push({ ...hit });
+  }
+  return merged.map((hit) => closeExtraParens(reply, hit));
+}
+
+function isCiteGlue(text: string): boolean {
+  return text.length <= 80 && CITE_GLUE.test(text);
+}
+
+function closeExtraParens(reply: string, hit: Hit): Hit {
+  let depth = 0;
+  for (const ch of reply.slice(hit.start, hit.end)) {
+    if (ch === '（' || ch === '(') {
+      depth += 1;
+    } else if ((ch === '）' || ch === ')') && depth > 0) {
+      depth -= 1;
+    }
+  }
+  let end = hit.end;
+  while (depth > 0) {
+    const tail = reply.slice(end).match(/^\s*[）)]/);
+    if (!tail) {
+      break;
+    }
+    end += tail[0].length;
+    depth -= 1;
+  }
+  return end === hit.end ? hit : { ...hit, end };
 }
 
 function collectHits(reply: string, sources: unknown[]): Hit[] {

@@ -6,10 +6,15 @@ import { lastValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import { DataSource } from 'typeorm';
 import {
+  loadCachedTeamIds,
   MQTT_PATTERNS,
+  readTeamIdsGeneration,
+  REDIS,
+  storeTeamIdsIfCurrent,
   WIKI_CLIENT,
   type AgentRagSource,
 } from '@app/common';
+import type Redis from 'ioredis';
 import { asRecord, optionalString, requiredString, rpcFail } from '../common/rpc';
 import { requireBizCode } from '../common/biz-scope';
 import { extractAttachmentTexts } from './attachment-text';
@@ -54,6 +59,7 @@ export class RagService extends RagPort implements OnModuleInit {
     private readonly ocr: OcrService,
     @InjectDataSource() private readonly db: DataSource,
     @Inject(WIKI_CLIENT) private readonly wiki: ClientProxy,
+    @Inject(REDIS) private readonly redis: Redis,
   ) {
     super();
   }
@@ -85,13 +91,13 @@ export class RagService extends RagPort implements OnModuleInit {
         `doc ${input.docId} skip attachments without public url: ${unresolved.join(', ')}`,
       );
     }
-    const attachmentTexts = await extractAttachmentTexts(attachments, (images) =>
-      this.ocr.textsForEmbedded(images),
-    );
-    const imageTexts = await this.ocr.textsForIndex(editorJsImages(input.body));
-    const todoText = formatTodoIndexText(
-      mergeRagTodos(await this.pageTodos(input), todosFromEditorJs(input.body)),
-    );
+    const localTodos = todosFromEditorJs(input.body);
+    const [attachmentTexts, imageTexts, remoteTodos] = await Promise.all([
+      extractAttachmentTexts(attachments, (images) => this.ocr.textsForEmbedded(images)),
+      this.ocr.textsForIndex(editorJsImages(input.body)),
+      this.pageTodos(input),
+    ]);
+    const todoText = formatTodoIndexText(mergeRagTodos(remoteTodos, localTodos));
 
     const pieces: Array<{ sourceType: string; sourceKey: string | null; text: string }> = [];
     if (bodyText) {
@@ -142,23 +148,19 @@ export class RagService extends RagPort implements OnModuleInit {
     const vectors = await this.embedding.embed(prepared.map((item) => item.content));
     await this.deleteByDocId(input.docId);
     const now = new Date();
+    const rows: Array<{ item: (typeof prepared)[number]; vec: number[] }> = [];
     for (let i = 0; i < prepared.length; i += 1) {
       const item = prepared[i]!;
       const vec = vectors[i];
-      if (!vec) {
-        continue;
+      if (vec) {
+        rows.push({ item, vec });
       }
-      await this.db.query(
-        `
-        INSERT INTO ag_rag_chunks (
-          id, app_code, author_id, team_id, visibility, doc_id, slug, title,
-          source_type, source_key, chunk_index, content, embedding, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8,
-          $9, $10, $11, $12, $13::vector, $14, $14
-        )
-        `,
-        [
+    }
+    if (rows.length) {
+      const params: unknown[] = [];
+      const values = rows.map((row, index) => {
+        const base = index * 14;
+        params.push(
           randomUUID(),
           input.appCode,
           input.authorId,
@@ -167,13 +169,23 @@ export class RagService extends RagPort implements OnModuleInit {
           input.docId,
           input.slug,
           input.title,
-          item.sourceType,
-          item.sourceKey,
-          item.chunkIndex,
-          item.content,
-          toVectorLiteral(vec),
+          row.item.sourceType,
+          row.item.sourceKey,
+          row.item.chunkIndex,
+          row.item.content,
+          toVectorLiteral(row.vec),
           now,
-        ],
+        );
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12}, $${base + 13}::vector, $${base + 14}, $${base + 14})`;
+      });
+      await this.db.query(
+        `
+        INSERT INTO ag_rag_chunks (
+          id, app_code, author_id, team_id, visibility, doc_id, slug, title,
+          source_type, source_key, chunk_index, content, embedding, created_at, updated_at
+        ) VALUES ${values.join(', ')}
+        `,
+        params,
       );
     }
     this.logger.log(`indexed doc ${input.docId} chunks=${prepared.length}`);
@@ -375,6 +387,11 @@ export class RagService extends RagPort implements OnModuleInit {
     appCode: string;
     bizCode: string;
   }): Promise<string[]> {
+    const cached = await loadCachedTeamIds(this.redis, input);
+    if (cached !== null) {
+      return cached;
+    }
+    const seenGen = await readTeamIdsGeneration(this.redis, input);
     try {
       const raw = await lastValueFrom(
         this.wiki
@@ -384,9 +401,11 @@ export class RagService extends RagPort implements OnModuleInit {
           )
           .pipe(timeout(8000)),
       );
-      return (raw?.items ?? [])
+      const ids = (raw?.items ?? [])
         .map((item) => optionalString(item.teamId))
         .filter((id): id is string => Boolean(id));
+      await storeTeamIdsIfCurrent(this.redis, input, ids, seenGen);
+      return ids;
     } catch {
       return [];
     }
