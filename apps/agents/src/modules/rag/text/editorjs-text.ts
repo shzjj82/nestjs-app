@@ -1,3 +1,5 @@
+import { formatLabeledTable } from './table-text';
+
 export type EditorJsBlock = {
   id?: string;
   type: string;
@@ -233,17 +235,8 @@ function blockToText(block: EditorJsBlock): string {
     }
     case 'code':
       return String(data.code ?? '').trim();
-    case 'table': {
-      const content = Array.isArray(data.content) ? data.content : [];
-      return content
-        .map((row) =>
-          Array.isArray(row)
-            ? row.map((cell) => stripHtml(String(cell ?? ''))).join(' | ')
-            : '',
-        )
-        .filter(Boolean)
-        .join('\n');
-    }
+    case 'table':
+      return tableBlockText(data);
     case 'attaches':
     case 'file':
     case 'attachment': {
@@ -278,6 +271,26 @@ function blockToText(block: EditorJsBlock): string {
       return '';
     }
   }
+}
+
+function tableCell(cell: unknown): string {
+  if (cell && typeof cell === 'object' && 'content' in cell) {
+    return stripHtml(String((cell as { content?: unknown }).content ?? '')).trim();
+  }
+  return stripHtml(String(cell ?? '')).trim();
+}
+
+/** 每一行都带上表头。没有表头时用列序号，避免把第一行数据当成列名。 */
+function tableBlockText(data: Record<string, unknown>): string {
+  const content = Array.isArray(data.content) ? data.content : [];
+  const rows = content
+    .filter((row): row is unknown[] => Array.isArray(row))
+    .map((row) => row.map((cell) => tableCell(cell)));
+  if (!rows.length) {
+    return '';
+  }
+  const labeled = formatLabeledTable('表格', rows, { headings: data.withHeadings !== false });
+  return labeled.replace('【表：表格】', '【表格】').replace('【表：表格 · ', '【表格 · ');
 }
 
 function attachmentFromBlock(block: EditorJsBlock): ExtractedAttachment[] {

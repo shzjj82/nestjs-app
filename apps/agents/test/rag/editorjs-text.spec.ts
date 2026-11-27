@@ -38,6 +38,24 @@ describe('editorJsToText', () => {
     expect(text).toContain('【附件：报价单.pdf】');
   });
 
+  it('labels each table cell with its column name', () => {
+    const text = editorJsToText({
+      blocks: [
+        {
+          type: 'table',
+          data: {
+            withHeadings: true,
+            content: [
+              ['姓名', '部门'],
+              ['张三', '研发'],
+            ],
+          },
+        },
+      ],
+    });
+    expect(text).toBe('【表格】\n姓名：张三；部门：研发');
+  });
+
   it('collects parseable attachments', () => {
     const files = editorJsAttachments({
       blocks: [
