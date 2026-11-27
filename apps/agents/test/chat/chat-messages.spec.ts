@@ -5,6 +5,9 @@ import { PROMPT_CODES } from '../../src/modules/prompts/codes';
 import {
   applyRagPolicy,
   asksForOutsideDefinition,
+  classifyChatIntent,
+  todoListAppendix,
+  todoStatusFilter,
   buildHistoryMessages,
   contextAppendix,
   describeAttachments,
@@ -73,6 +76,32 @@ describe('buildHistoryMessages', () => {
         { type: 'image_url', image_url: { url: 'https://cdn.example/a.png' } },
       ]),
     );
+  });
+});
+
+describe('classifyChatIntent', () => {
+  it('keeps small talk and writing requests out of retrieval', () => {
+    expect(classifyChatIntent('你好呀')).toBe('chat');
+    expect(classifyChatIntent('帮我写个开头')).toBe('chat');
+  });
+
+  it('treats a topic question as knowledge so it can use the library and the web', () => {
+    expect(classifyChatIntent('Fiber 是什么')).toBe('knowledge');
+    expect(classifyChatIntent('网上是怎么定义的')).toBe('knowledge');
+    expect(classifyChatIntent('这篇文档里的待办怎么写')).toBe('knowledge');
+  });
+
+  it('sends personal tasks to the todo list', () => {
+    expect(classifyChatIntent('我的任务有哪些')).toBe('todo');
+    expect(classifyChatIntent('今天要做什么')).toBe('todo');
+    expect(todoStatusFilter('我的待办')).toBe('pending,in_progress');
+    expect(todoStatusFilter('已完成的任务')).toBe('done');
+    expect(
+      todoListAppendix(
+        [{ title: '交报告', status: 'in_progress', startsAt: '', dueAt: '2026-11-30', content: '' }],
+        true,
+      ),
+    ).toContain('进行中：交报告');
   });
 });
 

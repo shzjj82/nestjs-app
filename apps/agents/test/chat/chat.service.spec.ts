@@ -17,6 +17,7 @@ const PROMPT_BODIES: Record<string, string> = {
   [PROMPT_CODES.chatRagGroundedOutside]: '先写资料中的定义。以下不是知识库内容',
   [PROMPT_CODES.chatRagGeneral]: '以下不是知识库内容',
   [PROMPT_CODES.chatWeb]: '每条链接都写成 Markdown：[标题](https://地址)',
+  [PROMPT_CODES.chatTodo]: '只根据下方「我的待办」回答',
 };
 
 function makeConversations(overrides?: Partial<ConversationsService>) {
@@ -53,7 +54,8 @@ function makeChat(conversations = makeConversations()) {
       embeddingDim: 1536,
     }),
     searchForChat: jest.fn().mockResolvedValue([]),
-  } as unknown as RagPort & { searchForChat: jest.Mock };
+    listTodosForChat: jest.fn().mockResolvedValue({ available: true, items: [] }),
+  } as unknown as RagPort & { searchForChat: jest.Mock; listTodosForChat: jest.Mock };
   const prompts = {
     text: jest.fn(async (code: string) => PROMPT_BODIES[code] ?? code),
   } as unknown as PromptsService;
@@ -260,6 +262,49 @@ describe('ChatService', () => {
     expect(sent).toContain('[React Fiber](https://react.dev/fiber)');
     expect(sent).toContain('[标题](https://地址)');
     expect(sent).not.toContain('not-a-url');
+  });
+
+  it('answers small talk without the knowledge-base miss line', async () => {
+    process.env.AI_API_KEY = 'test-key';
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '你好' } }] }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { chat, rag } = makeChat();
+
+    await chat.complete(sessionPayload({ rag: true, messages: [{ role: 'user', content: '你好呀' }] }));
+
+    expect(rag.searchForChat).not.toHaveBeenCalled();
+    expect(rag.listTodosForChat).not.toHaveBeenCalled();
+    expect(sentSystem(fetchMock)).not.toContain('以下不是知识库内容');
+  });
+
+  it('answers a personal task from the todo list', async () => {
+    process.env.AI_API_KEY = 'test-key';
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '你有一项待办' } }] }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { chat, rag } = makeChat();
+    rag.listTodosForChat.mockResolvedValue({
+      available: true,
+      items: [{ title: '交报告', status: 'pending', startsAt: '', dueAt: '2026-11-30', content: '' }],
+    });
+
+    await chat.complete(
+      sessionPayload({ rag: true, messages: [{ role: 'user', content: '我的任务有哪些' }] }),
+    );
+
+    expect(rag.searchForChat).not.toHaveBeenCalled();
+    expect(rag.listTodosForChat).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'pending,in_progress' }),
+    );
+    const sent = sentSystem(fetchMock);
+    expect(sent).toContain('只根据下方「我的待办」回答');
+    expect(sent).toContain('交报告');
+    expect(sent).not.toContain('以下不是知识库内容');
   });
 
   it('drops weak hits and allows labeled general knowledge', async () => {

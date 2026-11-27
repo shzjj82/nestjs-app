@@ -29,7 +29,7 @@ import {
 import { OcrService } from '../ocr/ocr.service';
 import { locateForRagSource } from './text/rag-locate';
 import { EmbeddingService } from './embedding.service';
-import { RagPort } from './rag-port';
+import { RagPort, type ChatTodo } from './rag-port';
 import {
   formatTodoIndexText,
   mergeRagTodos,
@@ -355,6 +355,33 @@ export class RagService extends RagPort implements OnModuleInit {
         `chat rag search failed: ${err instanceof Error ? err.message : String(err)}`,
       );
       return [];
+    }
+  }
+
+  async listTodosForChat(input: {
+    payload: unknown;
+    status: string;
+  }): Promise<{ available: boolean; items: ChatTodo[] }> {
+    try {
+      const raw = await lastValueFrom(
+        this.wiki
+          .send<{ items?: unknown[] }>(MQTT_PATTERNS.WIKI_TODO_LIST, {
+            ...asRecord(input.payload),
+            status: input.status,
+            page: 1,
+            pageSize: 30,
+          })
+          .pipe(timeout(4000)),
+      );
+      const items = (raw?.items ?? [])
+        .map((item) => ragTodoFromRecord(item))
+        .filter((item): item is ChatTodo => Boolean(item));
+      return { available: true, items };
+    } catch (err) {
+      this.logger.warn(
+        `chat todos unavailable: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return { available: false, items: [] };
     }
   }
 

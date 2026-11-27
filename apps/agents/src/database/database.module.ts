@@ -11,6 +11,7 @@ import { ChatConversations1760000003500 } from './migrations/1760000003500-chat-
 import { Ocr1760000003600 } from './migrations/1760000003600-ocr';
 import { LinkifyBareCitations1760000003700 } from './migrations/1760000003700-linkify-bare-citations';
 import { Prompts1760000003800 } from './migrations/1760000003800-prompts';
+import { ChatTodoPrompt1760000003900 } from './migrations/1760000003900-chat-todo-prompt';
 
 const sync = process.env.TYPEORM_SYNC === 'true';
 
@@ -32,6 +33,7 @@ const sync = process.env.TYPEORM_SYNC === 'true';
         Ocr1760000003600,
         LinkifyBareCitations1760000003700,
         Prompts1760000003800,
+        ChatTodoPrompt1760000003900,
       ],
       logging: process.env.TYPEORM_LOGGING === 'true',
     }),

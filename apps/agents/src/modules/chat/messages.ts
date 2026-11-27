@@ -1,4 +1,5 @@
 import type { AgentChatAttachment, AgentChatRole } from '@app/common';
+import type { ChatTodo } from '../rag/rag-port';
 import { PROMPT_CODES, type PromptCode } from '../prompts/codes';
 
 /**
@@ -6,6 +7,53 @@ import { PROMPT_CODES, type PromptCode } from '../prompts/codes';
  * 低于此线的标题或待办名命中不交给模型，避免被当成资料。
  */
 export const RAG_HIT_SCORE = 0.5;
+
+export type ChatIntent = 'chat' | 'knowledge' | 'todo';
+
+const DOCUMENT_CUE = /这篇|这个文档|这篇文章|文档里|页面里|知识库|资料里|根据资料|文中/;
+const TODO_CUE =
+  /我的待办|我的任务|我的安排|待办列表|待办事项|未完成的?(?:任务|待办)|已完成的?(?:任务|待办)|进行中的?(?:任务|待办)|全部任务|所有任务|所有待办|(?:今天|明天|这周|本周).{0,8}(?:要做|做什么|的任务|的待办|的安排)|(?:有哪些|有什么|还有什么|还有哪些).{0,8}(?:任务|待办)|截止|到期/;
+const CHAT_CUE = /^(?:你好|嗨|在吗|谢谢|早上好|晚上好)|帮我(?:写|改|润色|翻译|续写)|改写|润色/;
+const KNOWLEDGE_CUE =
+  /什么是|是什么|怎么|如何|为什么|为何|定义|区别|对比|详解|包含哪些|资料|文档|知识库|网上|网络上|互联网|业界/;
+
+/**
+ * 闲聊只写作。问资料走知识库，并且可以联网。问自己的任务走待办列表。
+ * 点名某篇文档时仍走资料，页面上的待办已经在知识库里。
+ */
+export function classifyChatIntent(query: string): ChatIntent {
+  const text = query.trim();
+  if (!text) {
+    return 'chat';
+  }
+  if (DOCUMENT_CUE.test(text)) {
+    return 'knowledge';
+  }
+  if (TODO_CUE.test(text)) {
+    return 'todo';
+  }
+  if (CHAT_CUE.test(text)) {
+    return 'chat';
+  }
+  if (KNOWLEDGE_CUE.test(text) || asksForOutsideDefinition(text)) {
+    return 'knowledge';
+  }
+  if (/待办/.test(text)) {
+    return 'todo';
+  }
+  return 'chat';
+}
+
+/** 已完成、全部、未完成用不同状态；默认只取还没做完的。 */
+export function todoStatusFilter(query: string): string {
+  if (/已完成|做完/.test(query)) {
+    return 'done';
+  }
+  if (/全部任务|所有待办|所有任务/.test(query)) {
+    return 'pending,in_progress,done';
+  }
+  return 'pending,in_progress';
+}
 
 /** 用户点名要资料以外的定义，而不是在问知识库里怎么写。 */
 export function asksForOutsideDefinition(query: string): boolean {
@@ -15,6 +63,42 @@ export function asksForOutsideDefinition(query: string): boolean {
 }
 
 export type WebHit = { title: string; url: string; content: string };
+
+export function todoListAppendix(items: ChatTodo[], available: boolean): string {
+  if (!available) {
+    return '【我的待办】\n待办列表暂时没有取到。不要编造任务。';
+  }
+  if (!items.length) {
+    return '【我的待办】\n没有符合条件的待办。';
+  }
+  const lines = ['【我的待办】'];
+  for (const item of items) {
+    const title = item.title.trim();
+    if (!title) {
+      continue;
+    }
+    const range = item.dueAt ? `，截止 ${item.dueAt.slice(0, 10)}` : '';
+    lines.push(`- ${todoStatusLabel(item.status)}：${title}${range}`);
+    const detail = item.content.trim();
+    if (detail) {
+      lines.push(detail);
+    }
+  }
+  return lines.join('\n');
+}
+
+function todoStatusLabel(status: string): string {
+  switch (status) {
+    case 'in_progress':
+      return '进行中';
+    case 'done':
+      return '已完成';
+    case 'cancelled':
+      return '已终止';
+    default:
+      return '未开始';
+  }
+}
 
 export function webResultsAppendix(hits: WebHit[]): string {
   if (!hits.length) {

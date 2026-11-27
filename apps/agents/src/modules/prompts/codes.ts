@@ -5,6 +5,7 @@ export const PROMPT_CODES = {
   chatRagGroundedOutside: 'chat.rag.grounded-outside',
   chatRagGeneral: 'chat.rag.general',
   chatWeb: 'chat.web',
+  chatTodo: 'chat.todo',
   ocrImage: 'ocr.image',
 } as const;
 
