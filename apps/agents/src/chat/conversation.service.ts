@@ -15,7 +15,7 @@ import { requireBizCode } from '../common/biz-scope';
 import { asRecord, optionalString, requiredString, rpcFail } from '../common/rpc';
 import { ConversationMessageEntity } from '../entities/conversation-message.entity';
 import { ConversationEntity } from '../entities/conversation.entity';
-import type { NormalizedMessage } from './chat-messages';
+import { linkifyBareCitations, type NormalizedMessage } from './chat-messages';
 import {
   CONVERSATION_HISTORY_LIMIT,
   mergeConversationHistory,
@@ -107,7 +107,7 @@ export class ConversationService {
     });
     return rows.reverse().map((row) => ({
       role: row.role,
-      content: row.content,
+      content: row.role === 'assistant' ? linkifyBareCitations(row.content) : row.content,
     }));
   }
 
@@ -250,7 +250,7 @@ export class ConversationService {
     return {
       id: row.id,
       role: row.role,
-      content: row.content,
+      content: row.role === 'assistant' ? linkifyBareCitations(row.content) : row.content,
       attachments: row.attachments,
       sources: row.sources,
       createdAt: row.createdAt.toISOString(),

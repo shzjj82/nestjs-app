@@ -244,7 +244,8 @@ describe('ChatService', () => {
     const sent = body.messages.map((item) => (typeof item.content === 'string' ? item.content : '')).join('\n');
     expect(sent).toContain('Fiber 把渲染拆成单元');
     expect(sent).toContain('【网上结果】');
-    expect(sent).toContain('https://react.dev/fiber');
+    expect(sent).toContain('[React Fiber](https://react.dev/fiber)');
+    expect(sent).toContain('[标题](https://地址)');
     expect(sent).not.toContain('not-a-url');
   });
 

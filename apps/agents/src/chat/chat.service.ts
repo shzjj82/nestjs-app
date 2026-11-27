@@ -17,6 +17,7 @@ import {
   buildHistoryMessages,
   contextAppendix,
   describeAttachments,
+  linkifyBareCitations,
   WEB_RESULTS_SYSTEM,
   webResultsAppendix,
   type NormalizedMessage,
@@ -73,7 +74,7 @@ export class ChatService {
       if (!reply) {
         rpcFail(502, 'AI_EMPTY');
       }
-      const trimmed = reply.slice(0, 12000);
+      const trimmed = linkifyBareCitations(reply.slice(0, 12000));
       await this.persistTurn(session, input, trimmed, prepared.sources);
       const result: AgentChatResult = {
         reply: trimmed,
@@ -155,7 +156,7 @@ export class ChatService {
       if (!reply) {
         rpcFail(502, 'AI_EMPTY');
       }
-      reply = reply.slice(0, 12000);
+      reply = linkifyBareCitations(reply.slice(0, 12000));
       flush(true, true);
       await writeChain;
       yield {

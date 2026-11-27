@@ -6,8 +6,10 @@ import {
   buildHistoryMessages,
   contextAppendix,
   describeAttachments,
+  linkifyBareCitations,
   normalizeMessages,
   RAG_HIT_SCORE,
+  webResultsAppendix,
 } from '../../src/chat/chat-messages';
 
 describe('normalizeMessages', () => {
@@ -128,6 +130,34 @@ describe('applyRagPolicy', () => {
     expect(policy.sources).toEqual([]);
     expect(policy.context).toBe('');
     expect(policy.systemAppendix).toContain('以下不是知识库内容');
+  });
+});
+
+describe('web citations', () => {
+  it('shows a markdown link in the web appendix', () => {
+    expect(
+      webResultsAppendix([{ title: 'React Fiber', url: 'https://react.dev/fiber', content: 'A unit of work' }]),
+    ).toContain('[React Fiber](https://react.dev/fiber)');
+  });
+
+  it('turns a book title plus a bare url into a markdown link', () => {
+    const raw =
+      '（《香港迪士尼樂園度假區 | 官方網站》 https://www.hongkongdisneyland.com/zh-hk/ ）\n' +
+      '（《迪士尼调查问卷》 https://www.wenjuan.com/lib_detail_full/57723bbba320fc84d20009a0/ ）';
+    const linked = linkifyBareCitations(raw);
+    expect(linked).toBe(
+      '（[香港迪士尼樂園度假區 | 官方網站](https://www.hongkongdisneyland.com/zh-hk/) ）\n' +
+        '（[迪士尼调查问卷](https://www.wenjuan.com/lib_detail_full/57723bbba320fc84d20009a0/) ）',
+    );
+    expect(linkifyBareCitations(linked)).toBe(linked);
+  });
+
+  it('leaves an existing markdown link and a fenced url alone', () => {
+    const raw =
+      '（[上海迪士尼攻略（6次吐血总结）](https://www.zhihu.com/tardis/zm/art/256381785)）\n' +
+      '```\n《示例》 https://example.com/keep\n```\n' +
+      '知识库《迪士尼游玩攻略》没有写 18。';
+    expect(linkifyBareCitations(raw)).toBe(raw);
   });
 });
 

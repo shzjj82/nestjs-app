@@ -28,7 +28,7 @@ export function asksForOutsideDefinition(query: string): boolean {
 
 export const RAG_GENERAL_SYSTEM = `本次知识库检索未达到采用线，没有可引用的正文。不要把未附上的页面当成依据，也不要编造文档标题。先说明知识库里没有可回答该问题的正文，再另起一段用通用知识回答，并标明「以下不是知识库内容」。待办、日期、负责人和项目里有没有这件事，仍然只能说资料不足，不要用通用知识编造。`;
 
-export const WEB_RESULTS_SYSTEM = `下方「网上结果」是本次联网检索到、并且页面仍然可以打开的网页摘要。转述网上内容时只能依据这些摘要，并写出标题和链接。不要编造没有给出的网址，不要引用 404 或已不存在的页面，也不要说自己没有联网。网上结果不是知识库内容。「参考资料」仍只表示知识库。待办、日期、负责人和项目里有没有这件事，仍然只能依据知识库，不要用网上结果编造。`;
+export const WEB_RESULTS_SYSTEM = `下方「网上结果」是本次联网检索到、并且页面仍然可以打开的网页摘要。转述网上内容时只能依据这些摘要。每条链接都写成 Markdown：[标题](https://地址)。不要写成《标题》后面再跟一串网址，也不要单独写出 https:// 地址。知识库出处仍用《标题》和类型，网上链接不要用书名号包地址。不要编造没有给出的网址，不要引用 404 或已不存在的页面，也不要说自己没有联网。网上结果不是知识库内容。「参考资料」仍只表示知识库。待办、日期、负责人和项目里有没有这件事，仍然只能依据知识库，不要用网上结果编造。`;
 
 export type WebHit = { title: string; url: string; content: string };
 
@@ -38,9 +38,36 @@ export function webResultsAppendix(hits: WebHit[]): string {
   }
   const blocks = hits.map((item, index) => {
     const body = item.content ? `\n${item.content}` : '';
-    return `### [${index + 1}] ${item.title}\n${item.url}${body}`;
+    const title = item.title.replace(/[\[\]]/g, '').trim() || item.url;
+    return `### [${index + 1}] [${title}](${item.url})${body}`;
   });
   return `【网上结果】\n${blocks.join('\n\n')}`;
+}
+
+/** 把《标题》后面的裸网址收成 [标题](网址)。已经是 Markdown 链接的不动。 */
+export function linkifyBareCitations(text: string): string {
+  if (!text.includes('http') || !text.includes('《')) {
+    return text;
+  }
+  return text
+    .split(/(```[\s\S]*?```)/g)
+    .map((part, index) =>
+      index % 2 === 1
+        ? part
+        : part.replace(
+            /《([^》\n]{1,180})》[ \t\u3000]*(?:\n[ \t\u3000]*)?(https?:\/\/[^\s<>）)】\]」』"“”，。、；]+)/g,
+            bareBookUrl,
+          ),
+    )
+    .join('');
+}
+
+function bareBookUrl(match: string, rawTitle: string, url: string): string {
+  const title = rawTitle.replace(/[\[\]]/g, '').trim();
+  if (!title) {
+    return match;
+  }
+  return `[${title}](${url})`;
 }
 
 type RagHit = {
