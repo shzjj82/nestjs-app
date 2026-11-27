@@ -102,17 +102,17 @@ export class ChatService {
     if (!lastUser) {
       rpcFail(400, '请先写一条问题');
     }
-    const turn = await this.conversations.startTurn({
+    const turnPromise = this.conversations.startTurn({
       conversation: session.conversation,
       userContent: lastUser.content,
       attachments: input.attachments,
     });
-    yield { conversationId: session.conversation.id };
-
-    const prepared = await this.prepare(
+    const preparedPromise = this.prepare(
       { ...input, messages: session.messages },
       payload,
     );
+    yield { conversationId: session.conversation.id };
+    const [turn, prepared] = await Promise.all([turnPromise, preparedPromise]);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), aiTimeoutMs());
     let reply = '';
@@ -139,15 +139,15 @@ export class ChatService {
           controller.signal,
         )) {
           reply += delta;
-          flush(false, false);
           yield { delta };
+          flush(false, false);
         }
       } catch (err) {
         if (prepared.imageUrls.length && reply === '' && isUpstreamError(err)) {
           for await (const delta of this.iterateUpstream(prepared.textOnly, controller.signal)) {
             reply += delta;
-            flush(false, false);
             yield { delta };
+            flush(false, false);
           }
         } else {
           throw err;
@@ -226,32 +226,41 @@ export class ChatService {
     const attachments = input.attachments ?? [];
     const { imageUrls } = describeAttachments(attachments);
     let appendix = contextAppendix(attachments);
-    let system = input.system?.trim() || (await this.prompts.text(PROMPT_CODES.chatDefault));
+    const systemTask = input.system?.trim()
+      ? Promise.resolve(input.system.trim())
+      : this.prompts.text(PROMPT_CODES.chatDefault);
+    let system = '';
     let sources: AgentRagSource[] = [];
 
     if (input.rag === true) {
       const lastUser = [...input.messages].reverse().find((item) => item.role === 'user');
       const query = lastUser?.content?.trim() ?? '';
       if (query) {
-        const [found, web] = await Promise.all([
+        const [baseSystem, found, web, promptBodies] = await Promise.all([
+          systemTask,
           this.rag.searchForChat({
             payload: asRecord(rawPayload),
             query,
             topK: input.ragTopK,
           }),
           this.lookupWeb(query),
+          this.ragPromptBodies(),
         ]);
+        system = baseSystem;
         const policy = applyRagPolicy(found, query);
         sources = policy.sources;
-        system = `${system}\n\n${await this.prompts.text(policy.promptCode)}`;
+        system = `${system}\n\n${promptBodies[policy.promptCode]}`;
         if (policy.context) {
           appendix = [appendix, policy.context].filter(Boolean).join('\n\n');
         }
         if (web.length) {
-          system = `${system}\n\n${await this.prompts.text(PROMPT_CODES.chatWeb)}`;
+          system = `${system}\n\n${promptBodies[PROMPT_CODES.chatWeb]}`;
           appendix = [appendix, webResultsAppendix(web)].filter(Boolean).join('\n\n');
         }
       }
+    }
+    if (!system) {
+      system = await systemTask;
     }
 
     return {
@@ -260,6 +269,17 @@ export class ChatService {
       withVision: buildHistoryMessages(system, input.messages, appendix, imageUrls, true),
       textOnly: buildHistoryMessages(system, input.messages, appendix, imageUrls, false),
     };
+  }
+
+  private async ragPromptBodies(): Promise<Record<string, string>> {
+    const codes = [
+      PROMPT_CODES.chatRagGrounded,
+      PROMPT_CODES.chatRagGroundedOutside,
+      PROMPT_CODES.chatRagGeneral,
+      PROMPT_CODES.chatWeb,
+    ];
+    const bodies = await Promise.all(codes.map((code) => this.prompts.text(code)));
+    return Object.fromEntries(codes.map((code, index) => [code, bodies[index]]));
   }
 
   private async lookupWeb(query: string) {

@@ -68,14 +68,14 @@ export function aiTimeoutMs(): number {
   return positiveMs(process.env.AI_TIMEOUT_MS, 90_000);
 }
 
-/** SearXNG 整次检索最多等这么久。超时由调用方当作没有网上结果。 */
+/** SearXNG 整次检索最多等这么久。超时由调用方当作没有网上结果，避免卡住首字。 */
 export function webSearchTimeoutMs(): number {
-  return positiveMs(process.env.WEB_SEARCH_TIMEOUT_MS, 8_000);
+  return positiveMs(process.env.WEB_SEARCH_TIMEOUT_MS, 3_000);
 }
 
-/** 打开单个网页确认是不是 404 / 410 的最长等待。 */
+/** 打开单个网页确认是不是 404 / 410 的最长等待。到点打不开就保留该条，不挡模型出字。 */
 export function pageProbeTimeoutMs(): number {
-  return positiveMs(process.env.PAGE_PROBE_TIMEOUT_MS, 2_500);
+  return positiveMs(process.env.PAGE_PROBE_TIMEOUT_MS, 400);
 }
 
 function positiveMs(raw: string | undefined, fallback: number): number {

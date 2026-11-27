@@ -261,15 +261,16 @@ export class RagService extends RagPort implements OnModuleInit {
     const query = requiredString(data.query, 'query').slice(0, 2000);
     const topK = clampInt(data.topK, 1, 20, 6);
     const mineOnly = data.mineOnly === true;
-    const teamIds = mineOnly
-      ? []
-      : await this.readableTeamIds({
-          accountId,
-          appCode,
-          bizCode: appCode,
-        });
-
-    const vector = await this.embedding.embedOne(query);
+    const [teamIds, vector] = await Promise.all([
+      mineOnly
+        ? Promise.resolve([])
+        : this.readableTeamIds({
+            accountId,
+            appCode,
+            bizCode: appCode,
+          }),
+      this.embedding.embedOne(query),
+    ]);
     const params: unknown[] = [toVectorLiteral(vector), appCode, accountId, topK];
     let visibilitySql: string;
     if (mineOnly) {

@@ -16,11 +16,12 @@ export class ChatHttpController {
       res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
+      res.socket?.setNoDelay(true);
       res.flushHeaders();
       for await (const event of this.chat.streamEvents(body)) {
-        res.write(encodeSse(event));
+        writeSse(res, encodeSse(event));
       }
-      res.write(encodeSse('[DONE]'));
+      writeSse(res, encodeSse('[DONE]'));
       res.end();
     } catch (err) {
       const { status, message } = rpcToHttp(err);
@@ -28,11 +29,16 @@ export class ChatHttpController {
         res.status(status).json({ status, message });
         return;
       }
-      res.write(encodeSse({ error: message }));
-      res.write(encodeSse('[DONE]'));
+      writeSse(res, encodeSse({ error: message }));
+      writeSse(res, encodeSse('[DONE]'));
       res.end();
     }
   }
+}
+
+function writeSse(res: Response, chunk: string) {
+  res.write(chunk);
+  (res as Response & { flush?: () => void }).flush?.();
 }
 
 function rpcToHttp(err: unknown): { status: number; message: string } {

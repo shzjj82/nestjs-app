@@ -116,6 +116,7 @@ export class AgentsOverrideController {
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
+    res.socket?.setNoDelay(true);
     res.flushHeaders();
     const reader = upstream.body.getReader();
     if (!wiki) {
@@ -124,7 +125,7 @@ export class AgentsOverrideController {
         if (done) {
           break;
         }
-        res.write(value);
+        writeSseChunk(res, value);
       }
       res.end();
       return;
@@ -136,7 +137,7 @@ export class AgentsOverrideController {
       if (done) {
         rest += decoder.decode();
         if (rest) {
-          res.write(rewriteWikiSse(rest));
+          writeSseChunk(res, rewriteWikiSse(rest));
         }
         break;
       }
@@ -144,11 +145,16 @@ export class AgentsOverrideController {
       const parts = rest.split(/\n\n/);
       rest = parts.pop() ?? '';
       if (parts.length) {
-        res.write(`${parts.map(rewriteWikiSse).join('\n\n')}\n\n`);
+        writeSseChunk(res, `${parts.map(rewriteWikiSse).join('\n\n')}\n\n`);
       }
     }
     res.end();
   }
+}
+
+function writeSseChunk(res: Response, chunk: string | Uint8Array) {
+  res.write(chunk);
+  (res as Response & { flush?: () => void }).flush?.();
 }
 
 function rewriteWikiSse(block: string): string {

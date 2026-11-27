@@ -59,7 +59,7 @@ async function pageIsMissing(hit: WebHit): Promise<boolean> {
 async function httpStatus(url: string): Promise<number | null> {
   try {
     const res = await fetch(url, {
-      method: 'GET',
+      method: 'HEAD',
       redirect: 'follow',
       signal: AbortSignal.timeout(pageProbeTimeoutMs()),
       headers: {
