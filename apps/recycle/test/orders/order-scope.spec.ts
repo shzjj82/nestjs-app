@@ -5,7 +5,7 @@ import {
   parseOrderView,
   resolveOrderView,
   resolveOrderViewForAction,
-} from '../../src/orders/order-scope';
+} from '../../src/modules/orders/order-scope';
 
 function actor(roles: string[], userId = 'u-1'): Actor {
   return {

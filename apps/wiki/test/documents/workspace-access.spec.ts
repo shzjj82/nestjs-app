@@ -1,4 +1,4 @@
-import { canReadWorkspacePost } from '../../src/documents/workspace-access';
+import { canReadWorkspacePost } from '../../src/modules/documents/workspace-access';
 
 const AUTHOR = 'author';
 const TEAMMATE = 'teammate';

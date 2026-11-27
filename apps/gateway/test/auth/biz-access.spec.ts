@@ -1,5 +1,5 @@
 import type { BusinessRegistryEntry } from '@app/common';
-import { evaluateBizAccess } from '../../src/auth/biz-access';
+import { evaluateBizAccess } from '../../src/modules/auth/biz-access';
 
 const blog: BusinessRegistryEntry = {
   code: 'blog',

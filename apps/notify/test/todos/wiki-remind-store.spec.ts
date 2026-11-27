@@ -1,7 +1,7 @@
 import {
   wikiRemindClaimSql,
   wikiRemindListSql,
-} from '../../src/todos/wiki-remind-store';
+} from '../../src/modules/todos/wiki-remind-store';
 
 describe('wiki overdue reminder', () => {
   it('selects open tasks past their end date that were not reminded today', () => {

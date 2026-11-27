@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { instanceId, mqttBrokerOptions } from '@app/common';
 import { ensureOrderDatabase } from './database/ensure-database';
-import { OrderModule } from './order.module';
+import { OrderModule } from './modules/order/order.module';
 
 async function bootstrap() {
   await ensureOrderDatabase();

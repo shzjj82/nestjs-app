@@ -15,7 +15,7 @@ import {
   parseStatusFilter,
   resolvePatchStatus,
   type CanonicalTodoStatus,
-} from '../todos/todo-status';
+} from '../modules/todos/todo-status';
 
 export { toPage };
 export { parseStatusFilter, normalizeTodoStatus };

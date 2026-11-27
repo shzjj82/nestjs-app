@@ -1,4 +1,4 @@
-import { readOrderLines } from '../../src/orders/order-items';
+import { readOrderLines } from '../../src/modules/orders/order-items';
 
 describe('order lines', () => {
   it('requires modelId', () => {

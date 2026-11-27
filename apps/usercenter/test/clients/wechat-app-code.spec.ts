@@ -1,4 +1,4 @@
-import { normalizeAppCode } from '../../src/clients/wechat-app-code';
+import { normalizeAppCode } from '../../src/modules/clients/wechat-app-code';
 
 describe('normalizeAppCode', () => {
   it('accepts letter-leading codes', () => {

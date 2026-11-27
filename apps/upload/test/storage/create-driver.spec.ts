@@ -1,7 +1,7 @@
-import { createStorageDriver } from '../../src/storage/create-driver';
-import { CosDriver } from '../../src/storage/drivers/cos.driver';
-import { MinioDriver } from '../../src/storage/drivers/minio.driver';
-import { OssDriver } from '../../src/storage/drivers/oss.driver';
+import { createStorageDriver } from '../../src/modules/storage/create-driver';
+import { CosDriver } from '../../src/modules/storage/drivers/cos.driver';
+import { MinioDriver } from '../../src/modules/storage/drivers/minio.driver';
+import { OssDriver } from '../../src/modules/storage/drivers/oss.driver';
 
 const base = {
   endpoint: 'http://127.0.0.1:9000',

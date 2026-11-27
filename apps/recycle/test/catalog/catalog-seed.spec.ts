@@ -1,5 +1,5 @@
 import { RecycleCartridgeTypeEntity } from '../../src/entities';
-import { seedCatalog } from '../../src/catalog/catalog-seed';
+import { seedCatalog } from '../../src/modules/catalog/catalog-seed';
 
 describe('seedCatalog', () => {
   it('does not upsert when types already exist', async () => {

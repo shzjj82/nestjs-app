@@ -1,0 +1,172 @@
+import { Controller, UseInterceptors } from '@nestjs/common';
+import { MessagePattern } from '@nestjs/microservices';
+import { ApiDoc, MQTT_PATTERNS, NotifyHandleLogInterceptor, sharePattern, MQTT_GROUPS } from '@app/common';
+import { parseSend, requireActor, requireInternal } from '../../common/input';
+import { TodosService } from './todos.service';
+
+@Controller()
+@UseInterceptors(NotifyHandleLogInterceptor)
+export class TodosController {
+  constructor(private readonly todos: TodosService) {}
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_LIST))
+  @ApiDoc({
+    name: '我的待办',
+    description:
+      '当前业务下本人的待办；status 支持多值：pending,in_progress 或重复 query；也兼容旧 open（=pending+in_progress）',
+  })
+  list(payload: Record<string, unknown>) {
+    return this.todos.list(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_OPEN_COUNT))
+  @ApiDoc({
+    name: '未完成数量',
+    description: '当前业务下本人 pending + in_progress 的待办数（含过渡 open）',
+  })
+  openCount(payload: Record<string, unknown>) {
+    return this.todos.openCount(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_FIND_ONE))
+  @ApiDoc({ name: '待办详情', description: '只能读取本人在当前业务下的待办' })
+  findOne(payload: Record<string, unknown>) {
+    return this.todos.findOne(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_EVENT_LIST))
+  @ApiDoc({
+    name: '待办操作日志',
+    description: '本人待办的业务操作事件（创建/开始/完成/取消/重开等），按时间倒序',
+  })
+  listEvents(payload: Record<string, unknown>) {
+    return this.todos.listEvents(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_CREATE))
+  @ApiDoc({ name: '新建待办', description: '给当前登录用户自己建一条待办，并经 socket 推送' })
+  createMine(payload: Record<string, unknown>) {
+    return this.todos.createMine(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_UPDATE))
+  @ApiDoc({
+    name: '更新待办',
+    description: '更新本人待办的标题、内容、开始/截止日与 status',
+  })
+  updateMine(payload: Record<string, unknown>) {
+    return this.todos.updateMine(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_START))
+  @ApiDoc({ name: '开始待办', description: 'pending → in_progress，写入 startedAt' })
+  start(payload: Record<string, unknown>) {
+    return this.todos.start(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_DONE))
+  @ApiDoc({ name: '完成待办', description: '把本人的一条活跃待办标为 done，并经 socket 推送' })
+  done(payload: Record<string, unknown>) {
+    return this.todos.finish(payload, 'done');
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_CANCEL))
+  @ApiDoc({ name: '取消待办', description: '把本人的一条活跃待办标为 cancelled，并经 socket 推送' })
+  cancel(payload: Record<string, unknown>) {
+    return this.todos.finish(payload, 'cancel');
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_REOPEN))
+  @ApiDoc({
+    name: '重新打开待办',
+    description: 'done/cancelled → pending 或 in_progress（按 startsAt 与今天）',
+  })
+  reopen(payload: Record<string, unknown>) {
+    return this.todos.reopen(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_ADMIN_CREATE))
+  @ApiDoc({
+    name: '指派待办',
+    description: '向指定业务下的用户创建待办，并经 socket 推送',
+  })
+  adminCreate(payload: Record<string, unknown>) {
+    const actor = requireActor(payload);
+    return this.todos.create(parseSend(payload, 'admin'), actor.userId);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_SEND))
+  send(payload: Record<string, unknown>) {
+    requireInternal(payload);
+    return this.todos.create(parseSend(payload, 'service'), null);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_PATCH_DATA))
+  @ApiDoc({
+    name: '补丁待办 data',
+    description: '内部接口：任意状态待办只更新 data，供 wiki 回填页面关联',
+  })
+  patchData(payload: Record<string, unknown>) {
+    requireInternal(payload);
+    return this.todos.patchData(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_DELETE))
+  @ApiDoc({
+    name: '删除待办',
+    description: '物理删除本人在当前业务下的一条待办，任意状态都可删',
+  })
+  remove(payload: Record<string, unknown>) {
+    return this.todos.remove(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_LIST_BY_PAGE))
+  @ApiDoc({
+    name: '按页面读取待办',
+    description: '内部接口：向量索引读取一篇页面上的 wiki 任务，不含列表壳',
+  })
+  listByPage(payload: Record<string, unknown>) {
+    requireInternal(payload);
+    return this.todos.listByPage(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_DELETE_BY_PAGES))
+  @ApiDoc({
+    name: '按页面删除待办',
+    description: '内部接口：文档删除时物理删除 source=wiki 且关联这些 pageId 的待办',
+  })
+  deleteByPages(payload: Record<string, unknown>) {
+    requireInternal(payload);
+    return this.todos.deleteByPages(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_WIKI_REMIND_LIST))
+  @ApiDoc({
+    name: 'wiki 催办候选',
+    description: '内部接口：按 slot 返回 wiki 待办候选；催办语义与定时由 wiki 负责',
+  })
+  wikiRemindList(payload: Record<string, unknown>) {
+    requireInternal(payload);
+    return this.todos.wikiRemindList(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_WIKI_REMIND_CLAIM))
+  @ApiDoc({
+    name: 'wiki 催办占坑',
+    description: '内部接口：写入 started/progress/overdue 通知标记，防止重复发送',
+  })
+  wikiRemindClaim(payload: Record<string, unknown>) {
+    requireInternal(payload);
+    return this.todos.wikiRemindClaim(payload);
+  }
+
+  @MessagePattern(sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.TODO_WIKI_REMIND_RELEASE))
+  @ApiDoc({
+    name: 'wiki 催办释放',
+    description: '内部接口：发送通知失败时回滚催办标记',
+  })
+  wikiRemindRelease(payload: Record<string, unknown>) {
+    requireInternal(payload);
+    return this.todos.wikiRemindRelease(payload);
+  }
+}

@@ -4,7 +4,7 @@ import {
   parseStatusFilter,
   reopenTargetStatus,
   resolvePatchStatus,
-} from '../../src/todos/todo-status';
+} from '../../src/modules/todos/todo-status';
 
 describe('todo-status', () => {
   it('normalizes legacy open to pending', () => {

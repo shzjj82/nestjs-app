@@ -1,6 +1,6 @@
 import { of, throwError } from 'rxjs';
 import type { Actor } from '../../src/domain';
-import { LiveRolesService } from '../../src/identity/live-roles.service';
+import { LiveRolesService } from '../../src/modules/identity/live-roles.service';
 
 function actor(roles: string[]): Actor {
   return {

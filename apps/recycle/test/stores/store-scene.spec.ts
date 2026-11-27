@@ -1,4 +1,4 @@
-import { newBindScene } from '../../src/stores/store-scene';
+import { newBindScene } from '../../src/modules/stores/store-scene';
 
 describe('store-scene', () => {
   it('fits wechat unlimited qr scene length', () => {

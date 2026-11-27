@@ -1,5 +1,5 @@
 import { Workbook } from 'exceljs';
-import { parsePermissionWorkbook } from '../../src/rbac/excel.parser';
+import { parsePermissionWorkbook } from '../../src/modules/rbac/excel.parser';
 
 describe('parsePermissionWorkbook', () => {
   it('reads function points, api bindings and role checks', async () => {

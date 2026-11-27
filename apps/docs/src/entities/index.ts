@@ -1,5 +1,5 @@
-import { CategoryEntity } from './category.entity';
-import { DocumentEntity } from './document.entity';
+import { CategoryEntity } from '../modules/categories/entity/category.entity';
+import { DocumentEntity } from '../modules/documents/entity/document.entity';
 
 export const DOCS_ENTITIES = [CategoryEntity, DocumentEntity];
 

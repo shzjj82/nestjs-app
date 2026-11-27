@@ -1,10 +1,10 @@
-import { CategoryEntity } from './category.entity';
-import { DocumentEntity } from './document.entity';
-import { TeamEntity } from './team.entity';
-import { TeamMemberEntity } from './team-member.entity';
-import { WikiOpEventEntity } from './wiki-op-event.entity';
-import { WikiShareEntity } from './wiki-share.entity';
-import { WikiShareFavoriteEntity } from './wiki-share-favorite.entity';
+import { CategoryEntity } from '../modules/categories/entity/category.entity';
+import { DocumentEntity } from '../modules/documents/entity/document.entity';
+import { WikiOpEventEntity } from '../modules/oplog/entity/wiki-op-event.entity';
+import { WikiShareFavoriteEntity } from '../modules/shares/entity/wiki-share-favorite.entity';
+import { WikiShareEntity } from '../modules/shares/entity/wiki-share.entity';
+import { TeamMemberEntity } from '../modules/teams/entity/team-member.entity';
+import { TeamEntity } from '../modules/teams/entity/team.entity';
 
 export const WIKI_ENTITIES = [
   CategoryEntity,

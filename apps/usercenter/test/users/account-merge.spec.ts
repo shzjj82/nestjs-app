@@ -1,4 +1,4 @@
-import { normalizePhone, pickSurvivor, tryNormalizePhone } from '../../src/users/account-merge';
+import { normalizePhone, pickSurvivor, tryNormalizePhone } from '../../src/modules/users/account-merge';
 import type { UserEntity } from '../../src/entities';
 
 function user(partial: Partial<UserEntity>): UserEntity {

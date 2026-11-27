@@ -2,7 +2,7 @@ jest.mock('@nestjs/typeorm', () => ({
   InjectRepository: () => () => undefined,
 }));
 
-import { ConversationsService } from '../../src/conversations/conversations.service';
+import { ConversationsService } from '../../src/modules/conversations/conversations.service';
 
 describe('ConversationsService.startTurn', () => {
   it('stores the question and an empty answer before the model finishes', async () => {

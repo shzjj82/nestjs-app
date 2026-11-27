@@ -1,6 +1,6 @@
 import { HttpException, NotFoundException } from '@nestjs/common';
 import { throwError } from 'rxjs';
-import { MqttProxy } from '../../src/mqtt/mqtt.proxy';
+import { MqttProxy } from '../../src/modules/mqtt/mqtt.proxy';
 
 describe('MqttProxy business codes', () => {
   const proxy = new MqttProxy();

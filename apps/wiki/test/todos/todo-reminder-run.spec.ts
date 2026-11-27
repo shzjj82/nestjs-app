@@ -4,7 +4,7 @@ import {
   type WikiRemindDeps,
   type WikiRemindRow,
   type WikiRemindSlot,
-} from '../../src/todos/todo-reminder-run';
+} from '../../src/modules/todos/todo-reminder-run';
 
 describe('wiki TodoReminder', () => {
   const now = new Date('2026-11-09T16:00:00.000Z');

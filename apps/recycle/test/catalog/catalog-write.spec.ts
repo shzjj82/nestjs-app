@@ -1,4 +1,4 @@
-import { parseTypeKey, parseNonNegInt } from '../../src/catalog/catalog-write';
+import { parseTypeKey, parseNonNegInt } from '../../src/modules/catalog/catalog-write';
 
 function statusOf(fn: () => unknown): number {
   try {

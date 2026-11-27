@@ -1,10 +1,10 @@
-import { ConversationEntity } from '../conversations/conversation.entity';
-import { ConversationMessageEntity } from '../conversations/message.entity';
-import { OcrCacheEntity } from '../ocr/cache.entity';
-import { OcrJobEntity } from '../ocr/job.entity';
-import { RagChunkEntity } from '../rag/chunk.entity';
-import { VisionImageEntity } from '../vision/image.entity';
-import { VisionJobEntity } from '../vision/job.entity';
+import { ConversationEntity } from '../modules/conversations/entity/conversation.entity';
+import { ConversationMessageEntity } from '../modules/conversations/entity/message.entity';
+import { OcrCacheEntity } from '../modules/ocr/entity/cache.entity';
+import { OcrJobEntity } from '../modules/ocr/entity/job.entity';
+import { RagChunkEntity } from '../modules/rag/entity/chunk.entity';
+import { VisionImageEntity } from '../modules/vision/entity/image.entity';
+import { VisionJobEntity } from '../modules/vision/entity/job.entity';
 
 export const AGENTS_ENTITIES = [
   VisionJobEntity,

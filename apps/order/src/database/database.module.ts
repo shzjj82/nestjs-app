@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { orderDatabaseUrl } from '@app/common';
-import { ORDER_ENTITIES } from '../entities';
+import { ORDER_ENTITIES } from '../modules/order/entity';
 import { InitOrderSchema1760000002000 } from './migrations/1760000002000-init-order-schema';
 import { OrdersNotShares1760000002100 } from './migrations/1760000002100-orders-not-shares';
 import { OrderAccountId1760000002200 } from './migrations/1760000002200-order-account-id';

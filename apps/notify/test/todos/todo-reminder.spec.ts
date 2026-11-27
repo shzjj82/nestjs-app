@@ -1,4 +1,4 @@
-import { deliverDueTodos } from '../../src/todos/todo-reminder-run';
+import { deliverDueTodos } from '../../src/modules/todos/todo-reminder-run';
 
 describe('TodoReminder (legacy non-wiki)', () => {
   const now = new Date('2026-11-09T16:00:00.000Z'); // 上海 2026-11-10 00:00

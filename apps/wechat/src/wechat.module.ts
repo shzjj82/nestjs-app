@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ApiDocsModule, MQTT_GROUPS, MQTT_PATTERNS, RedisInfraModule, sharePattern } from '@app/common';
-import { WechatApiModule } from './api/wechat-api.module';
+import { WechatApiModule } from './modules/api/wechat-api.module';
 import { DatabaseModule } from './database/database.module';
 import { SeedService } from './database/seed.service';
 import { MiniProgramEntity } from './entities';
-import { MiniProgramsModule } from './miniprograms/miniprograms.module';
-import { PayModule } from './pay/pay.module';
+import { MiniProgramsModule } from './modules/miniprograms/miniprograms.module';
+import { PayModule } from './modules/pay/pay.module';
 import { WechatController } from './wechat.controller';
 
 @Module({

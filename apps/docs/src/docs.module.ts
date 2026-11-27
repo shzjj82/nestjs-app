@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ApiDocsModule, MQTT_GROUPS, MQTT_PATTERNS, sharePattern } from '@app/common';
-import { CategoriesModule } from './categories/categories.module';
+import { CategoriesModule } from './modules/categories/categories.module';
 import { DatabaseModule } from './database/database.module';
 import { SeedService } from './database/seed.service';
 import { DocsController } from './docs.controller';
-import { DocumentsModule } from './documents/documents.module';
+import { DocumentsModule } from './modules/documents/documents.module';
 
 @Module({
   imports: [

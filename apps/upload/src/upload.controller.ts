@@ -1,7 +1,7 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { MQTT_PATTERNS, serviceHealth, UploadHandleLogInterceptor, sharePattern, MQTT_GROUPS } from '@app/common';
-import { StorageService } from './storage/storage.service';
+import { StorageService } from './modules/storage/storage.service';
 
 @Controller()
 @UseInterceptors(UploadHandleLogInterceptor)

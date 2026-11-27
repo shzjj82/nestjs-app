@@ -1,5 +1,5 @@
-import { editorJsImages } from '../../src/rag/text/editorjs-text';
-import { textFromOcrMessage } from '../../src/ocr/ocr-client';
+import { editorJsImages } from '../../src/modules/rag/text/editorjs-text';
+import { textFromOcrMessage } from '../../src/modules/ocr/ocr-client';
 
 describe('editorJsImages', () => {
   it('collects image blocks and image attachments once', () => {

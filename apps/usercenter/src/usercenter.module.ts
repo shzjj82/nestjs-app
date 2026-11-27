@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ApiDocsModule, MQTT_GROUPS, MQTT_PATTERNS, RedisInfraModule, sharePattern } from '@app/common';
-import { AccessClientsModule } from './clients/clients.module';
-import { AuthModule } from './auth/auth.module';
-import { LoginQrModule } from './login-qr/login-qr.module';
-import { BusinessesModule } from './businesses/businesses.module';
+import { AccessClientsModule } from './modules/clients/clients.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { LoginQrModule } from './modules/login-qr/login-qr.module';
+import { BusinessesModule } from './modules/businesses/businesses.module';
 import { DatabaseModule } from './database/database.module';
-import { RbacModule } from './rbac/rbac.module';
+import { RbacModule } from './modules/rbac/rbac.module';
 import { UsercenterController } from './usercenter.controller';
 import { UsercenterService } from './usercenter.service';
-import { UsersModule } from './users/users.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [

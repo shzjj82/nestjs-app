@@ -1,4 +1,4 @@
-import { generateTeamCode, TEAM_CODE_LENGTH } from '../../src/teams/team-code';
+import { generateTeamCode, TEAM_CODE_LENGTH } from '../../src/modules/teams/team-code';
 
 describe('team code', () => {
   it('generates a fresh code each time', () => {

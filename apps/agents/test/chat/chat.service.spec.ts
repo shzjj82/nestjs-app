@@ -5,9 +5,9 @@ jest.mock('@nestjs/typeorm', () => ({
   TypeOrmModule: { forFeature: () => ({}) },
 }));
 
-import { ChatService } from '../../src/chat/chat.service';
-import type { ConversationsService } from '../../src/conversations/conversations.service';
-import type { RagPort } from '../../src/rag/rag-port';
+import { ChatService } from '../../src/modules/chat/chat.service';
+import type { ConversationsService } from '../../src/modules/conversations/conversations.service';
+import type { RagPort } from '../../src/modules/rag/rag-port';
 
 function makeConversations(overrides?: Partial<ConversationsService>) {
   const conversation = {

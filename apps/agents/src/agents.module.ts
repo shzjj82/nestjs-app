@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ApiDocsModule, MQTT_GROUPS, MQTT_PATTERNS, sharePattern } from '@app/common';
 import { AgentsController } from './agents.controller';
-import { ChatModule } from './chat/chat.module';
-import { ConversationsModule } from './conversations/conversations.module';
-import { OcrModule } from './ocr/ocr.module';
-import { RagModule } from './rag/rag.module';
-import { VisionModule } from './vision/vision.module';
+import { ChatModule } from './modules/chat/chat.module';
+import { ConversationsModule } from './modules/conversations/conversations.module';
+import { OcrModule } from './modules/ocr/ocr.module';
+import { RagModule } from './modules/rag/rag.module';
+import { VisionModule } from './modules/vision/vision.module';
 
 @Module({
   imports: [

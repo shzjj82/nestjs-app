@@ -6,9 +6,9 @@ import { RpcException } from '@nestjs/microservices';
 import {
   SharesService,
   SHARE_BODY_LIMIT,
-} from '../../src/shares/shares.service';
-import { WikiShareEntity } from '../../src/entities/wiki-share.entity';
-import { WikiShareFavoriteEntity } from '../../src/entities/wiki-share-favorite.entity';
+} from '../../src/modules/shares/shares.service';
+import { WikiShareEntity } from '../../src/modules/shares/entity/wiki-share.entity';
+import { WikiShareFavoriteEntity } from '../../src/modules/shares/entity/wiki-share-favorite.entity';
 import type { DocPost } from '@app/common';
 
 const PAGE = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';

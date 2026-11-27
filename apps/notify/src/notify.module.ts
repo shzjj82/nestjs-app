@@ -6,9 +6,9 @@ import {
   sharePattern,
 } from '@app/common';
 import { DatabaseModule } from './database/database.module';
-import { NoticesModule } from './notices/notices.module';
+import { NoticesModule } from './modules/notices/notices.module';
 import { NotifyController } from './notify.controller';
-import { TodosModule } from './todos/todos.module';
+import { TodosModule } from './modules/todos/todos.module';
 
 @Module({
   imports: [

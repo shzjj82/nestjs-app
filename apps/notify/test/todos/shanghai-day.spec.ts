@@ -1,4 +1,4 @@
-import { msUntilNextShanghaiMidnight, shanghaiDate, shanghaiDayOf } from '../../src/todos/shanghai-day';
+import { msUntilNextShanghaiMidnight, shanghaiDate, shanghaiDayOf } from '../../src/modules/todos/shanghai-day';
 
 describe('shanghai day', () => {
   it('treats a date-only UTC midnight as that Shanghai calendar day', () => {

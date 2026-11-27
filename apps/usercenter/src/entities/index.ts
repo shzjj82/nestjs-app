@@ -1,15 +1,16 @@
-import { AccountEntity } from './account.entity';
-import { AccountRoleEntity } from './account-role.entity';
-import { BusinessEntity } from './business.entity';
-import { BusinessMemberEntity } from './business-member.entity';
-import { BusinessPermissionEntity } from './business-permission.entity';
-import { ClientEntity } from './client.entity';
-export type { ClientType } from './client.entity';
-export type { AccountType } from './account.entity';
-import { PermissionEntity } from './permission.entity';
-import { RoleEntity } from './role.entity';
-import { RolePermissionEntity } from './role-permission.entity';
-import { UserEntity } from './user.entity';
+import { BusinessMemberEntity } from '../modules/businesses/entity/business-member.entity';
+import { BusinessPermissionEntity } from '../modules/businesses/entity/business-permission.entity';
+import { BusinessEntity } from '../modules/businesses/entity/business.entity';
+import { ClientEntity } from '../modules/clients/entity/client.entity';
+import { AccountRoleEntity } from '../modules/rbac/entity/account-role.entity';
+import { PermissionEntity } from '../modules/rbac/entity/permission.entity';
+import { RolePermissionEntity } from '../modules/rbac/entity/role-permission.entity';
+import { RoleEntity } from '../modules/rbac/entity/role.entity';
+import { AccountEntity } from '../modules/users/entity/account.entity';
+import { UserEntity } from '../modules/users/entity/user.entity';
+
+export type { ClientType } from '../modules/clients/entity/client.entity';
+export type { AccountType } from '../modules/users/entity/account.entity';
 
 export const USERCENTER_ENTITIES = [
   BusinessEntity,

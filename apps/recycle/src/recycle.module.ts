@@ -5,15 +5,15 @@ import {
   MQTT_PATTERNS,
   sharePattern,
 } from '@app/common';
-import { ApprovalsModule } from './approvals/approvals.module';
-import { CatalogModule } from './catalog/catalog.module';
+import { ApprovalsModule } from './modules/approvals/approvals.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
 import { DatabaseModule } from './database/database.module';
-import { FacadeModule } from './facade/facade.module';
-import { IdentityModule } from './identity/identity.module';
-import { RecycleMqttModule } from './mqtt/recycle-mqtt.module';
-import { OrdersModule } from './orders/orders.module';
-import { StoresModule } from './stores/stores.module';
-import { PolicyModule } from './policy/policy.module';
+import { FacadeModule } from './modules/facade/facade.module';
+import { IdentityModule } from './modules/identity/identity.module';
+import { RecycleMqttModule } from './modules/mqtt/recycle-mqtt.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { StoresModule } from './modules/stores/stores.module';
+import { PolicyModule } from './modules/policy/policy.module';
 import { RecycleController } from './recycle.controller';
 
 /**

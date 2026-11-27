@@ -1,4 +1,4 @@
-import { distanceMeters, isValidLngLat } from '../../src/stores/geo';
+import { distanceMeters, isValidLngLat } from '../../src/modules/stores/geo';
 
 describe('geo', () => {
   it('computes roughly 1km for nearby points', () => {

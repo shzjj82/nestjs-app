@@ -1,4 +1,4 @@
-import { formatTodoIndexText, mergeRagTodos, ragTodoFromRecord, todosFromEditorJs } from '../../src/rag/text/todo-text';
+import { formatTodoIndexText, mergeRagTodos, ragTodoFromRecord, todosFromEditorJs } from '../../src/modules/rag/text/todo-text';
 
 describe('todo index text', () => {
   it('reads unsynced todo items from the page body', () => {

@@ -1,4 +1,4 @@
-import { buildProxyPayload } from '../../src/proxy/proxy.routes';
+import { buildProxyPayload } from '../../src/modules/proxy/proxy.routes';
 
 describe('buildProxyPayload', () => {
   it('drops client supplied appCode and _bizCode in favour of the verified code', () => {

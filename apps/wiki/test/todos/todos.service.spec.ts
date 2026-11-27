@@ -1,13 +1,13 @@
-jest.mock('../../src/documents/documents.service', () => ({
+jest.mock('../../src/modules/documents/documents.service', () => ({
   DocumentsService: class DocumentsService {},
 }));
-jest.mock('../../src/documents/team-access', () => ({
+jest.mock('../../src/modules/documents/team-access', () => ({
   TeamAccess: class TeamAccess {},
 }));
 
 import { MQTT_PATTERNS, WIKI_BIZ_CODE } from '@app/common';
 import { of } from 'rxjs';
-import { TodosService } from '../../src/todos/todos.service';
+import { TodosService } from '../../src/modules/todos/todos.service';
 
 describe('wiki TodosService start/reopen', () => {
   const page = {

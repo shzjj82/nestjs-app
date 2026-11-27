@@ -2,7 +2,7 @@ import {
   mergeTodoData,
   pageFromTodoData,
   requirePageId,
-} from '../../src/todos/page-ref';
+} from '../../src/modules/todos/page-ref';
 
 describe('wiki todo page-ref', () => {
   const page = {

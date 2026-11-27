@@ -1,4 +1,4 @@
-import { dropMissingPages, normalizeWebResults, titleSaysMissing } from '../../src/chat/web-search';
+import { dropMissingPages, normalizeWebResults, titleSaysMissing } from '../../src/modules/chat/web-search';
 
 describe('normalizeWebResults', () => {
   it('keeps the first five http results and drops the rest', () => {
