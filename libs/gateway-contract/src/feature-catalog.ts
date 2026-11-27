@@ -509,6 +509,8 @@ const businessFeatures: FeatureCatalogItem[] = [
     apis: [
       'GET /agents/chat/status',
       'POST /agents/chat',
+      'GET /agents/prompts/:code',
+      'PUT /agents/prompts/:code',
       'GET /agents/conversations',
       'GET /agents/conversations/:id',
       'PATCH /agents/conversations/:id',

@@ -11,13 +11,13 @@ import type { ConversationEntity } from '../conversations/entity/conversation.en
 import { RagPort } from '../rag/rag-port';
 import { aiApiBase, aiApiKey, aiConfigured, aiModel, aiTimeoutMs } from '../../ai/env';
 import { parseChatInput } from './input';
+import { PROMPT_CODES } from '../prompts/codes';
+import { PromptsService } from '../prompts/prompts.service';
 import {
   applyRagPolicy,
-  DEFAULT_SYSTEM,
   buildHistoryMessages,
   contextAppendix,
   describeAttachments,
-  WEB_RESULTS_SYSTEM,
   webResultsAppendix,
   type NormalizedMessage,
   type UpstreamMessage,
@@ -33,6 +33,7 @@ export class ChatService {
   constructor(
     private readonly rag: RagPort,
     private readonly conversations: ConversationsService,
+    private readonly prompts: PromptsService,
   ) {}
 
   status() {
@@ -225,7 +226,7 @@ export class ChatService {
     const attachments = input.attachments ?? [];
     const { imageUrls } = describeAttachments(attachments);
     let appendix = contextAppendix(attachments);
-    let system = input.system?.trim() || DEFAULT_SYSTEM;
+    let system = input.system?.trim() || (await this.prompts.text(PROMPT_CODES.chatDefault));
     let sources: AgentRagSource[] = [];
 
     if (input.rag === true) {
@@ -242,12 +243,12 @@ export class ChatService {
         ]);
         const policy = applyRagPolicy(found, query);
         sources = policy.sources;
-        system = `${system}\n\n${policy.systemAppendix}`;
+        system = `${system}\n\n${await this.prompts.text(policy.promptCode)}`;
         if (policy.context) {
           appendix = [appendix, policy.context].filter(Boolean).join('\n\n');
         }
         if (web.length) {
-          system = `${system}\n\n${WEB_RESULTS_SYSTEM}`;
+          system = `${system}\n\n${await this.prompts.text(PROMPT_CODES.chatWeb)}`;
           appendix = [appendix, webResultsAppendix(web)].filter(Boolean).join('\n\n');
         }
       }

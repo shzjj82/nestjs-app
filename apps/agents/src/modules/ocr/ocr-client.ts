@@ -1,8 +1,5 @@
 import { ocrApiBase, ocrApiKey, ocrModel } from '../../ai/env';
 
-const OCR_PROMPT =
-  'Please output only the text content from the image without any additional descriptions or formatting.';
-
 /** 从 OpenAI 兼容响应里取出识别文字。没有文字时返回空串。 */
 export function textFromOcrMessage(content: unknown): string {
   if (typeof content === 'string') {
@@ -25,7 +22,11 @@ export function textFromOcrMessage(content: unknown): string {
     .trim();
 }
 
-export async function requestOcrText(url: string, signal?: AbortSignal): Promise<string> {
+export async function requestOcrText(
+  url: string,
+  prompt: string,
+  signal?: AbortSignal,
+): Promise<string> {
   const apiKey = ocrApiKey();
   if (!apiKey) {
     throw new Error('AI_OCR_NOT_CONFIGURED');
@@ -45,7 +46,7 @@ export async function requestOcrText(url: string, signal?: AbortSignal): Promise
           role: 'user',
           content: [
             { type: 'image_url', image_url: { url } },
-            { type: 'text', text: OCR_PROMPT },
+            { type: 'text', text: prompt },
           ],
         },
       ],

@@ -7,7 +7,17 @@ jest.mock('@nestjs/typeorm', () => ({
 
 import { ChatService } from '../../src/modules/chat/chat.service';
 import type { ConversationsService } from '../../src/modules/conversations/conversations.service';
+import { PROMPT_CODES } from '../../src/modules/prompts/codes';
+import type { PromptsService } from '../../src/modules/prompts/prompts.service';
 import type { RagPort } from '../../src/modules/rag/rag-port';
+
+const PROMPT_BODIES: Record<string, string> = {
+  [PROMPT_CODES.chatDefault]: '你是中文写作搭档',
+  [PROMPT_CODES.chatRagGrounded]: '只根据下方参考资料回答',
+  [PROMPT_CODES.chatRagGroundedOutside]: '先写资料中的定义。以下不是知识库内容',
+  [PROMPT_CODES.chatRagGeneral]: '以下不是知识库内容',
+  [PROMPT_CODES.chatWeb]: '每条链接都写成 Markdown：[标题](https://地址)',
+};
 
 function makeConversations(overrides?: Partial<ConversationsService>) {
   const conversation = {
@@ -44,7 +54,10 @@ function makeChat(conversations = makeConversations()) {
     }),
     searchForChat: jest.fn().mockResolvedValue([]),
   } as unknown as RagPort & { searchForChat: jest.Mock };
-  return { chat: new ChatService(rag, conversations), conversations, rag };
+  const prompts = {
+    text: jest.fn(async (code: string) => PROMPT_BODIES[code] ?? code),
+  } as unknown as PromptsService;
+  return { chat: new ChatService(rag, conversations, prompts), conversations, rag };
 }
 
 function sentSystem(fetchMock: jest.Mock): string {

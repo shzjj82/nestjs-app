@@ -6,6 +6,8 @@ import { aiTimeoutMs, ocrConfigured, ocrModel } from '../../ai/env';
 import { asRecord, optionalString, rpcFail } from '@app/common';
 import { OcrCacheEntity } from './entity/cache.entity';
 import { OcrItem, OcrJobEntity } from './entity/job.entity';
+import { PROMPT_CODES } from '../prompts/codes';
+import { PromptsService } from '../prompts/prompts.service';
 import { requestOcrText } from './ocr-client';
 import { mapPool } from '../../support/map-pool';
 
@@ -20,6 +22,7 @@ export class OcrService {
   constructor(
     @InjectRepository(OcrCacheEntity) private readonly cache: Repository<OcrCacheEntity>,
     @InjectRepository(OcrJobEntity) private readonly jobs: Repository<OcrJobEntity>,
+    private readonly prompts: PromptsService,
   ) {}
 
   /** 文件内嵌图片。按内容哈希缓存，同一张图重复索引不再请求模型。 */
@@ -210,7 +213,8 @@ export class OcrService {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), aiTimeoutMs());
     try {
-      return await requestOcrText(url, controller.signal);
+      const prompt = await this.prompts.text(PROMPT_CODES.ocrImage);
+      return await requestOcrText(url, prompt, controller.signal);
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         throw new Error('OCR_TIMEOUT');

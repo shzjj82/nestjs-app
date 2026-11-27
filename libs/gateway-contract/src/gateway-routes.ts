@@ -312,6 +312,8 @@ export const GATEWAY_ROUTES: GatewayRoute[] = [
 
   { method: 'GET', path: '/agents/health', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_HEALTH },
   business({ method: 'GET', path: '/agents/chat/status', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CHAT_STATUS, auth: ['jwt'] }),
+  business({ method: 'GET', path: '/agents/prompts/:code', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_PROMPT_FIND, auth: ['jwt'] }),
+  business({ method: 'PUT', path: '/agents/prompts/:code', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_PROMPT_UPDATE, auth: ['jwt'] }),
   business({ method: 'POST', path: '/agents/chat', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CHAT, auth: ['jwt'], override: true }),
   business({ method: 'GET', path: '/agents/conversations', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CONVERSATION_LIST, auth: ['jwt'] }),
   business({ method: 'GET', path: '/agents/conversations/:id', client: AGENTS_CLIENT, pattern: MQTT_PATTERNS.AGENTS_CONVERSATION_FIND_ONE, auth: ['jwt'] }),

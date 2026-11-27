@@ -204,6 +204,8 @@ export const MQTT_PATTERNS = {
   AGENTS_API_DOCS: 'agents.apiDocs',
   AGENTS_CHAT: 'agents.chat',
   AGENTS_CHAT_STATUS: 'agents.chat.status',
+  AGENTS_PROMPT_FIND: 'agents.prompt.find',
+  AGENTS_PROMPT_UPDATE: 'agents.prompt.update',
   AGENTS_CONVERSATION_LIST: 'agents.conversation.list',
   AGENTS_CONVERSATION_FIND_ONE: 'agents.conversation.findOne',
   AGENTS_CONVERSATION_UPDATE: 'agents.conversation.update',

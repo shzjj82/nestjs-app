@@ -1,6 +1,7 @@
 import { RpcException } from '@nestjs/microservices';
 import { linkifyBareCitations } from '@app/common';
 import { parseChatInput } from '../../src/modules/chat/input';
+import { PROMPT_CODES } from '../../src/modules/prompts/codes';
 import {
   applyRagPolicy,
   asksForOutsideDefinition,
@@ -94,8 +95,7 @@ describe('applyRagPolicy', () => {
     expect(policy.context).toContain('正文的正文');
     expect(policy.context).not.toContain('弱标题');
     expect(policy.context).not.toContain('editorjs');
-    expect(policy.systemAppendix).toContain('只根据下方参考资料');
-    expect(policy.systemAppendix).not.toContain('以下不是知识库内容');
+    expect(policy.promptCode).toBe(PROMPT_CODES.chatRagGrounded);
   });
 
   it('keeps the wiki hit and allows a labeled general definition when asked', () => {
@@ -104,8 +104,7 @@ describe('applyRagPolicy', () => {
     expect(policy.mode).toBe('grounded');
     expect(policy.sources.map((item) => item.title)).toEqual(['Fiber详解']);
     expect(policy.context).toContain('Fiber详解的正文');
-    expect(policy.systemAppendix).toContain('先写资料中的定义');
-    expect(policy.systemAppendix).toContain('以下不是知识库内容');
+    expect(policy.promptCode).toBe(PROMPT_CODES.chatRagGroundedOutside);
   });
 
   it('labels a file hit with its type and filename', () => {
@@ -129,7 +128,7 @@ describe('applyRagPolicy', () => {
     expect(policy.mode).toBe('general');
     expect(policy.sources).toEqual([]);
     expect(policy.context).toBe('');
-    expect(policy.systemAppendix).toContain('以下不是知识库内容');
+    expect(policy.promptCode).toBe(PROMPT_CODES.chatRagGeneral);
   });
 });
 
