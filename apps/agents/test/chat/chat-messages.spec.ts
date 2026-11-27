@@ -89,6 +89,8 @@ describe('classifyChatIntent', () => {
     expect(classifyChatIntent('Fiber 是什么')).toBe('knowledge');
     expect(classifyChatIntent('网上是怎么定义的')).toBe('knowledge');
     expect(classifyChatIntent('这篇文档里的待办怎么写')).toBe('knowledge');
+    expect(classifyChatIntent('香港迪士尼的开放时间')).toBe('knowledge');
+    expect(classifyChatIntent('最小堆算法')).toBe('knowledge');
   });
 
   it('sends personal tasks to the todo list', () => {

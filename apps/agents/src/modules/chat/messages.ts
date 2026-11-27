@@ -10,38 +10,27 @@ export const RAG_HIT_SCORE = 0.5;
 
 export type ChatIntent = 'chat' | 'knowledge' | 'todo';
 
-const DOCUMENT_CUE = /这篇|这个文档|这篇文章|文档里|页面里|知识库|资料里|根据资料|文中/;
-const TODO_CUE =
+const ABOUT_A_DOCUMENT = /这篇|这个文档|这篇文章|文档里|页面里|知识库|资料里|根据资料|文中/;
+const OWN_TASK =
   /我的待办|我的任务|我的安排|待办列表|待办事项|未完成的?(?:任务|待办)|已完成的?(?:任务|待办)|进行中的?(?:任务|待办)|全部任务|所有任务|所有待办|(?:今天|明天|这周|本周).{0,8}(?:要做|做什么|的任务|的待办|的安排)|(?:有哪些|有什么|还有什么|还有哪些).{0,8}(?:任务|待办)|截止|到期/;
-const CHAT_CUE = /^(?:你好|嗨|在吗|谢谢|早上好|晚上好)|帮我(?:写|改|润色|翻译|续写)|改写|润色/;
-const KNOWLEDGE_CUE =
-  /什么是|是什么|怎么|如何|为什么|为何|定义|区别|对比|详解|包含哪些|资料|文档|知识库|网上|网络上|互联网|业界/;
+const CHITCHAT_OR_REWRITE = /^(?:你好|嗨|在吗|谢谢|早上好|晚上好)|帮我(?:写|改|润色|翻译|续写)|改写|润色/;
 
-/**
- * 闲聊只写作。问资料走知识库，并且可以联网。问自己的任务走待办列表。
- * 点名某篇文档时仍走资料，页面上的待办已经在知识库里。
- */
+/** 关键词退路。聊天选路已改为工具调用，生产路径不再使用。 */
 export function classifyChatIntent(query: string): ChatIntent {
   const text = query.trim();
   if (!text) {
     return 'chat';
   }
-  if (DOCUMENT_CUE.test(text)) {
+  if (ABOUT_A_DOCUMENT.test(text)) {
     return 'knowledge';
   }
-  if (TODO_CUE.test(text)) {
+  if (OWN_TASK.test(text) || /待办/.test(text)) {
     return 'todo';
   }
-  if (CHAT_CUE.test(text)) {
+  if (CHITCHAT_OR_REWRITE.test(text)) {
     return 'chat';
   }
-  if (KNOWLEDGE_CUE.test(text) || asksForOutsideDefinition(text)) {
-    return 'knowledge';
-  }
-  if (/待办/.test(text)) {
-    return 'todo';
-  }
-  return 'chat';
+  return 'knowledge';
 }
 
 /** 已完成、全部、未完成用不同状态；默认只取还没做完的。 */

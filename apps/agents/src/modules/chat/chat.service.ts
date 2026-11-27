@@ -14,9 +14,14 @@ import { parseChatInput } from './input';
 import { PROMPT_CODES } from '../prompts/codes';
 import { PromptsService } from '../prompts/prompts.service';
 import {
+  ChatToolChooser,
+  LIST_TODOS,
+  LOOKUP_MATERIAL,
+  type ChosenTool,
+} from './tool-choice';
+import {
   applyRagPolicy,
   buildHistoryMessages,
-  classifyChatIntent,
   contextAppendix,
   describeAttachments,
   todoListAppendix,
@@ -37,6 +42,7 @@ export class ChatService {
     private readonly rag: RagPort,
     private readonly conversations: ConversationsService,
     private readonly prompts: PromptsService,
+    private readonly tools: ChatToolChooser,
   ) {}
 
   status() {
@@ -234,46 +240,32 @@ export class ChatService {
       : this.prompts.text(PROMPT_CODES.chatDefault);
     const lastUser = [...input.messages].reverse().find((item) => item.role === 'user');
     const query = lastUser?.content?.trim() ?? '';
-    const intent = classifyChatIntent(query);
-    let system = '';
+    const [baseSystem, chosen] = await Promise.all([
+      systemTask,
+      query ? this.tools.choose(query) : Promise.resolve([] as ChosenTool[]),
+    ]);
+    let system = baseSystem;
     let sources: AgentRagSource[] = [];
-
-    if (intent === 'todo' && query) {
-      const [baseSystem, todos, todoPrompt] = await Promise.all([
-        systemTask,
-        this.rag.listTodosForChat({
-          payload: asRecord(rawPayload),
-          status: todoStatusFilter(query),
-        }),
-        this.prompts.text(PROMPT_CODES.chatTodo),
-      ]);
-      system = `${baseSystem}\n\n${todoPrompt}`;
-      appendix = [appendix, todoListAppendix(todos.items, todos.available)].filter(Boolean).join('\n\n');
-    } else if (intent === 'knowledge' && input.rag === true && query) {
-      const [baseSystem, found, web, promptBodies] = await Promise.all([
-        systemTask,
-        this.rag.searchForChat({
-          payload: asRecord(rawPayload),
-          query,
-          topK: input.ragTopK,
-        }),
-        this.lookupWeb(query),
-        this.ragPromptBodies(),
-      ]);
-      system = baseSystem;
-      const policy = applyRagPolicy(found, query);
-      sources = policy.sources;
-      system = `${system}\n\n${promptBodies[policy.promptCode]}`;
-      if (policy.context) {
-        appendix = [appendix, policy.context].filter(Boolean).join('\n\n');
+    const lookup = chosen.find((item) => item.name === LOOKUP_MATERIAL);
+    const todos = chosen.find((item) => item.name === LIST_TODOS);
+    const [material, todoBlock] = await Promise.all([
+      lookup && input.rag === true
+        ? this.collectMaterial(rawPayload, lookup.query || query, input.ragTopK)
+        : Promise.resolve(null),
+      todos ? this.collectTodos(rawPayload, query) : Promise.resolve(null),
+    ]);
+    if (material) {
+      if (material.prompts.length) {
+        system = [system, ...material.prompts].join('\n\n');
       }
-      if (web.length) {
-        system = `${system}\n\n${promptBodies[PROMPT_CODES.chatWeb]}`;
-        appendix = [appendix, webResultsAppendix(web)].filter(Boolean).join('\n\n');
+      if (material.appendix) {
+        appendix = [appendix, material.appendix].filter(Boolean).join('\n\n');
       }
+      sources = material.sources;
     }
-    if (!system) {
-      system = await systemTask;
+    if (todoBlock) {
+      system = `${system}\n\n${todoBlock.prompt}`;
+      appendix = [appendix, todoBlock.appendix].filter(Boolean).join('\n\n');
     }
 
     return {
@@ -284,11 +276,54 @@ export class ChatService {
     };
   }
 
+  private async collectMaterial(payload: unknown, query: string, topK?: number) {
+    const [found, web, promptBodies] = await Promise.all([
+      this.rag.searchForChat({
+        payload: asRecord(payload),
+        query,
+        topK,
+      }),
+      this.lookupWeb(query),
+      this.ragPromptBodies(),
+    ]);
+    const policy = applyRagPolicy(found, query);
+    const prompts: string[] = [];
+    const parts: string[] = [];
+    if (policy.mode === 'grounded') {
+      prompts.push(promptBodies[policy.promptCode]);
+      if (policy.context) {
+        parts.push(policy.context);
+      }
+    }
+    if (web.length) {
+      prompts.push(promptBodies[PROMPT_CODES.chatWeb]);
+      parts.push(webResultsAppendix(web));
+    }
+    return {
+      prompts,
+      appendix: parts.join('\n\n'),
+      sources: policy.mode === 'grounded' ? policy.sources : [],
+    };
+  }
+
+  private async collectTodos(payload: unknown, query: string) {
+    const [todos, prompt] = await Promise.all([
+      this.rag.listTodosForChat({
+        payload: asRecord(payload),
+        status: todoStatusFilter(query),
+      }),
+      this.prompts.text(PROMPT_CODES.chatTodo),
+    ]);
+    return {
+      prompt,
+      appendix: todoListAppendix(todos.items, todos.available),
+    };
+  }
+
   private async ragPromptBodies(): Promise<Record<string, string>> {
     const codes = [
       PROMPT_CODES.chatRagGrounded,
       PROMPT_CODES.chatRagGroundedOutside,
-      PROMPT_CODES.chatRagGeneral,
       PROMPT_CODES.chatWeb,
     ];
     const bodies = await Promise.all(codes.map((code) => this.prompts.text(code)));

@@ -6,6 +6,12 @@ jest.mock('@nestjs/typeorm', () => ({
 }));
 
 import { ChatService } from '../../src/modules/chat/chat.service';
+import {
+  LIST_TODOS,
+  LOOKUP_MATERIAL,
+  type ChatToolChooser,
+  type ChosenTool,
+} from '../../src/modules/chat/tool-choice';
 import type { ConversationsService } from '../../src/modules/conversations/conversations.service';
 import { PROMPT_CODES } from '../../src/modules/prompts/codes';
 import type { PromptsService } from '../../src/modules/prompts/prompts.service';
@@ -59,7 +65,10 @@ function makeChat(conversations = makeConversations()) {
   const prompts = {
     text: jest.fn(async (code: string) => PROMPT_BODIES[code] ?? code),
   } as unknown as PromptsService;
-  return { chat: new ChatService(rag, conversations, prompts), conversations, rag };
+  const tools = {
+    choose: jest.fn(async (query: string) => [{ name: LOOKUP_MATERIAL, query }] as ChosenTool[]),
+  } as ChatToolChooser & { choose: jest.Mock };
+  return { chat: new ChatService(rag, conversations, prompts, tools), conversations, rag, tools };
 }
 
 function sentSystem(fetchMock: jest.Mock): string {
@@ -264,6 +273,27 @@ describe('ChatService', () => {
     expect(sent).not.toContain('not-a-url');
   });
 
+  it('searches the library for a bare topic such as a heap algorithm', async () => {
+    process.env.AI_API_KEY = 'test-key';
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '最小堆是完全二叉树' } }] }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { chat, rag } = makeChat();
+    rag.searchForChat.mockResolvedValue([
+      { docId: '3', title: '堆', slug: 'heap', chunkIndex: 0, content: '最小堆的根是最小值', score: 0.8, sourceType: 'editorjs' },
+    ]);
+
+    await chat.complete(
+      sessionPayload({ rag: true, messages: [{ role: 'user', content: '最小堆算法' }] }),
+    );
+
+    expect(rag.searchForChat).toHaveBeenCalled();
+    expect(rag.listTodosForChat).not.toHaveBeenCalled();
+    expect(sentSystem(fetchMock)).toContain('最小堆的根是最小值');
+  });
+
   it('answers small talk without the knowledge-base miss line', async () => {
     process.env.AI_API_KEY = 'test-key';
     const fetchMock = jest.fn().mockResolvedValue({
@@ -271,7 +301,8 @@ describe('ChatService', () => {
       json: async () => ({ choices: [{ message: { content: '你好' } }] }),
     });
     global.fetch = fetchMock as unknown as typeof fetch;
-    const { chat, rag } = makeChat();
+    const { chat, rag, tools } = makeChat();
+    tools.choose.mockResolvedValue([]);
 
     await chat.complete(sessionPayload({ rag: true, messages: [{ role: 'user', content: '你好呀' }] }));
 
@@ -287,7 +318,8 @@ describe('ChatService', () => {
       json: async () => ({ choices: [{ message: { content: '你有一项待办' } }] }),
     });
     global.fetch = fetchMock as unknown as typeof fetch;
-    const { chat, rag } = makeChat();
+    const { chat, rag, tools } = makeChat();
+    tools.choose.mockImplementation(async (query: string) => [{ name: LIST_TODOS, query }]);
     rag.listTodosForChat.mockResolvedValue({
       available: true,
       items: [{ title: '交报告', status: 'pending', startsAt: '', dueAt: '2026-11-30', content: '' }],
@@ -307,7 +339,7 @@ describe('ChatService', () => {
     expect(sent).not.toContain('以下不是知识库内容');
   });
 
-  it('drops weak hits and allows labeled general knowledge', async () => {
+  it('drops weak hits without the knowledge-base miss line', async () => {
     process.env.AI_API_KEY = 'test-key';
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
@@ -325,8 +357,78 @@ describe('ChatService', () => {
 
     expect(result.sources).toBeUndefined();
     const sent = sentSystem(fetchMock);
-    expect(sent).toContain('以下不是知识库内容');
+    expect(sent).not.toContain('以下不是知识库内容');
     expect(sent).not.toContain('待办：Fiber详解');
+  });
+
+  it('keeps web results when the library score is too low', async () => {
+    process.env.AI_API_KEY = 'test-key';
+    process.env.SEARXNG_URL = 'http://127.0.0.1:8888';
+    const fetchMock = jest.fn().mockImplementation(async (url: string) => {
+      if (String(url).includes('/search')) {
+        return {
+          ok: true,
+          json: async () => ({
+            results: [{ title: '开放时间', url: 'https://example.com/hours', content: '今天 9 点开门' }],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: '按网上的时间' } }] }),
+      };
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { chat, rag } = makeChat();
+    rag.searchForChat.mockResolvedValue([
+      { docId: '1', title: '弱标题', slug: 'weak', chunkIndex: 0, content: '只有标题', score: 0.2, sourceType: 'editorjs' },
+    ]);
+
+    const result = await chat.complete(
+      sessionPayload({ rag: true, messages: [{ role: 'user', content: '香港迪士尼的开放时间' }] }),
+    );
+
+    expect(result.sources).toBeUndefined();
+    const chatCall = fetchMock.mock.calls.find((call) => String(call[0]).includes('/chat/completions'));
+    const body = JSON.parse(String(chatCall?.[1].body)) as {
+      messages: Array<{ content: string | unknown }>;
+    };
+    const sent = body.messages.map((item) => (typeof item.content === 'string' ? item.content : '')).join('\n');
+    expect(sent).toContain('【网上结果】');
+    expect(sent).toContain('[开放时间](https://example.com/hours)');
+    expect(sent).not.toContain('以下不是知识库内容');
+    expect(sent).not.toContain('只有标题');
+  });
+
+  it('reads todos and the library when both tools are chosen', async () => {
+    process.env.AI_API_KEY = 'test-key';
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '先看任务再看制度' } }] }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { chat, rag, tools } = makeChat();
+    tools.choose.mockImplementation(async (query: string) => [
+      { name: LIST_TODOS, query },
+      { name: LOOKUP_MATERIAL, query },
+    ]);
+    rag.listTodosForChat.mockResolvedValue({
+      available: true,
+      items: [{ title: '交报告', status: 'pending', startsAt: '', dueAt: '', content: '' }],
+    });
+    rag.searchForChat.mockResolvedValue([
+      { docId: '4', title: '报销制度', slug: 'expense', chunkIndex: 0, content: '发票贴在后面', score: 0.8, sourceType: 'editorjs' },
+    ]);
+
+    await chat.complete(
+      sessionPayload({ rag: true, messages: [{ role: 'user', content: '我待办里的报销按文档怎么做' }] }),
+    );
+
+    expect(rag.listTodosForChat).toHaveBeenCalled();
+    expect(rag.searchForChat).toHaveBeenCalled();
+    const sent = sentSystem(fetchMock);
+    expect(sent).toContain('交报告');
+    expect(sent).toContain('发票贴在后面');
   });
 
   it('maps upstream HTTP errors to AI_UPSTREAM_*', async () => {
