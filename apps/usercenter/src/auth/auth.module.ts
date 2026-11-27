@@ -14,7 +14,6 @@ import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AlipayClient } from './alipay.client';
 import { AuthService } from './auth.service';
-import { LoginQrService } from './login-qr.service';
 import { WechatClient } from './wechat.client';
 
 @Module({
@@ -36,13 +35,7 @@ import { WechatClient } from './wechat.client';
     ]),
   ],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    LoginQrService,
-    WechatClient,
-    UploadClient,
-    AlipayClient,
-  ],
-  exports: [AuthService, LoginQrService],
+  providers: [AuthService, WechatClient, UploadClient, AlipayClient],
+  exports: [AuthService, WechatClient, UploadClient],
 })
 export class AuthModule {}

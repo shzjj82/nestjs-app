@@ -1,4 +1,5 @@
 import { RpcException } from '@nestjs/microservices';
+import { linkifyBareCitations } from '@app/common';
 import { parseChatInput } from '../../src/chat/chat-input';
 import {
   applyRagPolicy,
@@ -6,7 +7,6 @@ import {
   buildHistoryMessages,
   contextAppendix,
   describeAttachments,
-  linkifyBareCitations,
   normalizeMessages,
   RAG_HIT_SCORE,
   webResultsAppendix,

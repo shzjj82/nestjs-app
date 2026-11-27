@@ -1,6 +1,6 @@
 import { SUBSCRIBE_SEMANTICS } from '@app/common';
 import type { WechatSubscribeTemplate } from '@app/common';
-import { optionalString, rpcFail } from '../common/rpc';
+import { optionalString, rpcFail } from '@app/common';
 
 /** 场景名：业务自定义，但必须能安全地当 JSON key 与日志字段 */
 const SCENE_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;

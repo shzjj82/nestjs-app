@@ -2,7 +2,7 @@ import {
   isTreeView,
   parseVisibility,
   resolveDocsListScope,
-} from '../../src/documents/list-scope';
+} from '@app/common';
 
 describe('resolveDocsListScope', () => {
   it('defaults to public', () => {

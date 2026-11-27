@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { asRecord, type WechatMiniProgram } from '@app/common';
 import { FindOptionsWhere, Repository } from 'typeorm';
-import { optionalString, requiredString, rpcFail } from '../common/rpc';
+import { optionalString, requiredString, rpcFail } from '@app/common';
 import { MiniProgramEntity } from '../entities';
 import { normalizeSubscribeTemplates } from './subscribe-templates';
 

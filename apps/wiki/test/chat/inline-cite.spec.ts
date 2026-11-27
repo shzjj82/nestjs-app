@@ -1,4 +1,4 @@
-import { markWikiCitations } from '../../src/chat/inline-cite';
+import { markWikiCitations } from '@app/common';
 
 describe('markWikiCitations', () => {
   const page = { title: '准备条件', sourceType: 'editorjs' };

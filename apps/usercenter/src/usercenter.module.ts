@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ApiDocsModule, MQTT_GROUPS, MQTT_PATTERNS, RedisInfraModule, sharePattern } from '@app/common';
 import { AccessClientsModule } from './clients/clients.module';
 import { AuthModule } from './auth/auth.module';
+import { LoginQrModule } from './login-qr/login-qr.module';
 import { BusinessesModule } from './businesses/businesses.module';
 import { DatabaseModule } from './database/database.module';
 import { RbacModule } from './rbac/rbac.module';
@@ -17,6 +18,7 @@ import { UsersModule } from './users/users.module';
     AccessClientsModule,
     UsersModule,
     AuthModule,
+    LoginQrModule,
     RbacModule,
     ApiDocsModule.forService({
       service: 'usercenter',

@@ -2,9 +2,9 @@ jest.mock('@nestjs/typeorm', () => ({
   InjectRepository: () => () => undefined,
 }));
 
-import { ConversationService } from '../../src/chat/conversation.service';
+import { ConversationsService } from '../../src/conversations/conversations.service';
 
-describe('ConversationService.startTurn', () => {
+describe('ConversationsService.startTurn', () => {
   it('stores the question and an empty answer before the model finishes', async () => {
     const stored = new Map<string, { id: string; role: string; content: string; conversationId: string }>();
     let seq = 0;
@@ -22,7 +22,7 @@ describe('ConversationService.startTurn', () => {
       save: jest.fn(async (row: { title: string }) => row),
       update: jest.fn(),
     };
-    const service = new ConversationService(conversations as never, messages as never);
+    const service = new ConversationsService(conversations as never, messages as never);
     const conversation = {
       id: 'conv-1',
       title: '新对话',

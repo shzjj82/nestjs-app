@@ -3,7 +3,7 @@ import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import { MQTT_PATTERNS, WIKI_CLIENT, type TeamRole } from '@app/common';
-import { rpcFail } from '../common/rpc';
+import { rpcFail } from '@app/common';
 
 export interface TeamGrant {
   teamId: string;

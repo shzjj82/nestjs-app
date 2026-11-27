@@ -6,24 +6,21 @@ import {
   sharePattern,
 } from '@app/common';
 import { DatabaseModule } from './database/database.module';
-import { InboxController } from './notices/inbox.controller';
-import { NoticesService } from './notices/notices.service';
-import { SendController } from './notices/send.controller';
+import { NoticesModule } from './notices/notices.module';
 import { NotifyController } from './notify.controller';
-import { TodoReminder } from './todos/todo-reminder';
-import { TodosController } from './todos/todos.controller';
-import { TodosService } from './todos/todos.service';
+import { TodosModule } from './todos/todos.module';
 
 @Module({
   imports: [
     DatabaseModule,
+    NoticesModule,
+    TodosModule,
     ApiDocsModule.forService({
       service: 'notify',
       label: '消息通知',
       pattern: sharePattern(MQTT_GROUPS.NOTIFY, MQTT_PATTERNS.NOTIFY_API_DOCS),
     }),
   ],
-  controllers: [NotifyController, InboxController, SendController, TodosController],
-  providers: [NoticesService, TodosService, TodoReminder],
+  controllers: [NotifyController],
 })
 export class NotifyModule {}

@@ -15,7 +15,7 @@ import {
   type AgentRagSource,
 } from '@app/common';
 import type Redis from 'ioredis';
-import { asRecord, optionalString, requiredString, rpcFail } from '../common/rpc';
+import { asRecord, optionalString, requiredString, rpcFail } from '@app/common';
 import { requireBizCode } from '../common/biz-scope';
 import { extractAttachmentTexts } from './attachment-text';
 import { chunkText } from './chunk';

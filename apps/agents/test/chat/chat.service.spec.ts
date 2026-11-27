@@ -6,10 +6,10 @@ jest.mock('@nestjs/typeorm', () => ({
 }));
 
 import { ChatService } from '../../src/chat/chat.service';
-import type { ConversationService } from '../../src/chat/conversation.service';
+import type { ConversationsService } from '../../src/conversations/conversations.service';
 import type { RagPort } from '../../src/rag/rag-port';
 
-function makeConversations(overrides?: Partial<ConversationService>) {
+function makeConversations(overrides?: Partial<ConversationsService>) {
   const conversation = {
     id: 'conv-1',
     bizCode: 'wiki',
@@ -32,7 +32,7 @@ function makeConversations(overrides?: Partial<ConversationService>) {
       .mockImplementation((_history: unknown, incoming: unknown) => incoming),
     appendTurn: jest.fn().mockResolvedValue(undefined),
     ...overrides,
-  } as unknown as ConversationService;
+  } as unknown as ConversationsService;
 }
 
 function makeChat(conversations = makeConversations()) {

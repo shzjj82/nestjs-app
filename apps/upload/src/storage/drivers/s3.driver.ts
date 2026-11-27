@@ -9,7 +9,7 @@ import {
   type UploadDriver,
   type UploadStorageConfig,
 } from '@app/common';
-import { rpcFail } from '../../common/rpc';
+import { rpcFail } from '@app/common';
 import type { StoredObject } from '../../common/types';
 import type { StorageDriver, StorageDriverStatus } from './storage.driver';
 

@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { optionalString, REDIS, wechatQrcodeCheckPath } from '@app/common';
 import type Redis from 'ioredis';
-import { rpcFail } from '../common/rpc';
+import { rpcFail } from '@app/common';
 import type { MiniProgramEntity } from '../entities';
 import { MiniProgramsService } from '../miniprograms/miniprograms.service';
 

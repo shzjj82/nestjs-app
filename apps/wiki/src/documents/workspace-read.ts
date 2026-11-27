@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { asRecord, optionalString, rpcFail } from '../common/rpc';
-import { resolveAppCode } from '../common/app-code';
-import type { DocPost } from '../common/shared';
+import { asRecord, optionalString, rpcFail } from '@app/common';
+import { resolveAppCode } from '@app/common';
+import type { DocPost } from '@app/common';
 import { DocumentsService } from './documents.service';
 import { TeamAccess } from './team-access';
 import { canReadWorkspacePost } from './workspace-access';

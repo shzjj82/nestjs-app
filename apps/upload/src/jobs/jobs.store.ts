@@ -2,7 +2,7 @@ import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type Redis from 'ioredis';
 import { REDIS } from '@app/common';
-import { rpcFail } from '../common/rpc';
+import { rpcFail } from '@app/common';
 import type { IncomingFile, UploadJob } from '../common/types';
 
 const QUEUE_KEY = 'upload:queue';

@@ -3,7 +3,7 @@ import {
   wechatPayMerchantConfig,
   type WechatPayMerchantConfig,
 } from '@app/common';
-import { optionalString, requiredString, rpcFail } from '../common/rpc';
+import { optionalString, requiredString, rpcFail } from '@app/common';
 import { MiniProgramsService } from '../miniprograms/miniprograms.service';
 import { WechatPayClient } from './wechat-pay.client';
 

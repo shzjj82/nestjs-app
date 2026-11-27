@@ -1,4 +1,4 @@
-import { pageProbeTimeoutMs, searxngUrl, webSearchTimeoutMs } from './chat-env';
+import { pageProbeTimeoutMs, searxngUrl, webSearchTimeoutMs } from '../ai/ai-env';
 import type { WebHit } from './chat-messages';
 
 const WEB_RESULT_LIMIT = 5;

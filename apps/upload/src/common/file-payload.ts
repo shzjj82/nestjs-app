@@ -1,6 +1,6 @@
 import { uploadMaxBytes } from '@app/common';
 import { bizPrefix, requireBizCode } from './biz-scope';
-import { asRecord, requiredString, rpcFail } from './rpc';
+import { asRecord, requiredString, rpcFail } from '@app/common';
 import type { IncomingFile } from './types';
 
 export function readIncomingFile(payload: unknown): IncomingFile {

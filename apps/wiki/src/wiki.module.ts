@@ -3,6 +3,7 @@ import { ApiDocsModule, MQTT_GROUPS, MQTT_PATTERNS, sharePattern } from '@app/co
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ChatModule } from './chat/chat.module';
+import { ConversationsModule } from './conversations/conversations.module';
 import { DatabaseModule } from './database/database.module';
 import { SeedService } from './database/seed.service';
 import { WikiController } from './wiki.controller';
@@ -29,6 +30,7 @@ import { VisionModule } from './vision/vision.module';
     AuthModule,
     UploadModule,
     ChatModule,
+    ConversationsModule,
     RagModule,
     VisionModule,
     OcrModule,

@@ -1,13 +1,13 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { ApiDoc, DocsHandleLogInterceptor, MQTT_PATTERNS, sharePattern, MQTT_GROUPS } from '@app/common';
-import { resolveAppCode } from '../common/app-code';
-import { optionalString, requiredString, rpcFail } from '../common/rpc';
+import { resolveAppCode } from '@app/common';
+import { optionalString, requiredString, rpcFail } from '@app/common';
 import {
   isCategoryKind,
   isStoredColor,
   type CategoryKind,
-} from '../common/shared';
+} from '@app/common';
 import { CategoriesService } from './categories.service';
 
 @Controller()

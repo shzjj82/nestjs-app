@@ -7,7 +7,7 @@ import {
   requiredString,
   rpcFail,
   toPage,
-} from '../src/rpc';
+} from '../src/rpc/parse';
 
 describe('rpc zod helpers', () => {
   it('requiredString trims and rejects blanks', () => {

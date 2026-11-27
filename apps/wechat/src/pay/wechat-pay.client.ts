@@ -1,7 +1,7 @@
 import { createPrivateKey, createSign, randomBytes } from 'crypto';
 import { Logger } from '@nestjs/common';
 import type { WechatPayMerchantConfig } from '@app/common';
-import { rpcFail } from '../common/rpc';
+import { rpcFail } from '@app/common';
 
 const HOST = 'https://api.mch.weixin.qq.com';
 

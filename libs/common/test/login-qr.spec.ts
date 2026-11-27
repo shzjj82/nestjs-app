@@ -2,7 +2,7 @@ import {
   isLoginQrScene,
   loginQrMqttTopic,
   newLoginQrScene,
-} from '../src/login-qr';
+} from '../src/session/login-qr';
 
 describe('login-qr', () => {
   it('builds login scenes that are not bind hex', () => {

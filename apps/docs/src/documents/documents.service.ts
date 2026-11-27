@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, Repository } from 'typeorm';
 import { CategoriesService } from '../categories/categories.service';
-import { rpcFail } from '../common/rpc';
-import { resolveDocKind, type DocKind } from '../common/doc-kinds';
+import { rpcFail } from '@app/common';
+import { resolveDocKind, type DocKind } from '@app/common';
 import {
   bodyHasBlocks,
   normalizeEditorDocument,
@@ -16,16 +16,16 @@ import {
   type DocPost,
   type DocPostListItem,
   type EditorJsDocument,
-} from '../common/shared';
+} from '@app/common';
 import { DocumentEntity } from '../entities';
-import { ANCESTOR_CHAIN_SQL, privateAncestorBlocks } from './document-ancestors';
-import { appendPageLinkBlock, stripPageLinkBlock } from './document-page-link';
+import { ANCESTOR_CHAIN_SQL, privateAncestorBlocks } from '@app/common';
+import { appendPageLinkBlock, stripPageLinkBlock } from '@app/common';
 import {
   applyDocumentVisibility,
   applyWorkspaceAuthor,
   type VisibilityFilter,
 } from './document-visibility';
-import type { DocVisibility } from './list-scope';
+import type { DocVisibility } from '@app/common';
 
 type WriteInput = {
   appCode: string;

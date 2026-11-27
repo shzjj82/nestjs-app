@@ -1,4 +1,4 @@
-import { pageProbeTimeoutMs, webSearchTimeoutMs } from '../../src/chat/chat-env';
+import { pageProbeTimeoutMs, webSearchTimeoutMs } from '../../src/ai/ai-env';
 
 describe('web search timeouts', () => {
   const originalSearch = process.env.WEB_SEARCH_TIMEOUT_MS;

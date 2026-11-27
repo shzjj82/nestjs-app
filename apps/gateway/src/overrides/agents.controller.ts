@@ -23,7 +23,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { GatewayUser } from '../auth/auth.types';
 import { ClientHub } from '../mqtt/client.hub';
-import { markWikiCitations } from '../../../wiki/src/chat/inline-cite';
+import { markWikiCitations } from '@app/common';
 import { requestPathname } from '../proxy/proxy.routes';
 
 function agentsMqttTimeoutMs() {

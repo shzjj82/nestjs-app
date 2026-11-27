@@ -2,7 +2,7 @@ import { ClientProxy } from '@nestjs/microservices';
 import { unwrapData } from '@app/common';
 import { lastValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
-import { rpcFail } from './rpc';
+import { rpcFail } from '@app/common';
 
 export async function callDownstream<T>(
   client: ClientProxy,

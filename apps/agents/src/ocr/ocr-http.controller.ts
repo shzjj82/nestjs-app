@@ -1,7 +1,7 @@
 import { Body, Controller, Post, Res } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import type { Response } from 'express';
-import { encodeSse } from '../chat/chat-stream';
+import { encodeSse } from '../common/sse';
 import { OcrService } from './ocr.service';
 
 @Controller()

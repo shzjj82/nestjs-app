@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
-import { rpcFail } from '../common/rpc';
+import { rpcFail } from '@app/common';
 import { CategoryEntity, DocumentEntity } from '../entities';
 import {
   normalizeTags,
@@ -12,7 +12,7 @@ import {
   validateTagSlug,
   type Category,
   type CategoryKind,
-} from '../common/shared';
+} from '@app/common';
 
 @Injectable()
 export class CategoriesService {

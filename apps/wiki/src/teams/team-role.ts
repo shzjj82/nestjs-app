@@ -1,5 +1,5 @@
 import type { TeamRole } from '@app/common';
-import { rpcFail } from '../common/rpc';
+import { rpcFail } from '@app/common';
 
 const ROLES: TeamRole[] = ['owner', 'developer', 'user'];
 

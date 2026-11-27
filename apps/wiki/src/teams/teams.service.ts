@@ -16,7 +16,7 @@ import type Redis from 'ioredis';
 import { lastValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import { Repository } from 'typeorm';
-import { optionalString, requiredString, rpcFail } from '../common/rpc';
+import { optionalString, requiredString, rpcFail } from '@app/common';
 import { DocumentEntity } from '../entities/document.entity';
 import { TeamEntity } from '../entities/team.entity';
 import { TeamMemberEntity } from '../entities/team-member.entity';

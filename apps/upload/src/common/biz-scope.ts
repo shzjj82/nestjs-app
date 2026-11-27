@@ -1,4 +1,4 @@
-import { asRecord, rpcFail } from './rpc';
+import { asRecord, rpcFail } from '@app/common';
 
 /** 网关校验后注入的业务 code；上传对象按业务分目录隔离 */
 export function requireBizCode(payload: unknown): string {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { keyInBiz, requireBizCode } from '../common/biz-scope';
-import { asRecord, requiredString, rpcFail } from '../common/rpc';
+import { asRecord, requiredString, rpcFail } from '@app/common';
 import { readIncomingFile } from '../common/file-payload';
 import { objectKey } from '../common/object-key';
 import { StorageService } from '../storage/storage.service';

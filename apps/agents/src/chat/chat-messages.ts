@@ -44,32 +44,6 @@ export function webResultsAppendix(hits: WebHit[]): string {
   return `【网上结果】\n${blocks.join('\n\n')}`;
 }
 
-/** 把《标题》后面的裸网址收成 [标题](网址)。已经是 Markdown 链接的不动。 */
-export function linkifyBareCitations(text: string): string {
-  if (!text.includes('http') || !text.includes('《')) {
-    return text;
-  }
-  return text
-    .split(/(```[\s\S]*?```)/g)
-    .map((part, index) =>
-      index % 2 === 1
-        ? part
-        : part.replace(
-            /《([^》\n]{1,180})》[ \t\u3000]*(?:\n[ \t\u3000]*)?(https?:\/\/[^\s<>）)】\]」』"“”，。、；]+)/g,
-            bareBookUrl,
-          ),
-    )
-    .join('');
-}
-
-function bareBookUrl(match: string, rawTitle: string, url: string): string {
-  const title = rawTitle.replace(/[\[\]]/g, '').trim();
-  if (!title) {
-    return match;
-  }
-  return `[${title}](${url})`;
-}
-
 type RagHit = {
   title: string;
   slug: string;

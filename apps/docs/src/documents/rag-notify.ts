@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { AGENTS_CLIENT, MQTT_PATTERNS } from '@app/common';
-import type { DocPost } from '../common/shared';
+import type { DocPost } from '@app/common';
 
 /** 文档变更后异步通知 agents 重建 / 删除 RAG 索引，不阻塞写路径 */
 @Injectable()

@@ -1,17 +1,17 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { ApiDoc, DocsHandleLogInterceptor, MQTT_PATTERNS, sharePattern, MQTT_GROUPS } from '@app/common';
-import { asRecord, optionalString, requiredString, rpcFail } from '../common/rpc';
-import { resolveAppCode } from '../common/app-code';
-import { isDocKind } from '../common/doc-kinds';
+import { asRecord, optionalString, requiredString, rpcFail } from '@app/common';
+import { resolveAppCode } from '@app/common';
+import { isDocKind } from '@app/common';
 import {
   isEditorJsDocument,
   normalizeTags,
   type DocPost,
   type EditorJsDocument,
   type DocKind,
-} from '../common/shared';
-import { removedAttachmentKeys } from './attachment-keys';
+} from '@app/common';
+import { removedAttachmentKeys } from '@app/common';
 import { DocumentsService } from './documents.service';
 import { RagNotify } from './rag-notify';
 import { TeamAccess } from './team-access';
@@ -20,7 +20,7 @@ import {
   parseVisibility,
   resolveDocsListScope,
   type DocVisibility,
-} from './list-scope';
+} from '@app/common';
 
 @Controller()
 @UseInterceptors(DocsHandleLogInterceptor)

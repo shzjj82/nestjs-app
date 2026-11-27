@@ -6,8 +6,8 @@ import {
   aiEmbeddingModel,
   aiTimeoutMs,
   ragConfigured,
-} from '../chat/chat-env';
-import { rpcFail } from '../common/rpc';
+} from '../ai/ai-env';
+import { rpcFail } from '@app/common';
 
 /** 通义 text-embedding-v* 单次 batch 上限 10 */
 const EMBED_BATCH_SIZE = 10;

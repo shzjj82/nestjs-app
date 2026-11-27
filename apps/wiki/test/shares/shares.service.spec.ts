@@ -9,7 +9,7 @@ import {
 } from '../../src/shares/shares.service';
 import { WikiShareEntity } from '../../src/entities/wiki-share.entity';
 import { WikiShareFavoriteEntity } from '../../src/entities/wiki-share-favorite.entity';
-import type { DocPost } from '../../src/common/shared';
+import type { DocPost } from '@app/common';
 
 const PAGE = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const OTHER_PAGE = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';

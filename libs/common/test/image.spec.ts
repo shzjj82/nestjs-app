@@ -2,7 +2,7 @@ import {
   imageExtForMime,
   qrImageFilename,
   sniffImageMime,
-} from '../src/image';
+} from '../src/upload/image';
 
 describe('image helpers', () => {
   it('sniffs jpeg / png from base64 magic', () => {

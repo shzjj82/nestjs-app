@@ -6,10 +6,10 @@ import type {
   AgentChatStreamEvent,
   AgentRagSource,
 } from '@app/common';
-import { asRecord, rpcFail } from '../common/rpc';
+import { asRecord, linkifyBareCitations, rpcFail } from '@app/common';
 import type { ConversationEntity } from '../entities/conversation.entity';
 import { RagPort } from '../rag/rag-port';
-import { aiApiBase, aiApiKey, aiConfigured, aiModel, aiTimeoutMs } from './chat-env';
+import { aiApiBase, aiApiKey, aiConfigured, aiModel, aiTimeoutMs } from '../ai/ai-env';
 import { parseChatInput } from './chat-input';
 import {
   applyRagPolicy,
@@ -17,7 +17,6 @@ import {
   buildHistoryMessages,
   contextAppendix,
   describeAttachments,
-  linkifyBareCitations,
   WEB_RESULTS_SYSTEM,
   webResultsAppendix,
   type NormalizedMessage,
@@ -25,7 +24,7 @@ import {
 } from './chat-messages';
 import { searchWeb } from './web-search';
 import { contentFromUpstreamData, splitSseBlocks } from './chat-stream';
-import { ConversationService } from './conversation.service';
+import { ConversationsService } from '../conversations/conversations.service';
 
 @Injectable()
 export class ChatService {
@@ -33,7 +32,7 @@ export class ChatService {
 
   constructor(
     private readonly rag: RagPort,
-    private readonly conversations: ConversationService,
+    private readonly conversations: ConversationsService,
   ) {}
 
   status() {

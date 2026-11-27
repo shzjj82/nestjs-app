@@ -1,5 +1,5 @@
 import type { MigrationInterface, QueryRunner } from 'typeorm';
-import { linkifyBareCitations } from '../../chat/chat-messages';
+import { linkifyBareCitations } from '@app/common';
 
 /** 只跑一次：把已经入库的《标题》裸网址收成 Markdown 链接。 */
 export class LinkifyBareCitations1760000003700 implements MigrationInterface {

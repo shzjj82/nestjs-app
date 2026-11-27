@@ -1,7 +1,7 @@
 import {
   editorJsAttachmentKeys,
   removedAttachmentKeys,
-} from '../../src/documents/attachment-keys';
+} from '@app/common';
 
 describe('attachment-keys', () => {
   it('collects url / fileId / key from attachment blocks', () => {

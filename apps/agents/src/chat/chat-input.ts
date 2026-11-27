@@ -1,5 +1,5 @@
 import type { AgentChatAttachment, AgentChatInput } from '@app/common';
-import { asRecord, optionalString, rpcFail } from '../common/rpc';
+import { asRecord, optionalString, rpcFail } from '@app/common';
 import { normalizeMessages } from './chat-messages';
 
 export function parseChatInput(payload: unknown): AgentChatInput {
