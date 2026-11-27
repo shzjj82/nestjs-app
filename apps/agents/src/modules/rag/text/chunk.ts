@@ -42,8 +42,14 @@ export function chunkText(
 
   for (const line of normalized.split('\n')) {
     if (isTableBanner(line)) {
+      if (bucket.length > 0) {
+        pushBucket();
+      }
       banner = line;
     } else if (line.trim() && !isLabeledRow(line)) {
+      if (banner && bucket.length > 0) {
+        pushBucket();
+      }
       banner = '';
     }
     if (line.length > size && isLabeledRow(line)) {

@@ -48,6 +48,16 @@ describe('applyMerges', () => {
 });
 
 describe('chunkText tables', () => {
+  it('keeps a role table out of the preceding paragraph', () => {
+    const prose = '产品目标'.repeat(80);
+    const table = '【表格】\n角色：超级管理员；主要职责：系统配置；核心权限：全部权限';
+    const chunks = chunkText(`${prose}\n${table}\n3.1 权限原则`, { size: 200, overlap: 0 });
+    const role = chunks.find((chunk) => chunk.includes('超级管理员'));
+    expect(role).toContain('【表格】');
+    expect(role).not.toContain('产品目标');
+    expect(role).not.toContain('权限原则');
+  });
+
   it('keeps a table row together and repeats the table name', () => {
     const row = `姓名：张三；部门：研发；城市：上海；备注：${'注'.repeat(80)}`;
     const text = `【表：名单】\n${row}`;
