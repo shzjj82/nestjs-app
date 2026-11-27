@@ -9,6 +9,7 @@ import { AgentsCreatedUpdatedAt1760000003300 } from './migrations/1760000003300-
 import { RagChunks1760000003400 } from './migrations/1760000003400-rag-chunks';
 import { ChatConversations1760000003500 } from './migrations/1760000003500-chat-conversations';
 import { Ocr1760000003600 } from './migrations/1760000003600-ocr';
+import { LinkifyBareCitations1760000003700 } from './migrations/1760000003700-linkify-bare-citations';
 
 const sync = process.env.TYPEORM_SYNC === 'true';
 
@@ -28,6 +29,7 @@ const sync = process.env.TYPEORM_SYNC === 'true';
         RagChunks1760000003400,
         ChatConversations1760000003500,
         Ocr1760000003600,
+        LinkifyBareCitations1760000003700,
       ],
       logging: process.env.TYPEORM_LOGGING === 'true',
     }),
