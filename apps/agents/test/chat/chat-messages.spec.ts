@@ -1,6 +1,6 @@
 import { RpcException } from '@nestjs/microservices';
 import { linkifyBareCitations } from '@app/common';
-import { parseChatInput } from '../../src/chat/chat-input';
+import { parseChatInput } from '../../src/chat/input';
 import {
   applyRagPolicy,
   asksForOutsideDefinition,
@@ -10,7 +10,7 @@ import {
   normalizeMessages,
   RAG_HIT_SCORE,
   webResultsAppendix,
-} from '../../src/chat/chat-messages';
+} from '../../src/chat/messages';
 
 describe('normalizeMessages', () => {
   it('keeps the last 24 non-empty user/assistant turns', () => {

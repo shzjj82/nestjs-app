@@ -1,7 +1,7 @@
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { AgentsHandleLogInterceptor, MQTT_PATTERNS, serviceHealth, sharePattern, MQTT_GROUPS } from '@app/common';
-import { aiConfigured, aiModel, aiVisionModel } from './ai/ai-env';
+import { aiConfigured, aiModel, aiVisionModel } from './ai/env';
 
 @Controller()
 @UseInterceptors(AgentsHandleLogInterceptor)

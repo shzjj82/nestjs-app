@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { Logger } from '@nestjs/common';
 import { embeddedImages, type EmbeddedImage } from './embedded-images';
 import type { ExtractedAttachment } from './editorjs-text';
-import { mapPool } from '../common/map-pool';
+import { mapPool } from '../../support/map-pool';
 
 const logger = new Logger('AgentsRagAttach');
 

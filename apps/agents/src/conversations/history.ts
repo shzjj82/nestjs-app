@@ -1,4 +1,4 @@
-import type { NormalizedMessage } from '../chat/chat-messages';
+import type { NormalizedMessage } from '../chat/messages';
 
 export const CONVERSATION_HISTORY_LIMIT = 24;
 

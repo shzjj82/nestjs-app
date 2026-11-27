@@ -1,4 +1,4 @@
-import { mergeConversationHistory } from '../../src/conversations/conversation-history';
+import { mergeConversationHistory } from '../../src/conversations/history';
 
 describe('mergeConversationHistory', () => {
   it('keeps incoming messages for a new conversation', () => {

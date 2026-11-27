@@ -1,4 +1,4 @@
-import { editorJsImages } from '../../src/rag/editorjs-text';
+import { editorJsImages } from '../../src/rag/text/editorjs-text';
 import { textFromOcrMessage } from '../../src/ocr/ocr-client';
 
 describe('editorJsImages', () => {

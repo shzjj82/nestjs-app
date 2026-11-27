@@ -1,4 +1,4 @@
-import { requireBizCode } from '../../src/common/biz-scope';
+import { requireBizCode } from '../../src/support/biz-code';
 
 describe('requireBizCode', () => {
   it('accepts the gateway-injected business code', () => {

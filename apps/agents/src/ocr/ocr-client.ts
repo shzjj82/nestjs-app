@@ -1,4 +1,4 @@
-import { ocrApiBase, ocrApiKey, ocrModel } from '../ai/ai-env';
+import { ocrApiBase, ocrApiKey, ocrModel } from '../ai/env';
 
 const OCR_PROMPT =
   'Please output only the text content from the image without any additional descriptions or formatting.';

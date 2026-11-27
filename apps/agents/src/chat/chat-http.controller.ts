@@ -2,7 +2,7 @@ import { Body, Controller, Post, Res } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import type { Response } from 'express';
 import { ChatService } from './chat.service';
-import { encodeSse } from '../common/sse';
+import { encodeSse } from '../http/sse';
 
 @Controller()
 export class ChatHttpController {

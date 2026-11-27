@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { embeddedImages } from '../../src/rag/embedded-images';
+import { embeddedImages } from '../../src/rag/text/embedded-images';
 
 describe('embeddedImages', () => {
   it('reads images stored inside a docx zip', async () => {

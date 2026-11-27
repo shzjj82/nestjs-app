@@ -4,9 +4,9 @@ import { RpcException } from '@nestjs/microservices';
 import { randomBytes } from 'crypto';
 import { Repository } from 'typeorm';
 import { asRecord, optionalString, rpcFail } from '@app/common';
-import { aiApiBase, aiApiKey, aiTimeoutMs, aiVisionModel } from '../ai/ai-env';
-import { VisionImageEntity } from '../entities/vision-image.entity';
-import { VisionJobEntity } from '../entities/vision-job.entity';
+import { aiApiBase, aiApiKey, aiTimeoutMs, aiVisionModel } from '../ai/env';
+import { VisionImageEntity } from './image.entity';
+import { VisionJobEntity } from './job.entity';
 import { extractJson } from './extract-json';
 
 const PROMPT_MAX = 20_000;

@@ -6,7 +6,7 @@ import {
   aiEmbeddingModel,
   aiTimeoutMs,
   ragConfigured,
-} from '../ai/ai-env';
+} from '../ai/env';
 import { rpcFail } from '@app/common';
 
 /** 通义 text-embedding-v* 单次 batch 上限 10 */

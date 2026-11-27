@@ -1,4 +1,4 @@
-import { locateForRagSource } from '../../src/rag/rag-locate';
+import { locateForRagSource } from '../../src/rag/text/rag-locate';
 
 describe('locateForRagSource', () => {
   it('opens the page and then locates the excerpt', () => {

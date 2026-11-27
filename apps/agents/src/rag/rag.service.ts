@@ -16,18 +16,18 @@ import {
 } from '@app/common';
 import type Redis from 'ioredis';
 import { asRecord, optionalString, requiredString, rpcFail } from '@app/common';
-import { requireBizCode } from '../common/biz-scope';
-import { extractAttachmentTexts } from './attachment-text';
-import { chunkText } from './chunk';
+import { requireBizCode } from '../support/biz-code';
+import { extractAttachmentTexts } from './text/attachment-text';
+import { chunkText } from './text/chunk';
 import {
   editorJsAttachments,
   editorJsImages,
   editorJsToText,
   editorJsUnresolvedAttachments,
   resolvePublicFileUrl,
-} from './editorjs-text';
+} from './text/editorjs-text';
 import { OcrService } from '../ocr/ocr.service';
-import { locateForRagSource } from './rag-locate';
+import { locateForRagSource } from './text/rag-locate';
 import { EmbeddingService } from './embedding.service';
 import { RagPort } from './rag-port';
 import {
@@ -36,7 +36,7 @@ import {
   ragTodoFromRecord,
   todosFromEditorJs,
   type RagTodo,
-} from './todo-text';
+} from './text/todo-text';
 
 type IndexPayload = {
   appCode: string;

@@ -1,11 +1,11 @@
-import { chunkText } from '../../src/rag/chunk';
+import { chunkText } from '../../src/rag/text/chunk';
 import {
   editorJsAttachmentKeys,
   editorJsAttachments,
   editorJsToText,
   editorJsUnresolvedAttachments,
   resolvePublicFileUrl,
-} from '../../src/rag/editorjs-text';
+} from '../../src/rag/text/editorjs-text';
 
 describe('editorJsToText', () => {
   it('flattens common blocks and strips html', () => {

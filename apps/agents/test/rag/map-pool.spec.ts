@@ -1,4 +1,4 @@
-import { mapPool } from '../../src/common/map-pool';
+import { mapPool } from '../../src/support/map-pool';
 
 describe('mapPool', () => {
   it('keeps result order while overlapping the work', async () => {

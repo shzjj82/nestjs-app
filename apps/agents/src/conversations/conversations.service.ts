@@ -11,15 +11,15 @@ import type {
 } from '@app/common';
 import { toPage } from '@app/common';
 import { Repository } from 'typeorm';
-import { requireBizCode } from '../common/biz-scope';
+import { requireBizCode } from '../support/biz-code';
 import { asRecord, optionalString, requiredString, rpcFail } from '@app/common';
-import { ConversationMessageEntity } from '../entities/conversation-message.entity';
-import { ConversationEntity } from '../entities/conversation.entity';
-import type { NormalizedMessage } from '../chat/chat-messages';
+import { ConversationMessageEntity } from './message.entity';
+import { ConversationEntity } from './conversation.entity';
+import type { NormalizedMessage } from '../chat/messages';
 import {
   CONVERSATION_HISTORY_LIMIT,
   mergeConversationHistory,
-} from './conversation-history';
+} from './history';
 
 @Injectable()
 export class ConversationsService {

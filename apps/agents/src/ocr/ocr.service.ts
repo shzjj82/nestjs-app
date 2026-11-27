@@ -2,12 +2,12 @@ import { createHash, randomBytes } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { aiTimeoutMs, ocrConfigured, ocrModel } from '../ai/ai-env';
+import { aiTimeoutMs, ocrConfigured, ocrModel } from '../ai/env';
 import { asRecord, optionalString, rpcFail } from '@app/common';
-import { OcrCacheEntity } from '../entities/ocr-cache.entity';
-import { OcrItem, OcrJobEntity } from '../entities/ocr-job.entity';
+import { OcrCacheEntity } from './cache.entity';
+import { OcrItem, OcrJobEntity } from './job.entity';
 import { requestOcrText } from './ocr-client';
-import { mapPool } from '../common/map-pool';
+import { mapPool } from '../support/map-pool';
 
 const MAX_IMAGES = 9;
 const INDEX_IMAGES = 8;

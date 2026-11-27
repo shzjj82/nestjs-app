@@ -1,6 +1,6 @@
 import type { AgentChatAttachment, AgentChatInput } from '@app/common';
 import { asRecord, optionalString, rpcFail } from '@app/common';
-import { normalizeMessages } from './chat-messages';
+import { normalizeMessages } from './messages';
 
 export function parseChatInput(payload: unknown): AgentChatInput {
   const data = asRecord(payload);
